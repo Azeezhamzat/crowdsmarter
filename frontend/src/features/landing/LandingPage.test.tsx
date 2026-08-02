@@ -17,7 +17,10 @@ describe("LandingPage", () => {
     expect(screen.getByRole("img", { name: /signal sensing workflow/i })).toBeInTheDocument();
     expect(screen.getByRole("img", { name: /foresight-to-decision trace/i })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("tab", { name: /interpret/i }));
+    const senseTab = screen.getByRole("tab", { name: /sense/i });
+    senseTab.focus();
+    fireEvent.keyDown(senseTab, { key: "ArrowRight" });
+    expect(screen.getByRole("tab", { name: /interpret/i })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("img", { name: /systems and scenario interpretation/i })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /connect signals, systems, stakeholders, and uncertainty/i })).toBeInTheDocument();
   });

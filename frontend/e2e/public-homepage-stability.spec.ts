@@ -41,3 +41,33 @@ test("each workflow stage has a distinct meaningful illustration", async ({ page
     await expect(page.getByRole("img", { name: illustrationName })).toBeVisible();
   }
 });
+
+
+test("sticky navigation does not cover anchored section headings", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("link", { name: "How it works" }).click();
+
+  const headerBounds = await page.locator(".public-header--executive").boundingBox();
+  const headingBounds = await page.getByRole("heading", { name: /move from emerging change to better judgement/i }).boundingBox();
+
+  expect(headerBounds).not.toBeNull();
+  expect(headingBounds).not.toBeNull();
+  expect(headingBounds?.y ?? 0).toBeGreaterThanOrEqual((headerBounds?.height ?? 0) + 8);
+});
+
+test("public-site supporting copy meets the readability floor", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
+
+  const sizes = await page.evaluate(() => {
+    const workflowCopy = document.querySelector(".workflow-feature--executive p:not(.public-eyebrow)");
+    const capabilityCopy = document.querySelector(".product-capability-grid--executive .product-capability p");
+    const traceCaption = document.querySelector(".capability-trace-graphic figcaption");
+    const px = (element: Element | null) => element ? Number.parseFloat(getComputedStyle(element).fontSize) : 0;
+    return { workflow: px(workflowCopy), capability: px(capabilityCopy), trace: px(traceCaption) };
+  });
+
+  expect(sizes.workflow).toBeGreaterThanOrEqual(17);
+  expect(sizes.capability).toBeGreaterThanOrEqual(16);
+  expect(sizes.trace).toBeGreaterThanOrEqual(13);
+});

@@ -244,56 +244,38 @@ export function WorkflowIllustration({ stage }: WorkflowIllustrationProps) {
 }
 
 export function ForesightDecisionTrace() {
+  const stages = [
+    { number: "01", title: "Signal", detail: "Attributable change" },
+    { number: "02", title: "System", detail: "Drivers and relationships" },
+    { number: "03", title: "Scenario", detail: "Structured uncertainty" },
+    { number: "04", title: "Decision", detail: "Human authority" },
+  ];
+
   return (
-    <svg className="capability-trace-illustration" viewBox="0 0 620 260" role="img" aria-labelledby="foresight-trace-title foresight-trace-desc">
-      <title id="foresight-trace-title">Foresight-to-decision trace</title>
-      <desc id="foresight-trace-desc">A signal is interpreted through a system and scenarios before informing a governed decision.</desc>
-      <defs>
-        <linearGradient id="trace-line" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0" stopColor="#8cd3a5" />
-          <stop offset="1" stopColor="#d2b06e" />
-        </linearGradient>
-      </defs>
-      <path d="M88 130 H532" stroke="url(#trace-line)" strokeWidth="4" strokeLinecap="round" />
-      <g className="capability-trace__stage" transform="translate(44 80)">
-        <rect width="92" height="100" rx="18" fill="#285c44" stroke="#4b7a61" />
-        <circle cx="46" cy="31" r="15" fill="#92cfaa" />
-        <circle cx="46" cy="31" r="6" fill="#17382a" />
-        <text x="46" y="65" textAnchor="middle">SIGNAL</text>
-        <text x="46" y="82" textAnchor="middle" className="capability-trace__sub">Attributable</text>
-      </g>
-      <g className="capability-trace__stage" transform="translate(190 80)">
-        <rect width="92" height="100" rx="18" fill="#285c44" stroke="#4b7a61" />
-        <circle cx="34" cy="28" r="7" fill="#92cfaa" />
-        <circle cx="58" cy="27" r="7" fill="#c4a36a" />
-        <circle cx="46" cy="45" r="7" fill="#86aebf" />
-        <path d="M38 31 43 40 M54 32 49 40" stroke="#d9ecdf" strokeWidth="2" />
-        <text x="46" y="65" textAnchor="middle">SYSTEM</text>
-        <text x="46" y="82" textAnchor="middle" className="capability-trace__sub">Relationships</text>
-      </g>
-      <g className="capability-trace__stage" transform="translate(336 80)">
-        <rect width="92" height="100" rx="18" fill="#285c44" stroke="#4b7a61" />
-        <path d="M46 17 V49 M27 33 H65" stroke="#d9ecdf" strokeWidth="2" />
-        <rect x="28" y="18" width="13" height="11" rx="3" fill="#92cfaa" />
-        <rect x="51" y="18" width="13" height="11" rx="3" fill="#c4a36a" />
-        <rect x="28" y="38" width="13" height="11" rx="3" fill="#86aebf" />
-        <rect x="51" y="38" width="13" height="11" rx="3" fill="#76b88f" />
-        <text x="46" y="65" textAnchor="middle">SCENARIO</text>
-        <text x="46" y="82" textAnchor="middle" className="capability-trace__sub">Uncertainty</text>
-      </g>
-      <g className="capability-trace__stage capability-trace__stage--decision" transform="translate(482 70)">
-        <rect width="100" height="120" rx="20" fill="#f2f8f4" />
-        <circle cx="50" cy="33" r="17" fill="#17382a" />
-        <path d="M42 33 48 39 59 25" fill="none" stroke="#a9dbbd" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-        <text x="50" y="73" textAnchor="middle">DECISION</text>
-        <text x="50" y="91" textAnchor="middle" className="capability-trace__sub">Human authority</text>
-      </g>
-      <g fill="#d7eadf">
-        <circle cx="159" cy="130" r="6" />
-        <circle cx="305" cy="130" r="6" />
-        <circle cx="451" cy="130" r="6" />
-      </g>
-      <text x="310" y="228" textAnchor="middle" className="capability-trace__caption">Every link remains inspectable, attributable, and exportable</text>
-    </svg>
+    <figure
+      className="capability-trace-graphic"
+      role="img"
+      aria-labelledby="foresight-trace-title foresight-trace-desc"
+    >
+      <span id="foresight-trace-title" className="visually-hidden">Foresight-to-decision trace</span>
+      <span id="foresight-trace-desc" className="visually-hidden">
+        A signal is interpreted through a system and scenarios before informing a governed human decision.
+      </span>
+      <div className="capability-trace-graphic__flow" aria-hidden="true">
+        {stages.map((stage, index) => (
+          <div className="capability-trace-graphic__item" key={stage.title}>
+            <article className={index === stages.length - 1 ? "is-decision" : ""}>
+              <span className="capability-trace-graphic__number">{stage.number}</span>
+              <strong>{stage.title}</strong>
+              <small>{stage.detail}</small>
+            </article>
+            {index < stages.length - 1 ? (
+              <span className="capability-trace-graphic__arrow">→</span>
+            ) : null}
+          </div>
+        ))}
+      </div>
+      <figcaption>Every link remains inspectable, attributable, and exportable.</figcaption>
+    </figure>
   );
 }

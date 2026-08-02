@@ -56,6 +56,14 @@ const audiences = ["Strategy", "Transformation", "Innovation", "Risk", "Policy",
 
 export function LandingPage() {
   const [activeWorkflow, setActiveWorkflow] = useState(workflow[0]!);
+  const activeWorkflowIndex = workflow.findIndex((step) => step.key === activeWorkflow.key);
+
+  const focusWorkflowTab = (index: number) => {
+    const nextStep = workflow[index];
+    if (!nextStep) return;
+    setActiveWorkflow(nextStep);
+    document.getElementById(`workflow-tab-${nextStep.key}`)?.focus();
+  };
 
   return (
     <div className="public-site public-site--executive">
@@ -184,17 +192,40 @@ export function LandingPage() {
             {workflow.map((step, index) => (
               <button
                 key={step.key}
+                id={`workflow-tab-${step.key}`}
                 type="button"
                 role="tab"
+                aria-controls="workflow-panel"
                 aria-selected={activeWorkflow.key === step.key}
+                tabIndex={activeWorkflow.key === step.key ? 0 : -1}
                 className={activeWorkflow.key === step.key ? "is-active" : ""}
                 onClick={() => setActiveWorkflow(step)}
+                onKeyDown={(event) => {
+                  if (event.key === "ArrowRight") {
+                    event.preventDefault();
+                    focusWorkflowTab((activeWorkflowIndex + 1) % workflow.length);
+                  } else if (event.key === "ArrowLeft") {
+                    event.preventDefault();
+                    focusWorkflowTab((activeWorkflowIndex - 1 + workflow.length) % workflow.length);
+                  } else if (event.key === "Home") {
+                    event.preventDefault();
+                    focusWorkflowTab(0);
+                  } else if (event.key === "End") {
+                    event.preventDefault();
+                    focusWorkflowTab(workflow.length - 1);
+                  }
+                }}
               >
                 <span>{String(index + 1).padStart(2, "0")}</span><Icon name={step.icon} size={18} />{step.label}
               </button>
             ))}
           </div>
-          <div className="workflow-feature workflow-feature--executive" role="tabpanel">
+          <div
+            id="workflow-panel"
+            className="workflow-feature workflow-feature--executive"
+            role="tabpanel"
+            aria-labelledby={`workflow-tab-${activeWorkflow.key}`}
+          >
             <div>
               <p className="public-eyebrow">{activeWorkflow.label}</p>
               <h3>{activeWorkflow.title}</h3>

@@ -17,15 +17,3 @@ backend/media/
 .DS_Store
 .idea/
 .vscode/
-
-# Local CrowdSmarter runtime files
-frontend/node_modules/
-frontend/dist/
-build/
-coverage/
-venv/
-media/
-private_media/
-*.sql
-*.log
-crowdsmarter-local-access-*.txt
