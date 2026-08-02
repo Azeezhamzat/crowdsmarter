@@ -44,3 +44,6 @@ staticfiles/
 *.log
 *.tar.gz
 crowdsmarter-local-access-*.txt
+
+# Local Claude Code tooling (per-machine, not shared)
+.claude/
