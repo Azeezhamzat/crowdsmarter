@@ -1,0 +1,61 @@
+"""Thin REST endpoints for decision options."""
+
+from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
+from apps.decisions.selectors import decision_for_user
+
+from .permissions import CanEditDecisionOption
+from .selectors import option_for_user, options_for_decision
+from .serializers import (
+    DecisionOptionCreateSerializer,
+    DecisionOptionSerializer,
+    DecisionOptionUpdateSerializer,
+)
+from .services import create_option, update_option
+
+
+class DecisionOptionListCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, decision_id):  # type: ignore[no-untyped-def]
+        options = options_for_decision(user=request.user, decision_id=decision_id)
+        return Response(
+            DecisionOptionSerializer(options, many=True, context={"request": request}).data
+        )
+
+    def post(self, request, decision_id):  # type: ignore[no-untyped-def]
+        decision = decision_for_user(user=request.user, decision_id=decision_id)
+        serializer = DecisionOptionCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        option = create_option(actor=request.user, decision=decision, **serializer.validated_data)
+        return Response(
+            DecisionOptionSerializer(option, context={"request": request}).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class DecisionOptionDetailView(APIView):
+    permission_classes = [IsAuthenticated, CanEditDecisionOption]
+
+    def _get_object(self, request, option_id):  # type: ignore[no-untyped-def]
+        option = option_for_user(user=request.user, option_id=option_id)
+        self.check_object_permissions(request, option)
+        return option
+
+    def get(self, request, option_id):  # type: ignore[no-untyped-def]
+        option = self._get_object(request, option_id)
+        return Response(DecisionOptionSerializer(option, context={"request": request}).data)
+
+    def patch(self, request, option_id):  # type: ignore[no-untyped-def]
+        option = self._get_object(request, option_id)
+        serializer = DecisionOptionUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        option = update_option(
+            actor=request.user,
+            option=option,
+            fields=dict(serializer.validated_data),
+        )
+        return Response(DecisionOptionSerializer(option, context={"request": request}).data)
