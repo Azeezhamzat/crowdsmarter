@@ -1,0 +1,72 @@
+import pytest
+from django.urls import reverse
+
+from apps.decisions.models import Decision
+
+
+@pytest.mark.django_db
+def test_option_endpoint_create_list_and_withdraw(
+    api_client,
+    decision_factory,
+):  # type: ignore[no-untyped-def]
+    decision = decision_factory(status=Decision.Status.FRAMING)
+    api_client.force_authenticate(decision.owner)
+    collection = reverse("decision_options:list-create", kwargs={"decision_id": decision.id})
+
+    response = api_client.post(
+        collection,
+        {
+            "title": "Run a pilot",
+            "description": "Test the approach before wider adoption.",
+            "expected_benefits": "Local evidence with limited exposure.",
+            "tradeoffs": "The pilot delays full rollout.",
+            "is_status_quo": False,
+        },
+        format="json",
+    )
+
+    assert response.status_code == 201
+    assert api_client.get(collection).status_code == 200
+    detail = reverse("decision_options:detail", kwargs={"option_id": response.json()["id"]})
+    patch = api_client.patch(detail, {"status": "withdrawn"}, format="json")
+    assert patch.status_code == 200
+    assert patch.json()["status"] == "withdrawn"
+
+
+@pytest.mark.django_db
+def test_option_endpoint_rejects_unknown_field(
+    api_client,
+    decision_factory,
+):  # type: ignore[no-untyped-def]
+    decision = decision_factory(status=Decision.Status.FRAMING)
+    api_client.force_authenticate(decision.owner)
+
+    response = api_client.post(
+        reverse("decision_options:list-create", kwargs={"decision_id": decision.id}),
+        {
+            "title": "Valid title",
+            "description": "A sufficiently detailed option description.",
+            "selected_by_ai": True,
+        },
+        format="json",
+    )
+
+    assert response.status_code == 400
+    assert "selected_by_ai" in response.json()
+
+
+@pytest.mark.django_db
+def test_option_endpoint_is_tenant_isolated(
+    api_client,
+    user_factory,
+    decision_factory,
+):  # type: ignore[no-untyped-def]
+    decision = decision_factory(status=Decision.Status.FRAMING)
+    outsider = user_factory()
+    api_client.force_authenticate(outsider)
+
+    response = api_client.get(
+        reverse("decision_options:list-create", kwargs={"decision_id": decision.id})
+    )
+
+    assert response.status_code == 404
