@@ -33,7 +33,10 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgresql://crowdsmarter:crowdsmarter@db:5432/crowdsmarter}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/0}
-    command: sh -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
+    command: >-
+      sh -c "python -m crowdsmarter.wait_for_database
+      && python manage.py migrate
+      && python manage.py runserver 0.0.0.0:8000"
     volumes:
       - ./backend:/app
       - media_data:/app/media
@@ -42,6 +45,18 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import urllib.request;
+          urllib.request.urlopen('http://localhost:8000/health/live/', timeout=2)
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
 
   worker:
     build:
@@ -52,10 +67,34 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgresql://crowdsmarter:crowdsmarter@db:5432/crowdsmarter}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/0}
-    command: celery -A crowdsmarter worker --loglevel=INFO
+    command: >-
+      sh -c "python -m crowdsmarter.wait_for_database
+      && celery -A crowdsmarter worker --loglevel=INFO"
     volumes:
       - ./backend:/app
       - media_data:/app/media
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    profiles: ["workers"]
+
+  scheduler:
+    build:
+      context: ./backend
+      target: development
+    env_file: .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://crowdsmarter:crowdsmarter@db:5432/crowdsmarter}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/0}
+    command: >-
+      sh -c "python -m crowdsmarter.wait_for_database
+      && celery -A crowdsmarter beat --loglevel=INFO
+      --schedule=/tmp/celerybeat-schedule"
+    volumes:
+      - ./backend:/app
     depends_on:
       db:
         condition: service_healthy
@@ -69,6 +108,12 @@ services:
       target: development
     environment:
       VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api/v1}
+      VITE_PUBLIC_CONTACT_EMAIL: ${VITE_PUBLIC_CONTACT_EMAIL:-hello@crowdsmarter.com}
+      VITE_DEMO_EMAIL: ${VITE_DEMO_EMAIL:-hello@crowdsmarter.com}
+      VITE_SUPPORT_EMAIL: ${VITE_SUPPORT_EMAIL:-hello@crowdsmarter.com}
+      VITE_PRIVACY_EMAIL: ${VITE_PRIVACY_EMAIL:-hello@crowdsmarter.com}
+      VITE_SECURITY_EMAIL: ${VITE_SECURITY_EMAIL:-hello@crowdsmarter.com}
+      VITE_ADMIN_BASE_URL: ${VITE_ADMIN_BASE_URL:-http://localhost:8000/admin/}
     command: npm run dev -- --host 0.0.0.0
     volumes:
       - ./frontend:/app
@@ -76,7 +121,8 @@ services:
     ports:
       - "5173:5173"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
 
 volumes:
   postgres_data:

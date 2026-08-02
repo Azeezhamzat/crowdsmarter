@@ -40,3 +40,27 @@ def membership_for_user(*, user: User, membership_id: UUID) -> Membership:
         ),
         id=membership_id,
     )
+
+
+def membership_events_for_organisation(*, user: User, organisation_id: UUID):
+    """Return append-only membership history after tenant access is established."""
+    organisation = organisation_for_user(user=user, organisation_id=organisation_id)
+    return organisation.membership_events.select_related("user", "actor")
+
+
+def deletion_requests_for_organisation(*, user: User, organisation_id: UUID):
+    """Return deletion-request history after tenant access is established."""
+    organisation = organisation_for_user(user=user, organisation_id=organisation_id)
+    return organisation.deletion_requests.select_related("requested_by", "cancelled_by")
+
+
+def deletion_request_for_user(*, user: User, request_id: UUID):
+    """Fetch a deletion request without revealing another tenant."""
+    from .models import OrganisationDeletionRequest
+
+    return get_object_or_404(
+        OrganisationDeletionRequest.objects.select_related("organisation", "requested_by", "cancelled_by").filter(
+            organisation__in=Organisation.objects.for_user(user)
+        ),
+        id=request_id,
+    )

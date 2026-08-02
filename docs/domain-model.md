@@ -123,7 +123,7 @@ An append-only attributable record of a material action. It stores tenant, actio
 8. Submitted positions are immutable and attributable to the participant who submitted them.
 9. Every active decision owner and decision maker must have a current position before finalisation.
 10. Finalisation must select an active option from the same decision and cannot be edited or deleted.
-11. Later lifecycle states remain blocked until their supporting domain records are implemented.
+11. Every lifecycle transition through archival requires its supporting domain record and an attributable authorised command.
 
 ## DecisionReview
 
@@ -141,3 +141,134 @@ The record is created at `Commitment`, progressively completed through `Outcome 
 ## Lesson
 
 A decision may have multiple lessons after outcome review. Each lesson records a concise title, detailed insight, category, applicability, recommended organisational change, creator, and active/retired state. At least one active lesson is required before archival. Lessons remain searchable organisational knowledge after the decision is archived.
+
+## Phase 6 models and read models
+
+### Notification
+
+A `Notification` belongs to one organisation and recipient, may reference a decision, and records kind, title, message, internal URL, metadata, deduplication key, and read time. Recipient plus non-empty deduplication key is unique. Notification reads never grant access to the referenced domain object; ordinary tenant permissions still apply when the user opens its URL.
+
+### AIReview
+
+An `AIReview` belongs to one organisation and decision and records the requesting human, provider identity, prompt/schema version, input fingerprint, private input snapshot, structured output or safe failure, and mutually exclusive human acknowledgement or dismissal. The review is append-only advisory context and is not part of the decision-authority state machine.
+
+### Organisation analytics
+
+Analytics have no write model in Phase 6. They are tenant-scoped read models computed from decisions, transitions, active participants, decision reviews, and active lessons. This avoids duplicated truth and a premature analytics warehouse.
+
+## Collaboration
+
+`DiscussionEntry` belongs directly to an organisation and decision. It records an author, kind, immutable body, optional parent entry, mentioned users, and optional resolution record. Only questions and concerns may be resolved. Resolution fields are additive and attributable.
+
+## Portfolio read models
+
+Portfolio services do not own persisted domain state. They derive personal accountability, due dates, unresolved discussion counts, and organisation-level decision lists from decisions, participants, reviews, positions, notifications, and collaboration records.
+
+## Phase 10 derived export artefacts
+
+Exports are generated artefacts, not authoritative database entities. The organisation archive and decision dossier contain stable identifiers from the authoritative domain records plus a manifest with schema version and generation time. No export model is persisted, avoiding duplicate customer state and storage cost. Audit events record the human download action.
+
+
+## Foresight and source intelligence
+
+### FeedSubscription
+
+A manually synchronised RSS or Atom feed belonging to one organisation. It records a public feed URL, accountable owner, conditional-request metadata, and the latest success or safe failure. Feed entries become unassessed `Source` records only.
+
+### Source
+
+An attributable input for foresight and decision evidence. It records source type, author, publisher, publication date, URL or reference, credibility assessment and rationale, lifecycle status, optional supersession, feed provenance, and creator. A source can support multiple signals and evidence records.
+
+### SourceAttachment
+
+A private file linked to one source. It preserves the original file name, verified MIME type, size, SHA-256 digest, uploader, and storage reference. Storage paths use generated identifiers rather than customer-supplied names. Files are tenant-authorised at download time and included in customer exports when available.
+
+### Signal
+
+A human interpretation of an observed change and its potential future implication. It records one STEEP category, strategic time horizon, maturity, opportunity/threat polarity, geography, domain, impact, uncertainty, accountable owner, review state, and optional source. `impact × uncertainty` is an attention aid, not an automated priority decision.
+
+### Watchlist
+
+An organisation-owned, accountable collection of signals for one continuing strategic concern. Watchlists preserve attention over time without changing the underlying signal records.
+
+### SignalDecisionLink
+
+An explicit, attributable explanation of why a signal matters to one decision. The signal and decision must belong to the same organisation. The link informs human reasoning but never mutates the decision lifecycle.
+
+## Phase 12 systems-foresight model
+
+- **ForesightCanvas** bounds a focal question, scope, horizon year, status, and accountable owner.
+- **Driver** represents a trend, force, critical uncertainty, predetermined element, or wild card and may be grounded in multiple signals.
+- **SystemStakeholder** records an actor's role, interests, influence, exposure, and stance.
+- **CausalRelationship** records one directed mechanism with polarity, strength, delay, and rationale.
+- **FeedbackLoop** records a human-interpreted reinforcing, balancing, mixed, or uncertain loop across at least two drivers.
+- **FuturesWheelConsequence** records first-, second-, or third-order consequences.
+- **ThreeHorizonItem** places current pressures, transition activity, or emerging futures in a time-oriented view.
+- **StrategicImplication** converts analysis into an owned opportunity, threat, capability need, policy implication, or decision requirement and may link to a decision.
+
+## Phase 13 scenario-intelligence model
+
+- **ScenarioSet** is a governed 2×2 exercise on one foresight canvas, defined by two different active critical uncertainties, meaningful endpoint labels, an accountable owner, and an optional same-tenant decision.
+- **Scenario** is one human-authored world in a unique quadrant with an explicit code, headline, narrative, assumptions, opportunities, threats, and review state.
+- **ScenarioDriverState** records how a canvas driver behaves and how salient it is within one scenario.
+- **ScenarioReview** preserves one attributable structured review per member and exposes aggregate criteria plus confidence dispersion.
+- **WindTunnelAssessment** tests one active option from the linked decision against one scenario without changing option or decision state.
+- **ScenarioImplicationLink** explains how an existing strategic implication is amplified, reduced, changed, or triggered in a scenario.
+- **Signpost** is an owned observable indicator with a threshold, direction, cadence, status, and explicit scenario relationships.
+- **SignpostObservation** is a dated human assessment of a signpost and may reference an existing same-tenant source.
+
+## Phase 14 collective-evaluation model
+
+- **EvaluationExercise** binds one decision to a scorecard, approval, consent, or Delphi method and records ownership, identity treatment, sealed-result policy, quorum, and applicable thresholds.
+- **EvaluationCriterion** defines a weighted bounded scale for scorecard exercises.
+- **EvaluationRound** creates a controlled contribution period and, for Delphi, a facilitator-authored feedback bridge to the next round.
+- **EvaluationSubmission** preserves one participant's confidence-rated contribution in one round.
+- **EvaluationResponse** records an option score or method-specific ballot with rationale.
+- **MinorityReport** preserves an attributable dissenting analysis and alternative recommendation linked to an exercise and optional round.
+- **PrioritisationPortfolio** defines an organisation-level comparison, resource envelope, ownership, identity mode, and blind-result policy.
+- **PortfolioCriterion** defines a positive-weight value dimension.
+- **PortfolioCandidate** links one same-tenant decision with resource requirements, mandatory status, and inclusion rationale.
+- **PortfolioAssessment** preserves one contributor's criterion score, confidence, and rationale.
+- **PortfolioSelection** records the accountable authority's actual inclusion or exclusion, ordering, approved resources, and rationale independently of the recommendation.
+
+Aggregated evaluation results and constrained recommendations are derived read models. They are not authoritative decisions and are not persisted as organisational truth.
+
+## Phase 15 decision-analysis records
+
+### DecisionIssue
+
+A human-accepted gap or contradiction associated with one decision and optionally one option, evidence item, assumption, risk, evaluation exercise, or scenario set. Types cover evidence contradiction, missing evidence, unsupported assumption, stakeholder gap, unresolved objection, scenario vulnerability, resource uncertainty, implementation uncertainty, and other.
+
+Each issue has severity, status, an active-member owner, optional due date, creation attribution, and resolution attribution. Linked records must share the same decision and organisation. Resolved issues require resolution text, resolver, and timestamp.
+
+### DecisionQualityReview
+
+A versioned human judgement over a bounded checklist. Answers are `yes`, `partly`, `no`, or `not_applicable`; overall judgement is `not_ready`, `ready_with_conditions`, or `ready`. A decision may have one draft and one current published review. Publishing supersedes the earlier published version. Published and superseded reviews are immutable.
+
+### ExecutiveDecisionSummary
+
+A structured versioned synthesis containing context, options, evidence, uncertainty, stakeholder, scenario, evaluation, risk, unresolved-issue, proposed-judgement, condition, and implementation sections. A decision may have one draft and one current approved summary. Approval requires a proposed judgement plus human approval attribution. Approved and superseded summaries are immutable.
+
+## Phase 15.1 public demo requests
+
+`DemoRequest` is deliberately outside the organisation aggregate. It records a prospective contact's name, work email, organisation, role, organisation-size band, primary need, optional decision context, contact consent, operational status, and timestamps. It has no membership, decision, or tenant relationship and cannot create any of them. Status changes are limited to Django administration in this release.
+
+## Contribution orchestration
+
+- `FacilitationSession`: one bounded workshop attached to one decision, with an attributable facilitator and forward-only state.
+- `SessionParticipant`: an invited organisation member, workshop role, and attendance state.
+- `ContributionRequest`: the bounded requested output, assignee, optional reviewer, optional option/session links, priority, due date, and governed workflow state.
+- `ContributionSubmission`: one mutable assignee draft or an immutable submitted revision with a per-request sequence.
+- `ContributionReview`: an append-only review outcome and guidance linked to a submitted revision.
+- `ContributionPreference`: one user's reminder and email-delivery settings inside one organisation.
+
+Tenant and decision duplication on child records is intentional: it supports direct tenant filtering, export, audit, and invariant validation.
+
+## Phase 17 domain additions
+
+- `DecisionMethod`: stable organisation-owned method identity and lifecycle.
+- `DecisionMethodVersion`: draft or human-approved prompt set; immutable after approval.
+- `DecisionMethodUsage`: permanent link between one decision and the exact approved version used.
+- `MembershipEvent`: append-only record of access, role, removal, and ownership changes.
+- `OrganisationDeletionRequest`: delayed owner request; no automatic hard deletion.
+- `Organisation` administrative fields: profile, branding, invitation policy, default role, retention wait, and deactivation state.

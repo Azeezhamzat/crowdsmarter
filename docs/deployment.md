@@ -68,3 +68,42 @@ Do not run Redis or Celery solely because they are in the technology stack. Star
 5. Add stateless backend replicas behind a load balancer.
 6. Add worker replicas by queue depth.
 7. Consider orchestration only when deployment complexity justifies it.
+
+## Phase 6 operational configuration
+
+The default AI provider requires no key:
+
+```env
+AI_PROVIDER_BACKEND=apps.ai_assistance.providers.rules.RuleBasedAIProvider
+API_AI_REVIEW_THROTTLE_RATE=20/hour
+```
+
+Core workflows, AI requests, analytics, and ordinary notifications run in the web process. Due-review delivery can be invoked manually:
+
+```bash
+docker compose exec backend python manage.py send_due_review_notifications
+```
+
+For scheduled daily delivery, start the optional profiles:
+
+```bash
+docker compose --profile workers up -d worker scheduler
+```
+
+A future external provider is enabled by installing its adapter in the backend image and changing `AI_PROVIDER_BACKEND`. This change must not require modifications to decision-domain code.
+
+## Phase 11 storage and feed configuration
+
+Local Docker development uses the existing private media volume mounted at `/app/media`. No new service is required.
+
+Relevant environment variables:
+
+```text
+SOURCE_ATTACHMENT_MAX_BYTES=15728640
+SOURCE_ATTACHMENT_ALLOWED_CONTENT_TYPES=application/pdf,text/plain,text/csv,application/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/png,image/jpeg,image/webp
+SOURCE_ATTACHMENT_ALLOWED_EXTENSIONS=.pdf,.txt,.csv,.docx,.xlsx,.png,.jpg,.jpeg,.webp
+FORESIGHT_FEED_ALLOWED_DOMAINS=
+API_FORESIGHT_FEED_SYNC_THROTTLE_RATE=20/hour
+```
+
+Production should configure a private S3-compatible Django storage backend and an explicit comma-separated feed-domain allowlist. Leaving `FORESIGHT_FEED_ALLOWED_DOMAINS` empty disables production feed creation and retrieval safely. Storage migration changes Django `STORAGES` configuration rather than foresight domain code.

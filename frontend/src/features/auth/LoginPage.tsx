@@ -7,6 +7,7 @@ import { z } from "zod";
 
 import { FieldError } from "../../components/FieldError";
 import { Icon } from "../../components/Icon";
+import { buildMailto, contactChannels } from "../../config/contact";
 import { ApiError } from "../../lib/api";
 import { loginWithPassword } from "./api";
 
@@ -40,7 +41,7 @@ export function LoginPage() {
   const hasCredentialError = login.error instanceof ApiError && login.error.status === 400;
 
   return (
-    <main className="auth-layout auth-layout--executive">
+    <main id="main-content" className="auth-layout auth-layout--executive" tabIndex={-1}>
       <section className="auth-introduction auth-introduction--executive" aria-labelledby="product-title">
         <Link className="auth-brand" to="/">
           <span className="public-brand__mark" aria-hidden="true"><span /><span /><span /></span>
@@ -131,6 +132,11 @@ export function LoginPage() {
             <Icon name="users" size={18} />
             <div><strong>Do you not have an account yet?</strong><span>Accounts are normally created through an organisation invitation.</span></div>
             <Link to="/request-demo">Request demo</Link>
+          </div>
+          <div className="auth-support-contact">
+            <Icon name="shield" size={17} />
+            <span>Account access issue?</span>
+            <a href={buildMailto(contactChannels.support, "CrowdSmarter account access support")}>{contactChannels.support}</a>
           </div>
           <Link className="public-text-link auth-back-link" to="/"><Icon name="arrow-right" size={16} />Return to the public site</Link>
         </div>

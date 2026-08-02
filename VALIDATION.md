@@ -1,67 +1,56 @@
-# Validation status
+# Phase 17 validation report
 
-## Completed in this release environment
+## Static validation completed on the exact release tree
 
-- Python AST parsing and bytecode compilation across 274 backend source and migration files.
-- Local absolute-import resolution for the `apps` and `crowdsmarter` packages.
-- Python line-length checks for all 242 non-migration backend files, with no lines over 100 characters.
-- JSON, TOML, and YAML parsing across repository configuration.
-- Shell syntax validation for all repository scripts, including the Phase 5 one-terminal upgrade script.
-- TypeScript compiler parsing across 55 TypeScript and TSX files, including frontend source, tests, configuration, and Playwright specifications, with zero syntax errors. Full type resolution requires the project dependency tree.
-- CSS structural-balance checks.
-- Source scans for merge markers, unresolved implementation markers, and packaged private-key indicators.
-- Manual model/migration consistency review for `reviews.DecisionReview` and `lessons.Lesson`.
-- Manual review of tenant isolation, post-finalisation authority, optimistic concurrency, implementation-owner transfer, offboarding protection, archive immutability, lesson retirement, search scoping, and generic-transition bypass prevention.
-- Public-route review confirming that `/` performs no authenticated API call and `/app` remains protected by Django session verification.
-- Documentation consistency review for the complete eleven-state lifecycle and the single-deployment public/product architecture.
-- Test inventory review: 181 backend test functions across 55 backend test files; eight focused review tests, six lesson tests, three PostgreSQL search tests; nine frontend unit-test files; and two Playwright specifications.
+The Phase 17 source is checked for:
 
-## Supplied but not executable in this release environment
+- Python syntax across the complete backend and migration tree;
+- TypeScript/TSX structural parsing and relative-import resolution;
+- model-to-migration field coverage for organisation, methodology, and decision additions;
+- Django app and route registration;
+- method visibility, approval, decision-provenance, search, export, and navigation wiring;
+- JSON, TOML, YAML, CSS, Markdown-link, and shell-script structure;
+- absence of `.env`, credentials, dependency directories, caches, and generated build output;
+- independent ZIP integrity and SHA-256 verification.
 
-The release-building environment does not contain Django/DRF or the project npm dependency tree. Docker is also unavailable. Runtime claims are therefore deliberately limited. The following checks are supplied but are not claimed as executed here:
+## Runtime gates enforced by the upgrader
 
-```bash
-cd backend
-python manage.py check
-python manage.py makemigrations --check --dry-run
-ruff check .
-ruff format --check .
-mypy crowdsmarter apps
-pytest --cov=apps --cov-report=term-missing --cov-fail-under=85
+Before reporting success, `upgrade-crowdsmarter-to-phase17.sh` runs inside the built containers:
 
-cd ../frontend
-npm run lint
-npm run typecheck
-npm test -- --run
-npm run build
-npm run test:e2e
-```
+1. PostgreSQL readiness and container DNS checks;
+2. Django migrations;
+3. secure debug-only provisioning of `hello@crowdsmarter.com`;
+4. `manage.py check`;
+5. migration-drift verification;
+6. methodology and organisation-administration tests;
+7. authentication, invitation, decision, contribution, search, export, and analysis regressions;
+8. full frontend TypeScript checking;
+9. focused methodology, administration, navigation, authentication, landing, and demo-request tests;
+10. the production Vite build;
+11. backend, homepage, login, application, methods, and administration route health checks.
 
-## Checks performed by the one-terminal upgrade script
+## Local login boundary
 
-The supplied Linux upgrade script verifies the archive checksum, preserves the existing database and Phase 4 source, builds the Docker images, applies migrations, and uses the installed container dependencies to run:
+The upgrader creates or repairs `hello@crowdsmarter.com` only when `DJANGO_DEBUG=true`. It assigns a generated strong password, ensures an active owner membership, and writes the secret to a mode-`0600` file in `~/Downloads`. The requested weak password `Admin1` is not embedded, printed, or placed in shell history.
 
-```bash
-docker compose exec backend python manage.py check
-docker compose exec backend python manage.py makemigrations --check --dry-run
-docker compose exec backend python manage.py showmigrations reviews lessons decisions
-docker compose exec backend pytest \
-  apps/reviews \
-  apps/lessons \
-  apps/search \
-  apps/organisations/tests/test_services.py::test_remove_member_requires_active_implementation_transfer \
-  apps/decisions/tests/test_services.py::test_post_decision_transition_uses_dedicated_outcome_workflow
+## Environment limitation
 
-docker compose exec frontend npm run typecheck
-docker compose exec frontend npm test -- --run \
-  src/features/landing/LandingPage.test.tsx \
-  src/features/outcomes/DecisionOutcomesPage.test.tsx \
-  src/features/search/OrganisationSearchPage.test.tsx
-docker compose exec frontend npm run build
-```
+The release-building environment does not include Django, DRF, the complete npm dependency tree, or Docker. Dependency-backed tests and builds cannot be executed during packaging. They remain mandatory in the supplied upgrader, which cannot report Phase 17 success unless they pass.
 
-The script stops on the first failed check, prints backend diagnostics, and preserves both a PostgreSQL dump and the previous Phase 4 source directory. A successful migration-drift check must report `No changes detected`.
 
-## Production gate still required
+## Phase 17.2 release validation
 
-Before public deployment, run the complete PostgreSQL-backed backend suite, frontend lint/typecheck/unit/build suite, and Playwright tests against the production same-origin container. Rehearse database backup and restoration, complete an independent accessibility review of both public and authenticated routes, and perform an independent security review before storing customer data.
+Phase 17.2 adds a frontend-only gate covering TypeScript, focused Vitest regression tests, the Vite production build, the working Request Demo route, five semantically labelled workflow illustrations, and the foresight-to-decision trace. The downloadable installer does not run database commands.
+## Phase 17.3 release validation
+
+Phase 17.3 adds a frontend-only readability gate covering sticky-header anchor clearance, minimum supporting-copy font sizes, stronger text contrast, keyboard-operable workflow tabs, enlarged workflow diagrams, and a responsive semantic foresight-to-decision trace. The installer prevalidates the complete candidate before replacing the live frontend and runs no database commands.
+
+## Phase 18A release validation
+
+Phase 18A adds frontend-only accessibility gates covering route-aware document titles, polite route announcements, working skip navigation, one main landmark per public route, nested-main removal in authenticated workspaces, keyboard-complete workflow tabs, command-palette focus containment and restoration, labelled public forms, a named not-found recovery page, minimum target sizing, focus visibility, reduced motion, increased contrast, and forced-colours behaviour. The atomic installer prevalidates TypeScript, focused Vitest suites, and the production build before replacing the live frontend. It runs no migration or PostgreSQL command.
+
+## Phase 18B platform-governance validation
+
+The release packaging gate verifies Python and TypeScript syntax, relative imports, configuration parsing, documentation links, migration numbering, archive integrity, repository hygiene, and absence of private environment files. The upgrade installer is the authoritative runtime gate: it builds the exact candidate images, runs Django migration-drift and governance tests, runs TypeScript and Vitest regression checks, and completes a production frontend build before touching the live source.
+
+Post-installation checks verify both platform-admin migrations, the explicit capability for the named operator, public contact configuration, application health, and the rule that only marked simulated organisations receive automatic owner membership.

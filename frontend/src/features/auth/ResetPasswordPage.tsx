@@ -32,7 +32,7 @@ export function ResetPasswordPage() {
   const linkMissing = !tokenParts.uid || !tokenParts.token;
 
   return (
-    <main className="auth-layout auth-layout--premium">
+    <main id="main-content" className="auth-layout auth-layout--premium" tabIndex={-1}>
       <section className="auth-introduction auth-introduction--premium" aria-labelledby="new-password-product-title">
         <Link className="auth-brand" to="/"><span className="public-brand__mark" aria-hidden="true"><span /><span /><span /></span><strong>The CrowdSmarter</strong></Link>
         <div className="auth-introduction__content">

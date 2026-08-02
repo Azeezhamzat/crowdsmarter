@@ -15,6 +15,7 @@ from .policies import (
 from .reasoning import reasoning_summary
 from .reasoning_policies import can_contribute_reasoning
 from .services import available_transition
+from .templates import template_for_key
 
 
 class DecisionUserSerializer(serializers.ModelSerializer):
@@ -77,6 +78,9 @@ class DecisionDetailSerializer(serializers.ModelSerializer):
             "context",
             "scope",
             "contribution_guidance",
+            "source_template_key",
+            "source_template_version",
+            "source_method_version_id",
             "urgency",
             "target_decision_date",
             "contribution_deadline",
@@ -142,16 +146,42 @@ class DecisionDetailSerializer(serializers.ModelSerializer):
 
 
 class DecisionCreateSerializer(StrictSerializer):
-    """Input contract for a new draft."""
+    """Input contract for a new draft, including guided framing fields."""
 
+    template_key = serializers.CharField(max_length=80, required=False, default="blank")
+    method_version_id = serializers.UUIDField(required=False, allow_null=True, default=None)
     title = serializers.CharField(max_length=240, trim_whitespace=True)
     decision_question = serializers.CharField(
-        max_length=4000,
-        trim_whitespace=True,
-        allow_blank=True,
-        required=False,
+        max_length=4000, trim_whitespace=True, allow_blank=True, required=False, default=""
     )
+    purpose = serializers.CharField(
+        max_length=8000, trim_whitespace=True, allow_blank=True, required=False, default=""
+    )
+    context = serializers.CharField(
+        max_length=12000, trim_whitespace=True, allow_blank=True, required=False, default=""
+    )
+    scope = serializers.CharField(
+        max_length=8000, trim_whitespace=True, allow_blank=True, required=False, default=""
+    )
+    contribution_guidance = serializers.CharField(
+        max_length=8000, trim_whitespace=True, allow_blank=True, required=False, default=""
+    )
+    urgency = serializers.ChoiceField(
+        choices=Decision.Urgency.choices, required=False, default=Decision.Urgency.NORMAL
+    )
+    target_decision_date = serializers.DateField(required=False, allow_null=True, default=None)
+    contribution_deadline = serializers.DateTimeField(required=False, allow_null=True, default=None)
     owner_id = serializers.UUIDField(required=False)
+
+    def validate_template_key(self, value: str) -> str:
+        if value and template_for_key(value) is None:
+            raise serializers.ValidationError("Choose a recognised decision template.")
+        return value
+
+    def validate(self, attrs):  # type: ignore[no-untyped-def]
+        if attrs.get("method_version_id") and attrs.get("template_key") not in {"", "blank"}:
+            raise serializers.ValidationError("Choose either a built-in template or an organisation method.")
+        return attrs
 
 
 class DecisionUpdateSerializer(StrictSerializer):

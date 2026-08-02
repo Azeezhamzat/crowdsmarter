@@ -25,6 +25,7 @@ describe("RequestDemoPage", () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ detail: "Thank you. Your request has been received.", reference: "request-123" }), { status: 202, headers: { "content-type": "application/json" } }));
 
     renderPage();
+    expect(screen.getByRole("link", { name: "hello@crowdsmarter.com" })).toHaveAttribute("href", expect.stringContaining("mailto:hello@crowdsmarter.com"));
     fireEvent.change(screen.getByLabelText("Full name *"), { target: { value: "Amina Yusuf" } });
     fireEvent.change(screen.getByLabelText("Work email *"), { target: { value: "AMINA@EXAMPLE.COM" } });
     fireEvent.change(screen.getByLabelText("Organisation *"), { target: { value: "Northstar Strategy" } });

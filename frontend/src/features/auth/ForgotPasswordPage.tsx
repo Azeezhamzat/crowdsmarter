@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { FieldError } from "../../components/FieldError";
 import { Icon } from "../../components/Icon";
+import { buildMailto, contactChannels } from "../../config/contact";
 import { StatusMessage } from "../../components/StatusMessage";
 import { ApiError } from "../../lib/api";
 import { requestPasswordReset } from "./api";
@@ -18,7 +19,7 @@ export function ForgotPasswordPage() {
   const reset = useMutation({ mutationFn: requestPasswordReset });
 
   return (
-    <main className="auth-layout auth-layout--premium">
+    <main id="main-content" className="auth-layout auth-layout--premium" tabIndex={-1}>
       <section className="auth-introduction auth-introduction--premium" aria-labelledby="recovery-product-title">
         <Link className="auth-brand" to="/"><span className="public-brand__mark" aria-hidden="true"><span /><span /><span /></span><strong>The CrowdSmarter</strong></Link>
         <div className="auth-introduction__content">
@@ -57,6 +58,11 @@ export function ForgotPasswordPage() {
               <button className="button button--primary button--full button--large" type="submit" disabled={reset.isPending}>{reset.isPending ? "Sending…" : "Send reset link"}</button>
             </form>
           )}
+          <div className="auth-support-contact auth-support-contact--recovery">
+            <Icon name="users" size={17} />
+            <span>Still unable to recover access?</span>
+            <a href={buildMailto(contactChannels.support, "CrowdSmarter password recovery support")}>{contactChannels.support}</a>
+          </div>
           <Link className="public-text-link auth-back-link" to="/login">Return to sign in</Link>
         </div>
       </section>

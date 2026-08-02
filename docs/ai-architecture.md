@@ -1,47 +1,35 @@
 # AI assistance architecture contract
 
-AI assistance is deferred until the underlying decision records and review workflow are valuable without it. When introduced, it will follow these constraints.
+AI is a supporting capability. Human judgement comes first, and no provider can select an option, submit a stakeholder position, finalise a decision, change lifecycle state, or silently modify an organisational record.
 
 ## Provider boundary
 
-Application services depend on an internal interface, not a vendor SDK. A provider adapter is responsible for:
+Application services depend on the `AIProvider` protocol in `apps.ai_assistance.providers.base`, not a vendor SDK. `AI_PROVIDER_BACKEND` selects a provider by import path. An adapter is responsible for invocation, credentials, timeouts, provider usage metadata, normalised structured output, and safe error translation.
 
-- model invocation;
-- authentication and endpoint configuration;
-- timeout/retry translation;
-- provider usage metadata;
-- normalising structured output;
-- redacting provider-specific errors.
-
-Provider names, model identifiers, and credentials are configuration. Domain records never contain provider SDK objects.
+Phase 6 uses `RuleBasedAIProvider` by default. It is deterministic, local, transparent, and zero-cost. It reviews only the decision snapshot supplied by the service and makes no network request.
 
 ## Assistance record
 
-Each generated result is persisted as a reviewable assistance record containing:
+Every request creates an `AIReview` containing:
 
 - organisation and decision scope;
-- assistance type;
-- provider and model identifier;
-- prompt/template version;
-- source record identities and versions;
-- generated output;
-- creation time and initiating human/system actor;
-- status: pending review, accepted as reference, dismissed, or superseded;
-- reviewer and review rationale;
-- usage/cost metadata where available;
-- failure details safe for customer display.
+- requesting human;
+- provider, model or rules identifier, and prompt/schema version;
+- private source snapshot and SHA-256 fingerprint;
+- status, output, safe failure message, and timestamps;
+- immutable human acknowledgement notes or dismissal reason.
 
-AI output does not overwrite evidence, assumptions, risks, positions, or decision rationale. A human may use an assistance result to propose an explicit record change, which follows the ordinary audited workflow.
+The API does not expose the private source snapshot. Output remains separate from evidence, assumptions, risks, positions, finalisation, outcomes, and lessons. A human may act on a finding only through the ordinary permissioned and audited workflow.
 
-## Permitted responsibilities
+## Phase 6 review responsibilities
 
-- summarise existing contributions;
-- identify potentially missing evidence;
-- identify unsupported assumptions;
-- identify contradictions for human review;
-- suggest potentially missing stakeholder categories;
-- retrieve similar historical decisions;
-- highlight risks already implied by the record.
+- identify absent or option-unspecific evidence;
+- highlight unverified or invalidated assumptions;
+- expose directly opposing evidence stances;
+- identify missing stakeholder roles;
+- highlight material recorded risks;
+- retrieve similar historical decisions using transparent term overlap;
+- explain limitations and provenance.
 
 ## Prohibited behaviour
 
@@ -49,10 +37,11 @@ AI output does not overwrite evidence, assumptions, risks, positions, or decisio
 - changing lifecycle state;
 - silently creating or modifying organisational records;
 - representing generated claims as verified evidence;
-- concealing provider/model provenance;
-- making dismissal difficult;
-- using customer data for a provider purpose not covered by contract and configuration.
+- concealing provider or model provenance;
+- overwriting human acknowledgement or dismissal;
+- making the core workflow depend on provider availability;
+- sending customer data to a provider not covered by deployment configuration and contract.
 
-## Zero-cost mode
+## Adding a provider
 
-The application must function with AI disabled. Development may use a deterministic fake adapter and optionally a locally operated model adapter. No paid model request may be required to create, review, finalise, implement, or learn from a decision.
+A new adapter must implement the internal protocol, return `AIReviewOutput`, avoid database mutation, redact provider-specific errors, and be tested with deterministic fixtures. Before production use, document data sent, purpose, retention, training use, region, credentials, timeouts, retries, rate limits, cost controls, and the configuration-only rollback path.

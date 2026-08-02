@@ -376,3 +376,175 @@ def test_remove_member_requires_active_implementation_transfer(
 
     with pytest.raises(OrganisationServiceError, match="implementation ownership"):
         remove_membership(actor=owner, membership=membership)
+
+@pytest.mark.django_db
+def test_active_foresight_canvas_ownership_must_be_transferred_before_offboarding(
+    user_factory, organisation_factory
+):  # type: ignore[no-untyped-def]
+    from apps.foresight.mapping_services import create_canvas
+
+    owner = user_factory()
+    departing_member = user_factory()
+    organisation = organisation_factory(owner=owner)
+    membership = Membership.objects.create(
+        organisation=organisation,
+        user=departing_member,
+        role=Membership.Role.CONTRIBUTOR,
+    )
+    create_canvas(
+        actor=owner,
+        organisation=organisation,
+        owner_id=departing_member.id,
+        title="Regional resilience inquiry",
+        focal_question="How might the regional system change?",
+        scope="The regional system and its operating environment.",
+        horizon_year=2035,
+        status="active",
+    )
+
+    with pytest.raises(
+        OrganisationServiceError, match="active foresight canvas ownership"
+    ):
+        remove_membership(actor=owner, membership=membership)
+
+
+@pytest.mark.django_db
+def test_active_foresight_driver_ownership_must_be_transferred_before_offboarding(
+    user_factory, organisation_factory
+):  # type: ignore[no-untyped-def]
+    from apps.foresight.mapping_services import create_canvas, create_driver
+
+    owner = user_factory()
+    departing_member = user_factory()
+    organisation = organisation_factory(owner=owner)
+    membership = Membership.objects.create(
+        organisation=organisation,
+        user=departing_member,
+        role=Membership.Role.CONTRIBUTOR,
+    )
+    canvas = create_canvas(
+        actor=owner,
+        organisation=organisation,
+        title="Technology transition",
+        focal_question="Which forces could reshape the transition?",
+        scope="The organisation and its technology ecosystem.",
+        horizon_year=2032,
+    )
+    create_driver(
+        actor=owner,
+        canvas=canvas,
+        owner_id=departing_member.id,
+        title="Availability of implementation capability",
+        description="Internal capability affects the pace and quality of transition.",
+        driver_type="driver",
+        steep_category="technological",
+        impact=4,
+        uncertainty=3,
+    )
+
+    with pytest.raises(OrganisationServiceError, match="active driver ownership"):
+        remove_membership(actor=owner, membership=membership)
+
+
+@pytest.mark.django_db
+def test_open_strategic_implication_ownership_must_be_transferred_before_offboarding(
+    user_factory, organisation_factory
+):  # type: ignore[no-untyped-def]
+    from apps.foresight.mapping_services import create_canvas, create_implication
+
+    owner = user_factory()
+    departing_member = user_factory()
+    organisation = organisation_factory(owner=owner)
+    membership = Membership.objects.create(
+        organisation=organisation,
+        user=departing_member,
+        role=Membership.Role.CONTRIBUTOR,
+    )
+    canvas = create_canvas(
+        actor=owner,
+        organisation=organisation,
+        title="Policy environment",
+        focal_question="How could the policy environment affect our choices?",
+        scope="Relevant policy actors, rules, and implementation conditions.",
+        horizon_year=2030,
+    )
+    create_implication(
+        actor=owner,
+        canvas=canvas,
+        owner_id=departing_member.id,
+        title="Prepare a contingent compliance pathway",
+        description="The organisation should retain an option for rapid compliance change.",
+        implication_type="policy",
+        priority=4,
+    )
+
+    with pytest.raises(
+        OrganisationServiceError, match="open strategic implication ownership"
+    ):
+        remove_membership(actor=owner, membership=membership)
+
+
+
+@pytest.mark.django_db
+def test_pending_contribution_review_must_be_completed_before_offboarding(
+    user_factory,
+    organisation_factory,
+    workspace_factory,
+    decision_factory,
+):  # type: ignore[no-untyped-def]
+    from apps.contributions.services import create_request, submit_request
+
+    owner = user_factory(email="owner-contribution-offboarding@example.com")
+    contributor = user_factory(email="contributor-offboarding@example.com")
+    reviewer = user_factory(email="reviewer-offboarding@example.com")
+    organisation = organisation_factory(owner=owner)
+    contributor_membership = Membership.objects.create(
+        organisation=organisation,
+        user=contributor,
+        role=Membership.Role.CONTRIBUTOR,
+    )
+    reviewer_membership = Membership.objects.create(
+        organisation=organisation,
+        user=reviewer,
+        role=Membership.Role.CONTRIBUTOR,
+    )
+    workspace = workspace_factory(organisation=organisation, created_by=owner)
+    decision = decision_factory(
+        workspace=workspace,
+        organisation=organisation,
+        owner=owner,
+        created_by=owner,
+        status="open_for_contribution",
+    )
+    add_participant(
+        actor=owner,
+        decision=decision,
+        user=contributor,
+        role=Participant.Role.CONTRIBUTOR,
+    )
+    add_participant(
+        actor=owner,
+        decision=decision,
+        user=reviewer,
+        role=Participant.Role.REVIEWER,
+    )
+    request = create_request(
+        actor=owner,
+        decision=decision,
+        assignee_id=contributor.id,
+        reviewer_id=reviewer.id,
+        kind="review",
+        title="Review the submitted evidence note",
+        instructions="Confirm that limitations and provenance are retained.",
+    )
+    submit_request(
+        actor=contributor,
+        request=request,
+        body="The note retains source provenance and material limitations.",
+    )
+
+    with pytest.raises(OrganisationServiceError, match="pending contribution reviews"):
+        remove_membership(actor=owner, membership=reviewer_membership)
+
+    assert Membership.objects.filter(id=reviewer_membership.id).exists()
+    assert Membership.objects.filter(id=contributor_membership.id).exists()

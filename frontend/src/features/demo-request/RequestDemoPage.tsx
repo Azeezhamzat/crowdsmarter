@@ -7,6 +7,7 @@ import { z } from "zod";
 import { FieldError } from "../../components/FieldError";
 import { Icon } from "../../components/Icon";
 import { StatusMessage } from "../../components/StatusMessage";
+import { buildMailto, contactChannels } from "../../config/contact";
 import { ApiError } from "../../lib/api";
 import { submitDemoRequest } from "./api";
 
@@ -51,7 +52,7 @@ export function RequestDemoPage() {
   const request = useMutation({ mutationFn: submitDemoRequest });
 
   return (
-    <main className="demo-request-page">
+    <main id="main-content" className="demo-request-page" tabIndex={-1}>
       <header className="demo-request-header">
         <Link className="public-brand" to="/" aria-label="The CrowdSmarter home">
           <span className="public-brand__mark" aria-hidden="true"><span /><span /><span /></span>
@@ -75,6 +76,10 @@ export function RequestDemoPage() {
             <article><span>03</span><div><strong>An honest fit assessment</strong><p>Where CrowdSmarter helps now, what should remain in specialist tools, and what a pilot would require.</p></div></article>
           </div>
           <div className="demo-trust-note"><Icon name="shield" size={18} /><span>Your details are used only to respond to this request. No advertising list and no automatic account creation.</span></div>
+          <div className="demo-direct-contact">
+            <span>Prefer email?</span>
+            <a href={buildMailto(contactChannels.demo, "CrowdSmarter demonstration enquiry", "Organisation:\nDecision challenge:\nPreferred next step:")}>{contactChannels.demo}</a>
+          </div>
         </div>
 
         <section className="demo-request-card" aria-label="Demo request form">
@@ -84,6 +89,7 @@ export function RequestDemoPage() {
               <p className="public-eyebrow">Request received</p>
               <h2>Thank you. We have the context needed to follow up.</h2>
               <p>{request.data.detail}</p>
+              <p className="demo-success__contact">Follow-up will come from an official CrowdSmarter address. You can also reach us at <a href={buildMailto(contactChannels.demo, `Demo request ${request.data.reference}`)}>{contactChannels.demo}</a>.</p>
               <div className="demo-reference"><span>Reference</span><code>{request.data.reference}</code></div>
               <Link className="public-button public-button--primary" to="/">Return to the homepage</Link>
             </div>

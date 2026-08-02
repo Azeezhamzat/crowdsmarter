@@ -9,6 +9,7 @@ from apps.workspaces.selectors import workspace_for_user
 
 from .finalisation import finalise_decision
 from .models import DecisionFinalisation
+from .overview import decision_overview
 from .permissions import CanAccessDecision
 from .selectors import decision_for_user, decisions_for_workspace, transitions_for_decision
 from .serializers import (
@@ -22,6 +23,27 @@ from .serializers import (
     DecisionUpdateSerializer,
 )
 from .services import create_decision, transition_decision, update_decision
+from .templates import list_templates
+
+
+class DecisionTemplateListView(APIView):
+    """List versioned built-in templates for guided decision creation."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):  # type: ignore[no-untyped-def]
+        return Response(list_templates())
+
+
+class DecisionOverviewView(APIView):
+    """Return the coherent decision overview read model."""
+
+    permission_classes = [IsAuthenticated, CanAccessDecision]
+
+    def get(self, request, decision_id):  # type: ignore[no-untyped-def]
+        decision = decision_for_user(user=request.user, decision_id=decision_id)
+        self.check_object_permissions(request, decision)
+        return Response(decision_overview(decision))
 
 
 class DecisionListCreateView(APIView):

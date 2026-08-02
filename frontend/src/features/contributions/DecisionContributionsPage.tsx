@@ -145,7 +145,7 @@ export function DecisionContributionsPage() {
 
       {tab === "requests" ? (
         <div className="contribution-layout">
-          <main className="contribution-list" aria-label="Contribution requests">
+          <section className="contribution-list" aria-label="Contribution requests">
             {workspace.data.requests.length === 0 ? <div className="empty-state"><h2>No contribution requests</h2><p>Create a named, due-dated request rather than relying on informal follow-up.</p></div> : null}
             {workspace.data.requests.map((item) => {
               const draft = latestDraft(item);
@@ -215,7 +215,7 @@ export function DecisionContributionsPage() {
                 </article>
               );
             })}
-          </main>
+          </section>
 
           {workspace.data.can_manage ? (
             <aside className="side-panel contribution-create-panel">
@@ -234,10 +234,10 @@ export function DecisionContributionsPage() {
         </div>
       ) : (
         <div className="contribution-layout">
-          <main className="contribution-list">
+          <section className="contribution-list" aria-label="Facilitation sessions">
             {sessions.data?.length === 0 ? <div className="empty-state"><h2>No facilitation sessions</h2><p>Schedule a bounded workshop and connect its outputs to named contribution requests.</p></div> : null}
             {sessions.data?.map((session) => <article className="facilitation-card" id={`session-${session.id}`} key={session.id}><header><div><span className="status-badge">{session.status_label}</span></div><time>{formatDateTime(session.starts_at)}</time></header><p className="eyebrow">Facilitated workshop</p><h2>{session.title}</h2><p>{session.objective}</p>{session.agenda ? <div><strong>Agenda</strong><p>{session.agenda}</p></div> : null}<p className="muted">Facilitator: {session.facilitator.email} · {session.participants.length} invited</p>{session.participants.length ? <div className="session-attendance-list">{session.participants.map((participant) => <div key={participant.id}><span>{participant.user.email}</span><select aria-label={`Attendance for ${participant.user.email}`} value={participant.attendance} disabled={!session.can_manage || attendanceMutation.isPending} onChange={(event) => attendanceMutation.mutate({ id: participant.id, attendance: event.target.value })}><option value="invited">Invited</option><option value="attended">Attended</option><option value="absent">Absent</option></select></div>)}</div> : null}{session.can_manage && session.status === "planned" ? <button className="button button--secondary" type="button" onClick={() => sessionStatusMutation.mutate({ id: session.id, status: "open" })}>Open session</button> : null}{session.can_manage && session.status === "open" ? <button className="button button--primary" type="button" onClick={() => sessionStatusMutation.mutate({ id: session.id, status: "closed" })}>Close session</button> : null}</article>)}
-          </main>
+          </section>
           {workspace.data.can_manage ? <aside className="side-panel contribution-create-panel"><p className="eyebrow">Structured workshop</p><h2>Schedule facilitation</h2><label htmlFor="session-title">Title</label><input id="session-title" value={sessionForm.title} onChange={(event) => setSessionForm({ ...sessionForm, title: event.target.value })} /><label htmlFor="session-objective">Objective</label><textarea id="session-objective" rows={4} value={sessionForm.objective} onChange={(event) => setSessionForm({ ...sessionForm, objective: event.target.value })} /><label htmlFor="session-agenda">Agenda</label><textarea id="session-agenda" rows={4} value={sessionForm.agenda} onChange={(event) => setSessionForm({ ...sessionForm, agenda: event.target.value })} /><div className="form-row"><div><label htmlFor="session-start">Starts</label><input id="session-start" type="datetime-local" value={sessionForm.starts_at} onChange={(event) => setSessionForm({ ...sessionForm, starts_at: event.target.value })} /></div><div><label htmlFor="session-end">Ends</label><input id="session-end" type="datetime-local" value={sessionForm.ends_at} onChange={(event) => setSessionForm({ ...sessionForm, ends_at: event.target.value })} /></div></div><label>Invite participants</label><div className="participant-checklist">{activeMembers.map((item) => <label key={item.id}><input type="checkbox" checked={sessionForm.participant_ids.includes(item.user.id)} onChange={(event) => setSessionForm({ ...sessionForm, participant_ids: event.target.checked ? [...sessionForm.participant_ids, item.user.id] : sessionForm.participant_ids.filter((id) => id !== item.user.id) })} />{item.user.email}</label>)}</div><button className="button button--primary button--full" type="button" disabled={!sessionForm.title.trim() || !sessionForm.objective.trim() || createSessionMutation.isPending} onClick={() => createSessionMutation.mutate()}>{createSessionMutation.isPending ? "Scheduling…" : "Schedule session"}</button></aside> : null}
         </div>
       )}

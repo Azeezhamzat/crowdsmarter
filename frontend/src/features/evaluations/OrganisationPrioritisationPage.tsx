@@ -110,11 +110,11 @@ export function OrganisationPrioritisationPage() {
           <section className="panel-card"><p className="eyebrow">Portfolios</p><div className="evaluation-list">{portfolios.data?.map((item) => <button key={item.id} type="button" className={selectedId === item.id ? "evaluation-list__item is-active" : "evaluation-list__item"} onClick={() => setSelectedId(item.id)}><span><strong>{item.title}</strong><small>{item.candidates.length} candidates</small></span><span className={`status-badge status-badge--${item.status}`}>{item.status}</span></button>)}</div></section>
         </aside>
 
-        <main className="evaluation-main">
+        <section className="evaluation-main" aria-label="Evaluation workspace">
           {portfolio.isPending && selectedId ? <p>Loading portfolio…</p> : null}
           {portfolio.error ? <StatusMessage kind="error">{message(portfolio.error)}</StatusMessage> : null}
           {portfolio.data ? <PortfolioWorkspace portfolio={portfolio.data} decisions={decisionPortfolio.data?.decisions ?? []} onRefresh={() => refresh(portfolio.data.id)} /> : !selectedId ? <section className="panel-card empty-state"><h2>Create a prioritisation portfolio</h2><p>Set the resource envelope, define weighted criteria, add candidate decisions, then invite independent assessments.</p></section> : null}
-        </main>
+        </section>
       </div>
     </div>
   );

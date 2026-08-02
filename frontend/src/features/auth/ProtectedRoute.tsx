@@ -15,7 +15,7 @@ export function ProtectedRoute() {
   });
 
   if (currentUser.isPending) {
-    return <div className="centred-state">Loading your workspace…</div>;
+    return <main id="main-content" className="centred-state" tabIndex={-1} aria-busy="true">Loading your workspace…</main>;
   }
 
   if (currentUser.error instanceof ApiError && currentUser.error.status === 403) {
@@ -24,7 +24,7 @@ export function ProtectedRoute() {
   }
 
   if (currentUser.isError) {
-    return <div className="centred-state" role="alert">The application could not verify your session.</div>;
+    return <main id="main-content" className="centred-state" tabIndex={-1} role="alert">The application could not verify your session.</main>;
   }
 
   return <AppShell />;

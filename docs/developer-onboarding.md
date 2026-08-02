@@ -41,3 +41,31 @@ A domain app should contain only the modules it needs. Typical modules are `mode
 ## Secrets
 
 Never commit `.env`, credentials, customer exports, or production database copies. Development defaults are deliberately unsafe for production, and production settings fail fast.
+
+## Phase 6 development paths
+
+Run a local advisory review from the authenticated decision workspace. The default provider is deterministic, so no AI account or API key is needed. Provider implementations live under `apps.ai_assistance.providers` and must satisfy the protocol in `providers/base.py`.
+
+Create due-review notifications manually with:
+
+```bash
+python manage.py send_due_review_notifications
+```
+
+Do not add provider SDK calls to views, serializers, React components, or decision services. Keep provider translation inside an adapter and persist output only through `apps.ai_assistance.services`.
+
+## Local first-run and sign-in recovery
+
+After migrations, create a starter owner only when the database has no active account:
+
+```bash
+docker compose run --rm backend python manage.py ensure_local_owner
+```
+
+The command prints a generated password when it creates the account. It does nothing when an active account already exists. To reset a local password without writing it to shell history:
+
+```bash
+bash scripts/reset-local-password.sh
+```
+
+Both workflows require `DJANGO_DEBUG=true` and must not be used as production identity administration.

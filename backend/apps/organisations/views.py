@@ -9,23 +9,37 @@ from rest_framework.views import APIView
 from .models import Membership
 from .permissions import CanManageMembership, CanManageOrganisation, IsOrganisationMember
 from .selectors import (
+    deletion_request_for_user,
+    deletion_requests_for_organisation,
+    membership_events_for_organisation,
     membership_for_user,
     memberships_for_user_organisation,
     organisation_for_user,
     organisations_for_user,
 )
 from .serializers import (
+    MembershipEventSerializer,
     MembershipSerializer,
     MembershipUpdateSerializer,
+    OrganisationAdministrationUpdateSerializer,
     OrganisationCreateSerializer,
+    OrganisationDeletionRequestSerializer,
     OrganisationSerializer,
+    OrganisationStateChangeSerializer,
     OrganisationUpdateSerializer,
+    OwnershipTransferSerializer,
 )
 from .services import (
+    cancel_organisation_deletion,
     change_membership_role,
     create_organisation,
+    deactivate_organisation,
+    reactivate_organisation,
     remove_membership,
+    request_organisation_deletion,
+    transfer_organisation_ownership,
     update_organisation,
+    update_organisation_administration,
 )
 
 
@@ -131,3 +145,124 @@ class MembershipDetailView(APIView):
         membership = self._get_object(request, membership_id)
         remove_membership(actor=request.user, membership=membership)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class OrganisationAdministrationView(APIView):
+    """Read or update organisation profile and administrative policy."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, organisation_id):  # type: ignore[no-untyped-def]
+        organisation = organisation_for_user(user=request.user, organisation_id=organisation_id)
+        return Response(OrganisationSerializer(organisation, context={"request": request}).data)
+
+    def patch(self, request, organisation_id):  # type: ignore[no-untyped-def]
+        organisation = organisation_for_user(user=request.user, organisation_id=organisation_id)
+        serializer = OrganisationAdministrationUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        organisation = update_organisation_administration(
+            actor=request.user, organisation=organisation, changes=dict(serializer.validated_data)
+        )
+        return Response(OrganisationSerializer(organisation, context={"request": request}).data)
+
+
+class OrganisationOwnershipTransferView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, organisation_id):  # type: ignore[no-untyped-def]
+        organisation = organisation_for_user(user=request.user, organisation_id=organisation_id)
+        serializer = OwnershipTransferSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        target = membership_for_user(
+            user=request.user, membership_id=serializer.validated_data["target_membership_id"]
+        )
+        if target.organisation_id != organisation.id:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({"target_membership_id": "Choose a member of this organisation."})
+        previous, new = transfer_organisation_ownership(
+            actor=request.user, organisation=organisation, target_membership=target,
+            rationale=serializer.validated_data["rationale"],
+        )
+        return Response({"previous_owner": MembershipSerializer(previous).data, "new_owner": MembershipSerializer(new).data})
+
+
+class OrganisationMembershipHistoryView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, organisation_id):  # type: ignore[no-untyped-def]
+        organisation = organisation_for_user(user=request.user, organisation_id=organisation_id)
+        membership = organisation.memberships.filter(user=request.user, status=Membership.Status.ACTIVE).first()
+        if membership is None or membership.role not in {Membership.Role.OWNER, Membership.Role.ADMIN}:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("This history requires an owner or administrator role.")
+        items = membership_events_for_organisation(user=request.user, organisation_id=organisation_id)
+        return Response(MembershipEventSerializer(items, many=True).data)
+
+
+class OrganisationDeactivateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, organisation_id):  # type: ignore[no-untyped-def]
+        organisation = organisation_for_user(user=request.user, organisation_id=organisation_id)
+        serializer = OrganisationStateChangeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        organisation = deactivate_organisation(
+            actor=request.user, organisation=organisation,
+            confirmation=serializer.validated_data.get("confirmation", ""),
+            reason=serializer.validated_data.get("reason", ""),
+        )
+        return Response(OrganisationSerializer(organisation, context={"request": request}).data)
+
+
+class OrganisationReactivateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, organisation_id):  # type: ignore[no-untyped-def]
+        organisation = organisation_for_user(user=request.user, organisation_id=organisation_id)
+        serializer = OrganisationStateChangeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        organisation = reactivate_organisation(
+            actor=request.user, organisation=organisation,
+            rationale=serializer.validated_data.get("rationale", ""),
+        )
+        return Response(OrganisationSerializer(organisation, context={"request": request}).data)
+
+
+class OrganisationDeletionRequestListCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, organisation_id):  # type: ignore[no-untyped-def]
+        organisation = organisation_for_user(user=request.user, organisation_id=organisation_id)
+        membership = organisation.memberships.filter(
+            user=request.user, status=Membership.Status.ACTIVE, role=Membership.Role.OWNER
+        ).first()
+        if membership is None:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("Only an organisation owner may view deletion requests.")
+        items = deletion_requests_for_organisation(user=request.user, organisation_id=organisation_id)
+        return Response(OrganisationDeletionRequestSerializer(items, many=True).data)
+
+    def post(self, request, organisation_id):  # type: ignore[no-untyped-def]
+        organisation = organisation_for_user(user=request.user, organisation_id=organisation_id)
+        serializer = OrganisationStateChangeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        item = request_organisation_deletion(
+            actor=request.user, organisation=organisation,
+            confirmation=serializer.validated_data.get("confirmation", ""),
+            reason=serializer.validated_data.get("reason", ""),
+        )
+        return Response(OrganisationDeletionRequestSerializer(item).data, status=status.HTTP_201_CREATED)
+
+
+class OrganisationDeletionRequestCancelView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, request_id):  # type: ignore[no-untyped-def]
+        serializer = OrganisationStateChangeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        item = cancel_organisation_deletion(
+            actor=request.user,
+            deletion_request=deletion_request_for_user(user=request.user, request_id=request_id),
+            rationale=serializer.validated_data.get("rationale", ""),
+        )
+        return Response(OrganisationDeletionRequestSerializer(item).data)

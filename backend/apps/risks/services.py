@@ -13,6 +13,8 @@ from apps.decision_options.models import DecisionOption
 from apps.decisions.models import Decision
 from apps.decisions.reasoning_policies import can_contribute_reasoning, can_edit_reasoning
 from apps.organisations.models import Membership
+from apps.notifications.models import Notification
+from apps.notifications.services import create_notification
 
 from .models import Risk
 
@@ -68,6 +70,17 @@ def create_risk(
     )
     risk.full_clean(validate_unique=False, validate_constraints=False)
     risk.save()
+    if risk.owner_id != actor.id:
+        create_notification(
+            recipient=risk.owner,
+            organisation=decision.organisation,
+            decision=decision,
+            kind=Notification.Kind.ASSIGNMENT,
+            title="You own a decision risk",
+            message=f"You were assigned the risk “{risk.title}” in “{decision.title}”.",
+            url=f"/decisions/{decision.id}/reasoning/risks",
+            dedup_key=f"risk-owner:{risk.id}:{risk.owner_id}",
+        )
     record_event(
         action="risk.created", object_type="risk", object_id=str(risk.id),
         actor=actor, organisation=decision.organisation,
@@ -90,6 +103,7 @@ def update_risk(*, actor: User, risk: Risk, fields: dict[str, Any]) -> Risk:
         accountable_user_id=risk.owner_id,
     ):
         raise PermissionDenied("You cannot edit this risk in the current decision state.")
+    previous_owner_id = risk.owner_id
     before = {field: getattr(risk, field) for field in fields}
     if "option_id" in fields:
         risk.option = _option(decision=risk.decision, option_id=fields.pop("option_id"))
@@ -103,6 +117,17 @@ def update_risk(*, actor: User, risk: Risk, fields: dict[str, Any]) -> Risk:
         setattr(risk, field, value)
     risk.full_clean(validate_unique=False, validate_constraints=False)
     risk.save()
+    if risk.owner_id != previous_owner_id and risk.owner_id != actor.id:
+        create_notification(
+            recipient=risk.owner,
+            organisation=risk.organisation,
+            decision=risk.decision,
+            kind=Notification.Kind.ASSIGNMENT,
+            title="You now own a decision risk",
+            message=f"You were assigned the risk “{risk.title}” in “{risk.decision.title}”.",
+            url=f"/decisions/{risk.decision_id}/reasoning/risks",
+            dedup_key=f"risk-owner:{risk.id}:{risk.owner_id}",
+        )
     after = {field: getattr(risk, field) for field in before}
     record_event(
         action="risk.updated", object_type="risk", object_id=str(risk.id),

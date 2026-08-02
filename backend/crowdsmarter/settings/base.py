@@ -49,6 +49,19 @@ INSTALLED_APPS = [
     "apps.reviews",
     "apps.lessons",
     "apps.search",
+    "apps.notifications",
+    "apps.ai_assistance",
+    "apps.analytics",
+    "apps.collaboration",
+    "apps.portfolio",
+    "apps.exports",
+    "apps.foresight",
+    "apps.evaluations",
+    "apps.decision_analysis",
+    "apps.demo_requests",
+    "apps.contributions",
+    "apps.methodology",
+    "apps.platform_admin",
 ]
 
 MIDDLEWARE = [
@@ -98,6 +111,7 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 AUTH_USER_MODEL = "accounts.User"
+AUTHENTICATION_BACKENDS = ["apps.accounts.backends.CaseInsensitiveEmailBackend"]
 
 LANGUAGE_CODE = "en-gb"
 TIME_ZONE = "UTC"
@@ -134,8 +148,15 @@ REST_FRAMEWORK = {
         "anon": os.getenv("API_ANON_THROTTLE_RATE", "60/min"),
         "user": os.getenv("API_USER_THROTTLE_RATE", "600/min"),
         "login": os.getenv("API_LOGIN_THROTTLE_RATE", "10/min"),
+        "password_reset_request": os.getenv("API_PASSWORD_RESET_REQUEST_THROTTLE_RATE", "5/hour"),
+        "password_reset_confirm": os.getenv("API_PASSWORD_RESET_CONFIRM_THROTTLE_RATE", "20/hour"),
+        "account_security": os.getenv("API_ACCOUNT_SECURITY_THROTTLE_RATE", "20/hour"),
+        "data_export": os.getenv("API_DATA_EXPORT_THROTTLE_RATE", "20/hour"),
         "invitation_management": os.getenv("API_INVITATION_MANAGEMENT_THROTTLE_RATE", "120/hour"),
         "invitation_acceptance": os.getenv("API_INVITATION_ACCEPTANCE_THROTTLE_RATE", "60/hour"),
+        "ai_review": os.getenv("API_AI_REVIEW_THROTTLE_RATE", "20/hour"),
+        "foresight_feed_sync": os.getenv("API_FORESIGHT_FEED_SYNC_THROTTLE_RATE", "20/hour"),
+        "demo_request": os.getenv("API_DEMO_REQUEST_THROTTLE_RATE", "5/hour"),
     },
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 50,
@@ -151,9 +172,37 @@ EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
 EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", True)
-DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "no-reply@localhost")
+PUBLIC_CONTACT_EMAIL = os.getenv("PUBLIC_CONTACT_EMAIL", "hello@crowdsmarter.com").strip()
+SUPPORT_EMAIL = os.getenv("SUPPORT_EMAIL", PUBLIC_CONTACT_EMAIL).strip()
+PRIVACY_EMAIL = os.getenv("PRIVACY_EMAIL", PUBLIC_CONTACT_EMAIL).strip()
+SECURITY_EMAIL = os.getenv("SECURITY_EMAIL", PUBLIC_CONTACT_EMAIL).strip()
+PLATFORM_ADMIN_EMAIL = os.getenv("PLATFORM_ADMIN_EMAIL", PUBLIC_CONTACT_EMAIL).strip()
+DEFAULT_FROM_EMAIL = os.getenv(
+    "DEFAULT_FROM_EMAIL", f"CrowdSmarter <{PUBLIC_CONTACT_EMAIL}>"
+).strip()
+EMAIL_REPLY_TO = os.getenv("EMAIL_REPLY_TO", PUBLIC_CONTACT_EMAIL).strip()
+DEMO_REQUEST_RECIPIENT = os.getenv("DEMO_REQUEST_RECIPIENT", PUBLIC_CONTACT_EMAIL).strip()
+DEMO_REQUEST_SEND_ACKNOWLEDGEMENT = env_bool(
+    "DEMO_REQUEST_SEND_ACKNOWLEDGEMENT", False
+)
 FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "http://localhost:5173")
 INVITATION_EXPIRY_HOURS = int(os.getenv("INVITATION_EXPIRY_HOURS", "168"))
+PASSWORD_RESET_TIMEOUT = int(os.getenv("PASSWORD_RESET_TIMEOUT", "3600"))
+
+SOURCE_ATTACHMENT_MAX_BYTES = int(os.getenv("SOURCE_ATTACHMENT_MAX_BYTES", str(15 * 1024 * 1024)))
+SOURCE_ATTACHMENT_ALLOWED_CONTENT_TYPES = env_list(
+    "SOURCE_ATTACHMENT_ALLOWED_CONTENT_TYPES",
+    "application/pdf,text/plain,text/csv,application/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/png,image/jpeg,image/webp",
+)
+SOURCE_ATTACHMENT_ALLOWED_EXTENSIONS = env_list(
+    "SOURCE_ATTACHMENT_ALLOWED_EXTENSIONS",
+    ".pdf,.txt,.csv,.docx,.xlsx,.png,.jpg,.jpeg,.webp",
+)
+
+AI_PROVIDER_BACKEND = os.getenv(
+    "AI_PROVIDER_BACKEND",
+    "apps.ai_assistance.providers.rules.RuleBasedAIProvider",
+)
 
 
 CACHE_URL = os.getenv("CACHE_URL", "")
@@ -179,6 +228,16 @@ CELERY_TASK_ACKS_LATE = True
 CELERY_TASK_REJECT_ON_WORKER_LOST = True
 CELERY_TASK_TRACK_STARTED = True
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+CELERY_BEAT_SCHEDULE = {
+    "send-due-review-notifications-daily": {
+        "task": "apps.notifications.tasks.send_due_review_notifications",
+        "schedule": 86400.0,
+    },
+    "send-contribution-reminders-and-digests-daily": {
+        "task": "apps.contributions.tasks.send_contribution_reminders_and_digests",
+        "schedule": 86400.0,
+    },
+}
 
 STORAGE_BACKEND = os.getenv("STORAGE_BACKEND", "local").lower()
 if STORAGE_BACKEND == "s3":

@@ -11,6 +11,8 @@ from apps.audit.services import record_event
 from apps.decisions.models import Decision
 from apps.decisions.policies import can_manage_participants
 from apps.organisations.models import Membership, Organisation
+from apps.notifications.models import Notification
+from apps.notifications.services import create_notification
 
 from .models import Participant
 
@@ -100,6 +102,17 @@ def change_owner_participant(*, decision: Decision, owner: User, actor: User) ->
     if not created:
         participant.role = Participant.Role.DECISION_OWNER
         participant.save(update_fields=["role", "updated_at"])
+    if owner.id != actor.id:
+        create_notification(
+            recipient=owner,
+            organisation=decision.organisation,
+            decision=decision,
+            kind=Notification.Kind.ASSIGNMENT,
+            title="You now own a decision",
+            message=f"You have been assigned as the decision owner for “{decision.title}”.",
+            url=f"/decisions/{decision.id}",
+            dedup_key=f"decision-owner:{decision.id}:{owner.id}",
+        )
     record_event(
         action="participant.owner_changed",
         object_type="participant",
@@ -172,6 +185,17 @@ def add_participant(
             raise ParticipantServiceError(
                 "That user already participates in this decision."
             ) from exc
+    if user.id != actor.id:
+        create_notification(
+            recipient=user,
+            organisation=decision.organisation,
+            decision=decision,
+            kind=Notification.Kind.ASSIGNMENT,
+            title="You were added to a decision",
+            message=f"You were added to “{decision.title}” as {participant.get_role_display()}.",
+            url=f"/decisions/{decision.id}",
+            dedup_key=f"participant-active:{participant.id}:{participant.updated_at.isoformat()}",
+        )
     record_event(
         action="participant.created",
         object_type="participant",
@@ -207,6 +231,21 @@ def change_participant_role(
     participant.role = role
     participant.full_clean(validate_unique=False, validate_constraints=False)
     participant.save(update_fields=["role", "updated_at"])
+    if participant.user_id != actor.id:
+        create_notification(
+            recipient=participant.user,
+            organisation=participant.organisation,
+            decision=participant.decision,
+            kind=Notification.Kind.ASSIGNMENT,
+            title="Your decision role changed",
+            message=(
+                f"Your role in “{participant.decision.title}” changed from "
+                f"{Participant.Role(previous_role).label} to "
+                f"{participant.get_role_display()}."
+            ),
+            url=f"/decisions/{participant.decision_id}",
+            dedup_key=f"participant-role:{participant.id}:{participant.updated_at.isoformat()}",
+        )
     record_event(
         action="participant.role_changed",
         object_type="participant",
@@ -239,6 +278,17 @@ def remove_participant(*, actor: User, participant: Participant) -> Participant:
     participant.save(
         update_fields=["status", "removed_at", "removed_by", "updated_at"]
     )
+    if participant.user_id != actor.id:
+        create_notification(
+            recipient=participant.user,
+            organisation=participant.organisation,
+            decision=participant.decision,
+            kind=Notification.Kind.ASSIGNMENT,
+            title="Decision participation ended",
+            message=f"Your active participation in “{participant.decision.title}” has ended.",
+            url=f"/decisions/{participant.decision_id}",
+            dedup_key=f"participant-removed:{participant.id}:{participant.updated_at.isoformat()}",
+        )
     record_event(
         action="participant.removed",
         object_type="participant",

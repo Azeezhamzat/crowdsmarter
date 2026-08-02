@@ -16,7 +16,10 @@ from django.utils import timezone
 
 from apps.accounts.models import User
 from apps.audit.services import record_event
-from apps.organisations.models import Membership, Organisation
+from apps.platform_admin.contact import notification_sender_email
+from apps.notifications.models import Notification
+from apps.notifications.services import create_notification
+from apps.organisations.models import Membership, MembershipEvent, Organisation
 
 from .models import OrganisationInvitation
 from .tokens import digest_token, generate_token
@@ -56,6 +59,13 @@ def _manager_membership(*, actor: User, organisation: Organisation) -> Membershi
         raise PermissionDenied("You are not an active member of this organisation.") from exc
     if membership.role not in {Membership.Role.OWNER, Membership.Role.ADMIN}:
         raise PermissionDenied("This action requires an owner or administrator role.")
+    if organisation.status != Organisation.Status.ACTIVE:
+        raise InvitationServiceError("Reactivate the organisation before managing invitations.")
+    if (
+        organisation.invitation_policy == Organisation.InvitationPolicy.OWNERS_ONLY
+        and membership.role != Membership.Role.OWNER
+    ):
+        raise PermissionDenied("This organisation allows only owners to manage invitations.")
     return membership
 
 
@@ -252,7 +262,7 @@ def deliver_invitation(
         delivered = send_mail(
             subject=subject,
             message=body,
-            from_email=settings.DEFAULT_FROM_EMAIL,
+            from_email=notification_sender_email(),
             recipient_list=[invitation.email],
             fail_silently=False,
         )
@@ -404,6 +414,19 @@ def accept_invitation(
     invitation.save(
         update_fields=["status", "accepted_by", "accepted_at", "updated_at"]
     )
+    if invitation.invited_by_id != user.id:
+        create_notification(
+            recipient=invitation.invited_by,
+            organisation=invitation.organisation,
+            kind=Notification.Kind.MEMBERSHIP,
+            title="Invitation accepted",
+            message=(
+                f"{user.email} joined {invitation.organisation.name} as "
+                f"{membership.get_role_display()}."
+            ),
+            url=f"/organisations/{invitation.organisation_id}",
+            dedup_key=f"invitation-accepted:{invitation.id}",
+        )
     record_event(
         action="invitation.accepted",
         object_type="organisation_invitation",
@@ -415,6 +438,16 @@ def accept_invitation(
             "role": invitation.role,
             "created_account": created_user,
         },
+    )
+    MembershipEvent.objects.create(
+        organisation=invitation.organisation,
+        membership_id_snapshot=membership.id,
+        user=user,
+        actor=user,
+        kind=MembershipEvent.Kind.CREATED,
+        new_role=membership.role,
+        new_status=membership.status,
+        note="Membership created through invitation acceptance.",
     )
     record_event(
         action="membership.created",

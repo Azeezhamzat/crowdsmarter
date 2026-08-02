@@ -12,6 +12,8 @@ from django.utils import timezone
 from apps.accounts.models import User
 from apps.audit.services import record_event
 from apps.organisations.models import Membership
+from apps.notifications.models import Notification
+from apps.notifications.services import notify_users
 from apps.workspaces.models import Workspace
 
 from .models import Decision, DecisionTransition
@@ -21,6 +23,7 @@ from .policies import (
     can_edit_decision,
     can_transition_decision,
 )
+from .templates import template_for_key
 
 
 class DecisionServiceError(ValidationError):
@@ -116,10 +119,21 @@ def create_decision(
     workspace: Workspace,
     title: str,
     decision_question: str = "",
+    purpose: str = "",
+    context: str = "",
+    scope: str = "",
+    contribution_guidance: str = "",
+    urgency: str = Decision.Urgency.NORMAL,
+    target_decision_date: Any | None = None,
+    contribution_deadline: Any | None = None,
+    template_key: str = "blank",
+    method_version_id: Any | None = None,
     owner_id: Any | None = None,
 ) -> Decision:
     """Create a draft decision and establish its human owner."""
     membership = _active_membership(actor=actor, organisation_id=workspace.organisation_id)
+    if workspace.organisation.status != "active":
+        raise DecisionServiceError("Reactivate the organisation before creating a decision.")
     if not can_create_decision(membership=membership):
         raise PermissionDenied("Your role cannot create decisions.")
 
@@ -130,11 +144,42 @@ def create_decision(
     if membership.role == Membership.Role.CONTRIBUTOR and owner.id != actor.id:
         raise PermissionDenied("Contributors may only create decisions they own.")
 
+    selected_method_version = None
+    selected_template = None
+    if method_version_id:
+        from apps.methodology.models import DecisionMethodVersion
+
+        try:
+            selected_method_version = DecisionMethodVersion.objects.select_related("method").get(
+                id=method_version_id,
+                organisation_id=workspace.organisation_id,
+                status=DecisionMethodVersion.Status.APPROVED,
+                method__status="approved",
+            )
+        except DecisionMethodVersion.DoesNotExist as exc:
+            raise DecisionServiceError({"method_version_id": "Choose an approved organisation method."}) from exc
+    else:
+        selected_template = template_for_key(template_key)
+        if selected_template is None:
+            raise DecisionServiceError(
+                {"template_key": "Choose a recognised decision template."}
+            )
+
     decision = Decision(
         organisation=workspace.organisation,
         workspace=workspace,
         title=title,
         decision_question=decision_question,
+        purpose=purpose,
+        context=context,
+        scope=scope,
+        contribution_guidance=contribution_guidance,
+        urgency=urgency,
+        target_decision_date=target_decision_date,
+        contribution_deadline=contribution_deadline,
+        source_template_key=selected_template.key if selected_template else "",
+        source_template_version=selected_template.version if selected_template else None,
+        source_method_version=selected_method_version,
         owner=owner,
         created_by=actor,
     )
@@ -144,6 +189,15 @@ def create_decision(
     from apps.participants.services import ensure_owner_participant
 
     ensure_owner_participant(decision=decision, owner=owner, actor=actor)
+    if selected_method_version is not None:
+        from apps.methodology.models import DecisionMethodUsage
+
+        usage = DecisionMethodUsage(
+            organisation=decision.organisation, method_version=selected_method_version,
+            decision=decision, applied_by=actor,
+        )
+        usage.full_clean(validate_unique=False, validate_constraints=False)
+        usage.save()
     record_event(
         action="decision.created",
         object_type="decision",
@@ -155,6 +209,9 @@ def create_decision(
             "title": decision.title,
             "owner_id": str(owner.id),
             "status": decision.status,
+            "template_key": decision.source_template_key,
+            "template_version": decision.source_template_version,
+            "method_version_id": str(decision.source_method_version_id) if decision.source_method_version_id else None,
         },
     )
     return decision
@@ -355,6 +412,28 @@ def append_transition_record(
             "rationale": transition_record.rationale,
             "warnings_acknowledged": transition_record.warnings_acknowledged,
         },
+    )
+    from apps.participants.models import Participant
+
+    recipients = User.objects.filter(
+        decision_participations__decision=decision,
+        decision_participations__status=Participant.Status.ACTIVE,
+    ).distinct()
+    notify_users(
+        recipients=recipients,
+        exclude_user_id=actor.id,
+        organisation=decision.organisation,
+        decision=decision,
+        kind=Notification.Kind.LIFECYCLE,
+        title=f"Decision moved to {Decision.Status(to_status).label}",
+        message=(
+            f"“{decision.title}” moved from "
+            f"{Decision.Status(from_status).label} to "
+            f"{Decision.Status(to_status).label}."
+        ),
+        url=f"/decisions/{decision.id}",
+        dedup_key_prefix=f"decision-transition:{transition_record.id}",
+        metadata={"from_status": from_status, "to_status": to_status},
     )
     return transition_record
 

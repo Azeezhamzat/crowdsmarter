@@ -3,6 +3,8 @@ export type User = {
   email: string;
   first_name: string;
   last_name: string;
+  is_staff?: boolean;
+  is_platform_administrator?: boolean;
 };
 
 export type OrganisationRole = "owner" | "admin" | "contributor" | "viewer";

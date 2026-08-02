@@ -207,3 +207,348 @@ Lessons record an insight, category, applicability, and optional recommended org
 | GET | `/organisations/{organisation_id}/search/?q={query}` | Search tenant decision knowledge |
 
 The query must contain at least two characters. Results are ranked by PostgreSQL full-text search and can include decisions, options, evidence, assumptions, risks, outcome reviews, and active lessons. A caller must first hold active membership in the organisation; inaccessible organisations return `404`.
+
+## Notifications
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/notifications/` | Read the newest 100 notifications for the authenticated user |
+| POST | `/notifications/{notification_id}/read/` | Mark one owned notification as read |
+| POST | `/notifications/read-all/` | Mark the authenticated user's unread notifications as read |
+
+`GET /notifications/?unread=true` limits the returned items to unread notifications. Notification visibility is recipient-private; another authenticated user receives `404` for an inaccessible notification.
+
+## Advisory AI reviews
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/decisions/{decision_id}/ai-reviews/` | Read attributable advisory reviews and request capability |
+| POST | `/decisions/{decision_id}/ai-reviews/` | Run one review through the configured provider |
+| GET | `/ai-reviews/{review_id}/` | Read one tenant-visible review |
+| POST | `/ai-reviews/{review_id}/acknowledge/` | Record immutable human review notes |
+| POST | `/ai-reviews/{review_id}/dismiss/` | Dismiss output with an immutable reason |
+
+The create command accepts an empty JSON object. Provider selection is deployment configuration, not client input. The response includes provider provenance, fingerprint, structured findings, limitations, and human disposition, but never returns the private decision snapshot. Requests are throttled. Advisory reviews cannot change the decision or execute lifecycle commands.
+
+## Organisation analytics
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/organisations/{organisation_id}/analytics/` | Read defined decision-flow and learning measures |
+
+The endpoint is available to active organisation members and returns totals, lifecycle counts, 90-day flow measures, median time to human finalisation, overdue target dates, participant coverage, outcome assessment distribution, due reviews, active lessons, and the definitions used to calculate the principal measures.
+
+## Phase 7 portfolio and collaboration
+
+### Personal work
+
+`GET /api/v1/me/work/`
+
+Returns active decisions where the current user is an owner, active participant, or implementation owner. Each item contains its lifecycle state, due date, overdue state, unresolved-discussion count, and an explainable next action.
+
+### Organisation decision portfolio
+
+`GET /api/v1/organisations/{organisation_id}/portfolio/`
+
+Optional query parameters:
+
+- `q`
+- `status`
+- `urgency`
+- `workspace_id`
+- `owner_id`
+- `my_work=true`
+- `overdue=true`
+
+### Decision discussion
+
+`GET /api/v1/decisions/{decision_id}/discussion/`
+
+`POST /api/v1/decisions/{decision_id}/discussion/`
+
+```json
+{
+  "kind": "question",
+  "body": "Which evidence validates this assumption?",
+  "mentioned_user_ids": ["user-uuid"],
+  "reply_to_id": null
+}
+```
+
+### Resolve a question or concern
+
+`POST /api/v1/discussion-entries/{entry_id}/resolve/`
+
+```json
+{
+  "resolution_note": "The baseline dataset was added as evidence item E-14."
+}
+```
+
+### Decision activity
+
+`GET /api/v1/decisions/{decision_id}/activity/`
+
+Returns up to 200 recent discussion and material audit items in reverse chronological order.
+
+## Phase 8 guided creation and decision overview
+
+### Decision-template catalogue
+
+`GET /api/v1/decision-templates/`
+
+Returns the authenticated catalogue of built-in, versioned framing templates. Each item contains prompts, a suggested urgency, and a checklist. The response contains no organisation data and does not create records.
+
+### Guided draft creation
+
+`POST /api/v1/workspaces/{workspace_id}/decisions/`
+
+The existing create endpoint now also accepts complete draft framing:
+
+```json
+{
+  "template_key": "technology_adoption",
+  "title": "Pilot a field monitoring platform",
+  "decision_question": "Should we run a controlled pilot before wider adoption?",
+  "purpose": "Reduce uncertainty before committing organisational resources.",
+  "context": "Current local performance is unknown.",
+  "scope": "Three sites for three months; no wider rollout.",
+  "contribution_guidance": "Provide security, usability, cost, and outcome evidence.",
+  "urgency": "high",
+  "target_decision_date": "2026-09-30",
+  "contribution_deadline": "2026-09-15T17:00:00Z",
+  "owner_id": "user-uuid"
+}
+```
+
+All fields are user-submitted. The endpoint creates a Draft and never transitions the lifecycle automatically. `template_key` defaults to `blank` for compatible existing clients.
+
+### Decision overview
+
+`GET /api/v1/decisions/{decision_id}/overview/`
+
+Returns a tenant-scoped read model containing lifecycle progress, next action, framing completeness, participant roles, unresolved discussion, active options, material risks, the transparent reasoning summary, and target-date state. It performs no writes and grants no additional capabilities.
+
+## Phase 10 account self-service
+
+| Method | Path | Purpose |
+|---|---|---|
+| PATCH | `/auth/me/` | Update the authenticated user's first and last name |
+| POST | `/auth/password/change/` | Change the password after checking the current password |
+| POST | `/auth/password/reset/` | Request a generic, non-enumerating recovery response |
+| POST | `/auth/password/reset/confirm/` | Validate a time-limited token and set a new password |
+
+The reset-request response is deliberately identical for registered and unregistered email addresses. In local debug mode it may include `development_reset_url` so console-email installations remain usable without external infrastructure.
+
+## Phase 10 customer exports
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/organisations/{organisation_id}/exports/complete/` | Download the complete tenant archive as an owner or administrator |
+| GET | `/decisions/{decision_id}/export/` | Download a portable dossier for one visible decision |
+
+Both endpoints return `application/zip`, use `Cache-Control: private, no-store`, are rate limited, and append audit events. The archive manifest records export type, schema version, generation time, record counts, and stable customer identifiers.
+
+## Phase 11 foresight and source intelligence
+
+All endpoints require an authenticated Django session and active organisation membership. Write endpoints also enforce organisation role and record ownership in services.
+
+### Organisation overview
+
+- `GET /api/v1/organisations/{organisation_id}/foresight/overview/`
+
+Returns active signal, source, watchlist, high-attention, STEEP, and horizon counts plus the caller's contribution capability.
+
+### RSS and Atom feeds
+
+- `GET|POST /api/v1/organisations/{organisation_id}/foresight/feeds/`
+- `POST /api/v1/foresight/feeds/{feed_id}/sync/`
+
+Synchronisation is manual and throttled. Feed entries create unassessed sources only. The endpoint never creates or interprets signals.
+
+### Sources and private attachments
+
+- `GET|POST /api/v1/organisations/{organisation_id}/foresight/sources/`
+- `GET|PATCH /api/v1/foresight/sources/{source_id}/`
+- `POST /api/v1/foresight/sources/{source_id}/attachments/`
+- `GET /api/v1/foresight/attachments/{attachment_id}/download/`
+
+Attachment uploads use multipart form data with a `file` field. Downloads are tenant-authorised, audited, and returned with private no-store headers.
+
+### Signals
+
+- `GET|POST /api/v1/organisations/{organisation_id}/foresight/signals/`
+- `GET|PATCH /api/v1/foresight/signals/{signal_id}/`
+- `POST /api/v1/foresight/signals/{signal_id}/decisions/`
+
+Signal list filters include `q`, `steep_category`, `time_horizon`, `maturity`, and `status`. A decision link requires a same-tenant decision identifier and an explicit relevance explanation.
+
+### Watchlists
+
+- `GET|POST /api/v1/organisations/{organisation_id}/foresight/watchlists/`
+- `GET|PATCH /api/v1/foresight/watchlists/{watchlist_id}/`
+- `POST /api/v1/foresight/watchlists/{watchlist_id}/signals/`
+- `DELETE /api/v1/foresight/watchlists/{watchlist_id}/signals/{signal_id}/`
+
+### Evidence integration
+
+Evidence create and update contracts accept an optional `source_id`. When a structured source is selected, it must belong to the same organisation as the decision. Manual source references remain supported for backwards compatibility.
+
+## Phase 12 systems foresight
+
+- `GET|POST /api/v1/organisations/{organisation_id}/foresight/canvases/`
+- `GET|PATCH /api/v1/foresight/canvases/{canvas_id}/`
+- `POST /api/v1/foresight/canvases/{canvas_id}/drivers/`
+- `PATCH /api/v1/foresight/drivers/{driver_id}/`
+- `POST /api/v1/foresight/drivers/{driver_id}/signals/`
+- `POST /api/v1/foresight/canvases/{canvas_id}/stakeholders/`
+- `POST /api/v1/foresight/canvases/{canvas_id}/relationships/`
+- `POST /api/v1/foresight/canvases/{canvas_id}/feedback-loops/`
+- `POST /api/v1/foresight/canvases/{canvas_id}/consequences/`
+- `POST /api/v1/foresight/canvases/{canvas_id}/horizons/`
+- `POST /api/v1/foresight/canvases/{canvas_id}/implications/`
+- `PATCH /api/v1/foresight/implications/{implication_id}/`
+
+All commands use strict serializers and service-layer permission, tenant, and archival checks.
+
+## Phase 13 scenario intelligence
+
+All endpoints require authentication and tenant membership. Write commands require contribution capability; governed update commands also enforce creator, owner, or organisation-manager authority.
+
+### Scenario sets and worlds
+
+- `GET|POST /api/v1/foresight/canvases/{canvas_id}/scenario-sets/`
+- `GET|PATCH /api/v1/foresight/scenario-sets/{scenario_set_id}/`
+- `POST /api/v1/foresight/scenario-sets/{scenario_set_id}/scenarios/`
+- `PATCH /api/v1/foresight/scenarios/{scenario_id}/`
+- `POST /api/v1/foresight/scenarios/{scenario_id}/driver-states/`
+- `POST /api/v1/foresight/scenarios/{scenario_id}/implications/`
+
+The scenario-set workspace returns the four worlds, review summaries, driver states, linked implications, wind-tunnel assessments, signposts, observations, and active options from the linked decision.
+
+### Collective review and wind-tunnelling
+
+- `POST /api/v1/foresight/scenarios/{scenario_id}/reviews/`
+- `POST /api/v1/foresight/scenarios/{scenario_id}/wind-tunnel/`
+
+Posting again updates the caller's review or the scenario–option assessment. Wind-tunnelling accepts only an active option from the scenario set's linked decision.
+
+### Adaptive signposts
+
+- `POST /api/v1/foresight/scenario-sets/{scenario_set_id}/signposts/`
+- `POST /api/v1/foresight/signposts/{signpost_id}/observations/`
+
+A signpost may contain explicit relationships to scenarios in the same set. An observation may reference an existing source from the same organisation. Neither endpoint automatically changes scenario or decision status.
+
+## Phase 14 collective evaluation and prioritisation
+
+All routes require authentication. Tenant outsiders receive `404`. Strict command serializers reject unknown fields.
+
+### Decision evaluation
+
+- `GET|POST /api/v1/decisions/{decision_id}/evaluations/`
+- `GET|PATCH /api/v1/evaluations/{exercise_id}/`
+- `POST /api/v1/evaluations/{exercise_id}/criteria/`
+- `POST /api/v1/evaluations/{exercise_id}/rounds/`
+- `PATCH /api/v1/evaluation-rounds/{round_id}/`
+- `PUT /api/v1/evaluation-rounds/{round_id}/submission/`
+- `GET /api/v1/evaluation-rounds/{round_id}/results/`
+- `POST /api/v1/evaluations/{exercise_id}/minority-reports/`
+
+The exercise contract identifies one method: `scorecard`, `approval`, `consent`, or `delphi`. A blind open round returns only the caller's submission and a sealed result object. Closing the round exposes quorum, method-specific aggregates, confidence dispersion, and scorecard sensitivity. Peer-anonymous responses use neutral labels but remain attributable in the database and audit layer.
+
+### Organisation prioritisation
+
+- `GET|POST /api/v1/organisations/{organisation_id}/prioritisations/`
+- `GET|PATCH /api/v1/prioritisations/{portfolio_id}/`
+- `POST /api/v1/prioritisations/{portfolio_id}/criteria/`
+- `POST /api/v1/prioritisations/{portfolio_id}/candidates/`
+- `PUT /api/v1/prioritisation-candidates/{candidate_id}/assessments/`
+- `PUT /api/v1/prioritisation-candidates/{candidate_id}/selection/`
+
+An open blind portfolio hides aggregate scores and the constrained recommendation. After closure, the response shows candidate score, assessor count, confidence, resource requirements, mandatory status, recommendation status, and a human-readable constraint reason. Authority selections are separate records and never mutate the candidate decision.
+
+## Integrated decision analysis
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/decisions/{decision_id}/analysis/` | Read the option-centred integrated analysis workspace |
+| GET, POST | `/decisions/{decision_id}/analysis/issues/` | List or create governed contradictions and gaps |
+| PATCH | `/decision-analysis/issues/{issue_id}/` | Update an issue as its owner or an accountable authority |
+| GET, POST | `/decisions/{decision_id}/analysis/quality-reviews/` | Read visible versions or create one authority-scoped draft |
+| PATCH | `/decision-analysis/quality-reviews/{review_id}/` | Edit or publish a draft quality review |
+| GET, POST | `/decisions/{decision_id}/analysis/executive-summaries/` | Read visible versions or create one authority-scoped draft |
+| PATCH | `/decision-analysis/executive-summaries/{summary_id}/` | Edit or approve a draft executive summary |
+
+The workspace response contains server-derived `can_manage` and `can_contribute` capabilities and a principle statement confirming that analysis does not select an option or advance the decision lifecycle.
+
+Issue creation accepts a bounded issue type, title, description, severity, active-member owner, optional due date, and optional same-decision links. Resolution requires `status: "resolved"` plus non-empty `resolution` text.
+
+Quality-review answer keys are limited to the published checklist contract. A draft may only transition to `published`. An executive-summary draft may only transition to `approved`. Published, approved, and superseded records reject mutation.
+
+## Public demo requests
+
+| Method | Path | Purpose | Access |
+|---|---|---|---|
+| POST | `/public/demo-requests/` | Store a prospective-customer request for a tailored demonstration | Public, CSRF protected, rate limited |
+
+Accepted fields are `full_name`, `work_email`, `organisation_name`, `job_title`, `organisation_size`, `primary_need`, `message`, `consent_to_contact`, and the blank anti-spam field `website`. Unknown fields are rejected. A successful response is `202 Accepted` with a reference identifier. The endpoint does not create an account, organisation, membership, or marketing subscription.
+
+## Phase 16 contribution-orchestration API
+
+All routes require the normal session-authenticated, CSRF-protected API boundary. Unknown command fields are rejected.
+
+- `GET|POST /api/v1/decisions/{decision_id}/contribution-requests/` — read the decision workspace or create a governed request.
+- `GET /api/v1/contribution-requests/{request_id}/` — read one visible request; `PATCH` revises an editable assignment without rewriting submitted history.
+- `POST /api/v1/contribution-requests/{request_id}/actions/` — open, start, start review, or cancel under state and capability rules.
+- `PUT /api/v1/contribution-requests/{request_id}/draft/` — create or replace the assignee's mutable draft.
+- `POST /api/v1/contribution-requests/{request_id}/submit/` — create an immutable submitted revision.
+- `POST /api/v1/contribution-requests/{request_id}/review/` — append an accepted, returned, or comment review.
+- `GET|POST /api/v1/decisions/{decision_id}/facilitation-sessions/` — list or schedule structured sessions.
+- `POST /api/v1/facilitation-sessions/{session_id}/status/` — perform a valid forward session transition.
+- `POST /api/v1/facilitation-participants/{participant_id}/attendance/` — record workshop attendance.
+- `GET /api/v1/contributions/my-work/` — return current assignee and explicit reviewer work across visible organisations.
+- `GET|PATCH /api/v1/organisations/{organisation_id}/contribution-preferences/` — read or update the current user's delivery settings.
+
+## Phase 17 organisation methodology and administration API
+
+Method routes:
+
+- `GET|POST /api/v1/organisations/{organisation_id}/decision-methods/`
+- `POST /api/v1/organisations/{organisation_id}/decision-methods/clone/`
+- `GET /api/v1/organisations/{organisation_id}/decision-method-usage/`
+- `GET /api/v1/decision-methods/{method_id}/`
+- `POST /api/v1/decision-methods/{method_id}/versions/`
+- `POST /api/v1/decision-methods/{method_id}/retire/`
+- `PATCH /api/v1/decision-method-versions/{version_id}/`
+- `POST /api/v1/decision-method-versions/{version_id}/approve/`
+
+Organisation-administration routes:
+
+- `GET|PATCH /api/v1/organisations/{organisation_id}/administration/`
+- `GET /api/v1/organisations/{organisation_id}/membership-history/`
+- `POST /api/v1/organisations/{organisation_id}/transfer-ownership/`
+- `POST /api/v1/organisations/{organisation_id}/deactivate/`
+- `POST /api/v1/organisations/{organisation_id}/reactivate/`
+- `GET|POST /api/v1/organisations/{organisation_id}/deletion-requests/`
+- `POST /api/v1/organisations/deletion-requests/{request_id}/cancel/`
+
+Decision creation accepts either `template_key` or `method_version_id`, never both as active choices. Only an approved same-tenant organisation method is accepted.
+
+## Platform administration (Phase 18B)
+
+Public contact configuration is available at `GET /api/v1/public/configuration/`.
+
+Authenticated users with an active platform-administrator capability may use:
+
+- `GET /api/v1/platform-admin/overview/`
+- `GET /api/v1/platform-admin/organisations/`
+- `POST /api/v1/platform-admin/organisations/{id}/support-access/`
+- `GET /api/v1/platform-admin/organisations/{id}/`
+- `POST /api/v1/platform-admin/organisations/{id}/ownership/`
+- `POST /api/v1/platform-admin/organisations/{id}/state/`
+- `GET /api/v1/platform-admin/users/`
+- `GET/PATCH /api/v1/platform-admin/configuration/`
+- demo-request, administrator-capability, invitation-action, and audit endpoints under the same prefix.
+
+Tenant detail and operational endpoints enforce an active, unexpired support-access grant and append audit records. Platform authority does not imply organisation membership.

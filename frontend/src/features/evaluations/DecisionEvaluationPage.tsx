@@ -127,7 +127,7 @@ export function DecisionEvaluationPage() {
           </section>
         </aside>
 
-        <main className="evaluation-main">
+        <section className="evaluation-main" aria-label="Evaluation workspace">
           {selectedId && exercise.isPending ? <p>Loading exercise…</p> : null}
           {exercise.isError ? <StatusMessage kind="error">The selected exercise could not be loaded.</StatusMessage> : null}
           {exercise.data ? (
@@ -139,7 +139,7 @@ export function DecisionEvaluationPage() {
           ) : !selectedId ? (
             <section className="empty-state panel-card"><h2>Create the first evaluation</h2><p>Start with a method that matches the decision: score alternatives, test approval, seek consent, or run iterative Delphi rounds.</p></section>
           ) : null}
-        </main>
+        </section>
       </div>
     </div>
   );

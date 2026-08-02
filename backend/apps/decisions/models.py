@@ -62,6 +62,15 @@ class Decision(UUIDTimeStampedModel):
     context = models.TextField(blank=True)
     scope = models.TextField(blank=True)
     contribution_guidance = models.TextField(blank=True)
+    source_template_key = models.CharField(max_length=80, blank=True)
+    source_template_version = models.PositiveSmallIntegerField(null=True, blank=True)
+    source_method_version = models.ForeignKey(
+        "methodology.DecisionMethodVersion",
+        on_delete=models.PROTECT,
+        related_name="decisions",
+        null=True,
+        blank=True,
+    )
     urgency = models.CharField(
         max_length=20,
         choices=Urgency.choices,
@@ -142,6 +151,38 @@ class Decision(UUIDTimeStampedModel):
         self.context = self.context.strip()
         self.scope = self.scope.strip()
         self.contribution_guidance = self.contribution_guidance.strip()
+        self.source_template_key = self.source_template_key.strip()
+        if self.source_template_key:
+            from .templates import template_for_key
+
+            template = template_for_key(self.source_template_key)
+            if template is None:
+                raise ValidationError(
+                    {"source_template_key": "Use a recognised decision template."}
+                )
+            if self.source_template_version != template.version:
+                raise ValidationError(
+                    {
+                        "source_template_version": (
+                            "The template version must match the selected template."
+                        )
+                    }
+                )
+        elif self.source_template_version is not None:
+            raise ValidationError(
+                {
+                    "source_template_version": (
+                        "A template version requires a template key."
+                    )
+                }
+            )
+        if self.source_method_version_id:
+            if self.source_template_key:
+                raise ValidationError({"source_method_version": "Choose either a built-in template or an organisation method."})
+            if self.source_method_version.organisation_id != self.organisation_id:
+                raise ValidationError({"source_method_version": "The method must belong to the decision organisation."})
+            if self.source_method_version.status != "approved":
+                raise ValidationError({"source_method_version": "Only an approved method version can be applied."})
         if self.workspace_id and self.organisation_id:
             if self.workspace.organisation_id != self.organisation_id:
                 raise ValidationError(

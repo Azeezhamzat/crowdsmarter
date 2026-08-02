@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import { Icon, type IconName } from "../../components/Icon";
+import { buildMailto, contactChannels } from "../../config/contact";
 import { ForesightDecisionTrace, WorkflowIllustration } from "./WorkflowIllustrations";
 
 const workflow = [
@@ -67,7 +68,6 @@ export function LandingPage() {
 
   return (
     <div className="public-site public-site--executive">
-      <a className="skip-link" href="#main-content">Skip to main content</a>
       <header className="public-header public-header--executive">
         <Link className="public-brand" to="/" aria-label="The CrowdSmarter home">
           <span className="public-brand__mark" aria-hidden="true"><span /><span /><span /></span>
@@ -85,7 +85,7 @@ export function LandingPage() {
         </div>
       </header>
 
-      <main id="main-content">
+      <main id="main-content" tabIndex={-1}>
         <section className="hero hero--executive" aria-labelledby="hero-title">
           <div className="hero__copy hero__copy--executive">
             <div className="public-proof-pill"><Icon name="shield" size={16} />Human judgement remains in control</div>
@@ -188,7 +188,7 @@ export function LandingPage() {
             <p className="public-eyebrow">The product is the workflow</p>
             <h2 id="workflow-title">Move from emerging change to better judgement—without losing the evidence trail.</h2>
           </div>
-          <div className="workflow-tabs workflow-tabs--executive" role="tablist" aria-label="CrowdSmarter workflow stages">
+          <div className="workflow-tabs workflow-tabs--executive" role="tablist" aria-label="CrowdSmarter workflow stages" aria-orientation="horizontal">
             {workflow.map((step, index) => (
               <button
                 key={step.key}
@@ -225,6 +225,7 @@ export function LandingPage() {
             className="workflow-feature workflow-feature--executive"
             role="tabpanel"
             aria-labelledby={`workflow-tab-${activeWorkflow.key}`}
+            tabIndex={0}
           >
             <div>
               <p className="public-eyebrow">{activeWorkflow.label}</p>
@@ -270,6 +271,10 @@ export function LandingPage() {
               <h2 id="trust-title">Your decision records should remain inspectable, portable, and under human authority.</h2>
               <p>CrowdSmarter is built as a maintainable modular monolith using open technologies, explicit permissions, tenant isolation, audit history, and customer-controlled exports.</p>
               <Link className="public-text-link" to="/request-demo">Discuss your governance requirements <Icon name="arrow-right" size={16} /></Link>
+              <div className="trust-contact-links" aria-label="Governance contact channels">
+                <a href={buildMailto(contactChannels.privacy, "CrowdSmarter privacy enquiry")}>Privacy enquiries</a>
+                <a href={buildMailto(contactChannels.security, "CrowdSmarter security report")}>Security reports</a>
+              </div>
             </div>
             <div className="trust-list trust-list--executive">
               <article><Icon name="shield" /><div><strong>Human authority</strong><span>No automated final decisions or silent AI changes.</span></div></article>
@@ -297,6 +302,10 @@ export function LandingPage() {
 
       <footer className="public-footer public-footer--executive">
         <div className="public-brand"><span className="public-brand__mark" aria-hidden="true"><span /><span /><span /></span><span><strong>The CrowdSmarter</strong><small>Foresight-driven organisational decision intelligence</small></span></div>
+        <div className="public-footer__contact">
+          <span>General enquiries and partnerships</span>
+          <a href={buildMailto(contactChannels.general, "CrowdSmarter enquiry")}>{contactChannels.general}</a>
+        </div>
         <div className="public-footer__links"><Link to="/request-demo">Request a demo</Link><Link to="/login">Sign in</Link><span>Human authority retained</span></div>
       </footer>
     </div>

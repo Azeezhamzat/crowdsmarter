@@ -5,6 +5,8 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { FieldError } from "../../components/FieldError";
+import { Icon } from "../../components/Icon";
+import { buildMailto, contactChannels } from "../../config/contact";
 import { StatusMessage } from "../../components/StatusMessage";
 import { ApiError } from "../../lib/api";
 import { changePassword, fetchCurrentUser, updateProfile } from "./api";
@@ -63,6 +65,26 @@ export function AccountSettingsPage() {
             <button className="button button--primary" type="submit" disabled={password.isPending}>{password.isPending ? "Changing…" : "Change password"}</button>
           </form>
         </section>
+      </div>
+      <div className="account-operations-grid">
+        <section className="overview-card account-contact-card" aria-labelledby="account-support-title">
+          <span className="account-contact-card__icon"><Icon name="users" size={20} /></span>
+          <div>
+            <h2 id="account-support-title">Account and product support</h2>
+            <p className="muted">Use the official CrowdSmarter address for access issues, account questions, and product support.</p>
+            <a href={buildMailto(contactChannels.support, "CrowdSmarter account support", `Account email: ${user.data?.email ?? ""}\nIssue:`)}>{contactChannels.support}</a>
+          </div>
+        </section>
+        {user.data?.is_staff ? (
+          <section className="overview-card account-contact-card" aria-labelledby="system-admin-title">
+            <span className="account-contact-card__icon"><Icon name="shield" size={20} /></span>
+            <div>
+              <h2 id="system-admin-title">System administration</h2>
+              <p className="muted">Use Django administration for technical access, demo-request triage, and exceptional data correction—not normal decision work.</p>
+              <a href={contactChannels.adminUrl} target="_blank" rel="noreferrer">Open system administration <Icon name="external" size={15} /></a>
+            </div>
+          </section>
+        ) : null}
       </div>
     </div>
   );

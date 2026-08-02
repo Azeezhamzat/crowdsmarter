@@ -42,6 +42,13 @@ class Evidence(UUIDTimeStampedModel):
     decision = models.ForeignKey(
         "decisions.Decision", on_delete=models.CASCADE, related_name="evidence_items"
     )
+    source = models.ForeignKey(
+        "foresight.Source",
+        on_delete=models.PROTECT,
+        related_name="decision_evidence",
+        null=True,
+        blank=True,
+    )
     option = models.ForeignKey(
         "decision_options.DecisionOption",
         on_delete=models.PROTECT,
@@ -121,14 +128,16 @@ class Evidence(UUIDTimeStampedModel):
                 raise ValidationError(
                     {"organisation": "The evidence must share the decision organisation."}
                 )
+        if self.source_id and self.source.organisation_id != self.organisation_id:
+            raise ValidationError({"source": "The source must share the organisation."})
         if self.option_id:
             if self.option.decision_id != self.decision_id:
                 raise ValidationError({"option": "The option must belong to this decision."})
             if self.option.organisation_id != self.organisation_id:
                 raise ValidationError({"option": "The option must share the organisation."})
-        if not self.source_reference and not self.source_url:
+        if not self.source_id and not self.source_reference and not self.source_url:
             raise ValidationError(
-                {"source_reference": "Provide a source reference or a source URL."}
+                {"source_reference": "Provide a structured source, source reference, or source URL."}
             )
         if self.status == self.Status.ACTIVE and (self.withdrawn_at or self.withdrawn_by_id):
             raise ValidationError("Active evidence cannot contain withdrawal metadata.")

@@ -20,7 +20,7 @@ class EvidenceSerializer(serializers.ModelSerializer):
     class Meta:
         model = Evidence
         fields = [
-            "id", "decision_id", "option_id", "title", "summary", "source_type",
+            "id", "decision_id", "option_id", "source_id", "title", "summary", "source_type",
             "source_type_label", "source_reference", "source_url", "stance",
             "stance_label", "strength", "strength_label", "status", "status_label",
             "created_by", "can_edit", "created_at", "updated_at",
@@ -40,6 +40,7 @@ class EvidenceSerializer(serializers.ModelSerializer):
 
 
 class EvidenceCreateSerializer(StrictSerializer):
+    source_id = serializers.UUIDField(required=False, allow_null=True)
     option_id = serializers.UUIDField(required=False, allow_null=True)
     title = serializers.CharField(max_length=240, trim_whitespace=True)
     summary = serializers.CharField(max_length=12000, trim_whitespace=True)
@@ -56,14 +57,15 @@ class EvidenceCreateSerializer(StrictSerializer):
     )
 
     def validate(self, attrs):  # type: ignore[no-untyped-def]
-        if not attrs.get("source_reference") and not attrs.get("source_url"):
+        if not attrs.get("source_id") and not attrs.get("source_reference") and not attrs.get("source_url"):
             raise serializers.ValidationError(
-                {"source_reference": "Provide a source reference or a source URL."}
+                {"source_reference": "Provide a structured source, source reference, or source URL."}
             )
         return attrs
 
 
 class EvidenceUpdateSerializer(StrictSerializer):
+    source_id = serializers.UUIDField(required=False, allow_null=True)
     option_id = serializers.UUIDField(required=False, allow_null=True)
     title = serializers.CharField(max_length=240, trim_whitespace=True, required=False)
     summary = serializers.CharField(max_length=12000, trim_whitespace=True, required=False)

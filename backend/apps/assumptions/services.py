@@ -13,6 +13,8 @@ from apps.decision_options.models import DecisionOption
 from apps.decisions.models import Decision
 from apps.decisions.reasoning_policies import can_contribute_reasoning, can_edit_reasoning
 from apps.organisations.models import Membership
+from apps.notifications.models import Notification
+from apps.notifications.services import create_notification
 
 from .models import Assumption
 
@@ -68,6 +70,20 @@ def create_assumption(
     )
     assumption.full_clean(validate_unique=False, validate_constraints=False)
     assumption.save()
+    if assumption.owner_id != actor.id:
+        create_notification(
+            recipient=assumption.owner,
+            organisation=decision.organisation,
+            decision=decision,
+            kind=Notification.Kind.ASSIGNMENT,
+            title="You own an assumption",
+            message=(
+                f"You were assigned an assumption in “{decision.title}”: "
+                f"{assumption.statement[:180]}"
+            ),
+            url=f"/decisions/{decision.id}/reasoning/assumptions",
+            dedup_key=f"assumption-owner:{assumption.id}:{assumption.owner_id}",
+        )
     record_event(
         action="assumption.created",
         object_type="assumption",
@@ -93,6 +109,7 @@ def update_assumption(
         accountable_user_id=assumption.owner_id,
     ):
         raise PermissionDenied("You cannot edit this assumption in the current decision state.")
+    previous_owner_id = assumption.owner_id
     before = {field: getattr(assumption, field) for field in fields}
     if "option_id" in fields:
         assumption.option = _option(
@@ -108,6 +125,20 @@ def update_assumption(
         setattr(assumption, field, value)
     assumption.full_clean(validate_unique=False, validate_constraints=False)
     assumption.save()
+    if assumption.owner_id != previous_owner_id and assumption.owner_id != actor.id:
+        create_notification(
+            recipient=assumption.owner,
+            organisation=assumption.organisation,
+            decision=assumption.decision,
+            kind=Notification.Kind.ASSIGNMENT,
+            title="You now own an assumption",
+            message=(
+                "You were assigned an assumption in "
+                f"“{assumption.decision.title}”: {assumption.statement[:180]}"
+            ),
+            url=f"/decisions/{assumption.decision_id}/reasoning/assumptions",
+            dedup_key=f"assumption-owner:{assumption.id}:{assumption.owner_id}",
+        )
     after = {field: getattr(assumption, field) for field in before}
     record_event(
         action="assumption.updated",

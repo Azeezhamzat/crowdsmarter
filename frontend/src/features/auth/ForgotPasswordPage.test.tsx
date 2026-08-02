@@ -13,6 +13,7 @@ function renderPage() {
 describe("ForgotPasswordPage", () => {
   it("validates the email address before requesting recovery", async () => {
     renderPage();
+    expect(screen.getByRole("link", { name: "hello@crowdsmarter.com" })).toHaveAttribute("href", expect.stringContaining("mailto:hello@crowdsmarter.com"));
     fireEvent.click(screen.getByRole("button", { name: "Send reset link" }));
     expect(await screen.findByText("Enter a valid email address.")).toBeInTheDocument();
   });

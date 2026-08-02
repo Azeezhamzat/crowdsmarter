@@ -26,10 +26,36 @@ export function AppShell() {
   const location = useLocation();
   const queryClient = useQueryClient();
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const mobileMenuButtonRef = useRef<HTMLButtonElement>(null);
+  const sidebarCloseButtonRef = useRef<HTMLButtonElement>(null);
+  const restoreSidebarFocusRef = useRef(false);
+  const commandTriggerRef = useRef<HTMLButtonElement>(null);
+  const commandDialogRef = useRef<HTMLDivElement>(null);
+  const restoreCommandFocusRef = useRef(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
   const [commandQuery, setCommandQuery] = useState("");
   const [commandIndex, setCommandIndex] = useState(0);
+
+  function closeSidebar(restoreFocus = true) {
+    restoreSidebarFocusRef.current = restoreFocus;
+    setSidebarOpen(false);
+  }
+
+  function openSidebar() {
+    restoreSidebarFocusRef.current = false;
+    setSidebarOpen(true);
+  }
+
+  function closeCommand(restoreFocus = true) {
+    restoreCommandFocusRef.current = restoreFocus;
+    setCommandOpen(false);
+  }
+
+  function openCommand() {
+    restoreCommandFocusRef.current = false;
+    setCommandOpen(true);
+  }
 
   const currentUser = useQuery({
     queryKey: ["current-user"],
@@ -56,24 +82,56 @@ export function AppShell() {
   });
 
   useEffect(() => {
+    restoreSidebarFocusRef.current = false;
     setSidebarOpen(false);
+    restoreCommandFocusRef.current = false;
     setCommandOpen(false);
   }, [location.pathname]);
+
+  useEffect(() => {
+    if (sidebarOpen) {
+      const focusTimer = window.setTimeout(() => sidebarCloseButtonRef.current?.focus());
+      return () => window.clearTimeout(focusTimer);
+    }
+    if (restoreSidebarFocusRef.current) {
+      const focusTimer = window.setTimeout(() => mobileMenuButtonRef.current?.focus());
+      restoreSidebarFocusRef.current = false;
+      return () => window.clearTimeout(focusTimer);
+    }
+    return undefined;
+  }, [sidebarOpen]);
+
+  useEffect(() => {
+    const focusTimer = window.setTimeout(() => {
+      const main = document.getElementById("main-content");
+      const focusTarget = main?.querySelector<HTMLElement>("h1") ?? main;
+      if (!focusTarget) return;
+      if (!focusTarget.hasAttribute("tabindex")) focusTarget.setAttribute("tabindex", "-1");
+      focusTarget.classList.add("route-focus-target");
+      focusTarget.focus({ preventScroll: true });
+    });
+    return () => window.clearTimeout(focusTimer);
+  }, []);
 
   useEffect(() => {
     function handleShortcut(event: KeyboardEvent) {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
-        setCommandOpen((open) => !open);
+        setCommandOpen((open) => {
+          restoreCommandFocusRef.current = open;
+          return !open;
+        });
       }
       if (event.key === "Escape") {
+        restoreCommandFocusRef.current = commandOpen;
         setCommandOpen(false);
+        restoreSidebarFocusRef.current = sidebarOpen;
         setSidebarOpen(false);
       }
     }
     window.addEventListener("keydown", handleShortcut);
     return () => window.removeEventListener("keydown", handleShortcut);
-  }, []);
+  }, [commandOpen, sidebarOpen]);
 
   useEffect(() => {
     if (commandOpen) {
@@ -81,12 +139,17 @@ export function AppShell() {
     } else {
       setCommandQuery("");
       setCommandIndex(0);
+      if (restoreCommandFocusRef.current) {
+        window.setTimeout(() => commandTriggerRef.current?.focus(), 0);
+        restoreCommandFocusRef.current = false;
+      }
     }
   }, [commandOpen]);
 
   const commandItems = useMemo<CommandItem[]>(() => {
     const basics: CommandItem[] = [
       { label: "My work", description: "Your active decisions and next actions", href: "/app", icon: "home", group: "Navigate" },
+      ...(currentUser.data?.is_platform_administrator ? [{ label: "Platform administration", description: "Users, tenants, support access, demo requests, and service settings", href: "/platform-admin", icon: "shield" as const, group: "Administration" }] : []),
       { label: "Notifications", description: "Assignments, mentions, and workflow updates", href: "/notifications", icon: "bell", group: "Navigate" },
       { label: "Contribution inbox", description: "Assigned contributions, drafts, reviews, and due work", href: "/contributions", icon: "check", group: "Navigate" },
       { label: "Account settings", description: "Profile and password security", href: "/account", icon: "shield", group: "Navigate" },
@@ -136,7 +199,7 @@ export function AppShell() {
       }] : []),
     ]));
     return [...basics, ...organisationItems];
-  }, [organisations.data]);
+  }, [organisations.data, currentUser.data?.is_platform_administrator]);
 
   const filteredCommands = commandItems.filter((item) => {
     const needle = commandQuery.trim().toLowerCase();
@@ -155,7 +218,27 @@ export function AppShell() {
     const selectedCommand = filteredCommands[commandIndex];
     if (event.key === "Enter" && selectedCommand) {
       event.preventDefault();
+      closeCommand(false);
       navigate(selectedCommand.href);
+    }
+  }
+
+  function handleCommandDialogKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    if (event.key !== "Tab" || !commandDialogRef.current) return;
+    const focusable = Array.from(
+      commandDialogRef.current.querySelectorAll<HTMLElement>(
+        'input:not([disabled]), button:not([disabled]):not([tabindex="-1"]), [href]:not([tabindex="-1"])',
+      ),
+    );
+    if (!focusable.length) return;
+    const first = focusable[0]!;
+    const last = focusable[focusable.length - 1]!;
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
     }
   }
 
@@ -170,16 +253,16 @@ export function AppShell() {
         className="app-nav-backdrop"
         type="button"
         aria-label="Close navigation"
-        onClick={() => setSidebarOpen(false)}
+        onClick={() => closeSidebar()}
       />
 
-      <aside className="app-sidebar" aria-label="Primary application navigation">
+      <aside id="application-sidebar" className="app-sidebar" aria-label="Primary application navigation">
         <div className="app-sidebar__brand-row">
           <Link to="/app" className="brand brand--sidebar" aria-label="The CrowdSmarter application home">
             <span className="brand-mark brand-mark--premium" aria-hidden="true"><span /><span /><span /></span>
             <span className="brand-copy"><strong>The CrowdSmarter</strong><small>Decision intelligence</small></span>
           </Link>
-          <button className="icon-button app-sidebar__close" type="button" onClick={() => setSidebarOpen(false)} aria-label="Close navigation">
+          <button ref={sidebarCloseButtonRef} className="icon-button app-sidebar__close" type="button" onClick={() => closeSidebar()} aria-label="Close navigation">
             <Icon name="close" />
           </button>
         </div>
@@ -196,6 +279,9 @@ export function AppShell() {
           <NavLink to="/contributions" className={({ isActive }) => `sidebar-nav__link${isActive ? " is-active" : ""}`}>
             <Icon name="check" /><span>Contribution inbox</span>
           </NavLink>
+          {currentUser.data?.is_platform_administrator ? <NavLink to="/platform-admin" className={({ isActive }) => `sidebar-nav__link sidebar-nav__link--platform${isActive ? " is-active" : ""}`}>
+            <Icon name="shield" /><span>Platform administration</span>
+          </NavLink> : null}
 
           <p className="sidebar-nav__label sidebar-nav__label--spaced">Organisations</p>
           {organisations.isPending ? <div className="sidebar-skeleton" aria-label="Loading organisations"><span /><span /></div> : null}
@@ -231,10 +317,19 @@ export function AppShell() {
       <div className="app-frame">
         <header className="app-topbar">
           <div className="app-topbar__left">
-            <button className="icon-button mobile-menu-button" type="button" onClick={() => setSidebarOpen(true)} aria-label="Open navigation">
+            <button ref={mobileMenuButtonRef} className="icon-button mobile-menu-button" type="button" onClick={openSidebar} aria-label="Open navigation" aria-expanded={sidebarOpen} aria-controls="application-sidebar">
               <Icon name="menu" />
             </button>
-            <button className="command-trigger" type="button" onClick={() => setCommandOpen(true)}>
+            <button
+              ref={commandTriggerRef}
+              className="command-trigger"
+              type="button"
+              onClick={openCommand}
+              aria-haspopup="dialog"
+              aria-expanded={commandOpen}
+              aria-controls="quick-navigation-dialog"
+              aria-keyshortcuts="Control+K Meta+K"
+            >
               <Icon name="search" />
               <span>Search or go to…</span>
               <kbd>⌘ K</kbd>
@@ -252,39 +347,72 @@ export function AppShell() {
           </div>
         </header>
 
-        <main className="main-content main-content--app">
+        <main id="main-content" className="main-content main-content--app" tabIndex={-1}>
           <Outlet />
         </main>
       </div>
 
       {commandOpen ? (
-        <div className="command-overlay" role="dialog" aria-modal="true" aria-labelledby="command-title" onMouseDown={(event) => {
-          if (event.currentTarget === event.target) setCommandOpen(false);
-        }}>
+        <div
+          id="quick-navigation-dialog"
+          ref={commandDialogRef}
+          className="command-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="command-title"
+          aria-describedby="command-instructions"
+          onKeyDown={handleCommandDialogKeyDown}
+          onMouseDown={(event) => {
+            if (event.currentTarget === event.target) closeCommand();
+          }}
+        >
           <section className="command-palette">
             <h2 className="visually-hidden" id="command-title">Quick navigation</h2>
+            <p className="visually-hidden" id="command-instructions">Type to filter destinations. Use the up and down arrow keys to choose a result, then press Enter to open it. Press Escape to close.</p>
             <div className="command-search">
               <Icon name="search" />
               <input
                 ref={searchInputRef}
+                role="combobox"
+                aria-autocomplete="list"
+                aria-expanded="true"
+                aria-controls="command-results"
+                aria-activedescendant={filteredCommands[commandIndex] ? `command-option-${commandIndex}` : undefined}
                 value={commandQuery}
                 onChange={(event) => { setCommandQuery(event.target.value); setCommandIndex(0); }}
                 onKeyDown={handleCommandKeyDown}
                 placeholder="Search organisations and destinations"
                 aria-label="Search navigation"
               />
-              <kbd>Esc</kbd>
+              <button className="icon-button command-close" type="button" onClick={() => closeCommand()} aria-label="Close quick navigation">
+                <Icon name="close" size={18} />
+              </button>
             </div>
-            <div className="command-results">
+            <div id="command-results" className="command-results" role="listbox" aria-label="Navigation results">
               {filteredCommands.length ? filteredCommands.map((item, index) => (
-                <button className={`command-item${commandIndex === index ? " is-selected" : ""}`} type="button" key={`${item.group}-${item.href}`} onMouseEnter={() => setCommandIndex(index)} onClick={() => navigate(item.href)}>
+                <button
+                  id={`command-option-${index}`}
+                  className={`command-item${commandIndex === index ? " is-selected" : ""}`}
+                  type="button"
+                  role="option"
+                  aria-selected={commandIndex === index}
+                  tabIndex={-1}
+                  key={`${item.group}-${item.href}`}
+                  onMouseEnter={() => setCommandIndex(index)}
+                  onClick={() => { closeCommand(false); navigate(item.href); }}
+                >
                   <span className="command-item__icon"><Icon name={item.icon} /></span>
                   <span><strong>{item.label}</strong><small>{item.description}</small></span>
                   <Icon name="arrow-right" size={17} />
                 </button>
               )) : <div className="command-empty"><Icon name="search" /><p>No matching destination</p></div>}
             </div>
-            <footer className="command-footer"><span><kbd>↑</kbd><kbd>↓</kbd> navigate</span><span><kbd>Enter</kbd> open</span></footer>
+            <div className="visually-hidden" role="status" aria-live="polite" aria-atomic="true">
+              {filteredCommands[commandIndex]
+                ? `${filteredCommands[commandIndex].label}, ${commandIndex + 1} of ${filteredCommands.length}`
+                : "No matching destinations"}
+            </div>
+            <footer className="command-footer"><span><kbd>↑</kbd><kbd>↓</kbd> navigate</span><span><kbd>Enter</kbd> open</span><span><kbd>Esc</kbd> close</span></footer>
           </section>
         </div>
       ) : null}

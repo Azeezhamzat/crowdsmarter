@@ -66,7 +66,7 @@ export function AcceptInvitationPage() {
 
   if (!rawToken) {
     return (
-      <main className="auth-layout">
+      <main id="main-content" className="auth-layout" tabIndex={-1}>
         <section className="auth-card">
           <StatusMessage kind="error">The invitation link is incomplete.</StatusMessage>
         </section>
@@ -75,12 +75,12 @@ export function AcceptInvitationPage() {
   }
 
   if (invitation.isPending) {
-    return <div className="centred-state">Checking your invitation…</div>;
+    return <main id="main-content" className="centred-state" tabIndex={-1} aria-busy="true">Checking your invitation…</main>;
   }
 
   if (invitation.isError || !invitation.data) {
     return (
-      <main className="auth-layout">
+      <main id="main-content" className="auth-layout" tabIndex={-1}>
         <section className="auth-card">
           <h1>Invitation unavailable</h1>
           <StatusMessage kind="error">
@@ -101,7 +101,7 @@ export function AcceptInvitationPage() {
   const loginNext = `/accept-invitation#token=${encodeURIComponent(rawToken)}`;
 
   return (
-    <main className="auth-layout">
+    <main id="main-content" className="auth-layout" tabIndex={-1}>
       <section className="auth-introduction" aria-labelledby="invitation-heading">
         <p className="eyebrow">Organisation invitation</p>
         <h1 id="invitation-heading">Join {details.organisation_name}</h1>

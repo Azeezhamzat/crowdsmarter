@@ -11,6 +11,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml manage.py ./
+COPY conftest.py ./
 COPY crowdsmarter ./crowdsmarter
 COPY apps ./apps
 RUN pip install --upgrade pip && pip install .

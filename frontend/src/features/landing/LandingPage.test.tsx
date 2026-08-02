@@ -16,6 +16,11 @@ describe("LandingPage", () => {
     expect(screen.getByRole("heading", { name: /move from emerging change to better judgement/i })).toBeInTheDocument();
     expect(screen.getByRole("img", { name: /signal sensing workflow/i })).toBeInTheDocument();
     expect(screen.getByRole("img", { name: /foresight-to-decision trace/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "hello@crowdsmarter.com" })).toHaveAttribute("href", expect.stringContaining("mailto:hello@crowdsmarter.com"));
+    expect(screen.getByRole("link", { name: "Privacy enquiries" })).toHaveAttribute("href", expect.stringContaining("mailto:hello@crowdsmarter.com"));
+
+    expect(screen.getByRole("tablist", { name: /workflow stages/i })).toHaveAttribute("aria-orientation", "horizontal");
+    expect(screen.getByRole("tabpanel", { name: /sense/i })).toHaveAttribute("tabindex", "0");
 
     const senseTab = screen.getByRole("tab", { name: /sense/i });
     senseTab.focus();

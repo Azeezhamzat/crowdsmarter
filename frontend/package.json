@@ -1,7 +1,7 @@
 {
   "name": "crowdsmarter-frontend",
   "private": true,
-  "version": "0.17.3",
+  "version": "0.18.2",
   "type": "module",
   "engines": {
     "node": ">=20.19"

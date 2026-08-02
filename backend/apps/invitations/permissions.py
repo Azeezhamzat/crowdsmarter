@@ -22,7 +22,8 @@ class CanManageInvitations(BasePermission):
             user=request.user,
             status=Membership.Status.ACTIVE,
         ).first()
-        return membership is not None and membership.role in {
-            Membership.Role.OWNER,
-            Membership.Role.ADMIN,
-        }
+        if membership is None or organisation.status != Organisation.Status.ACTIVE:
+            return False
+        if organisation.invitation_policy == Organisation.InvitationPolicy.OWNERS_ONLY:
+            return membership.role == Membership.Role.OWNER
+        return membership.role in {Membership.Role.OWNER, Membership.Role.ADMIN}

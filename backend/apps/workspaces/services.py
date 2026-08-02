@@ -66,6 +66,8 @@ def create_workspace(
 ) -> Workspace:
     """Create a workspace under tenant management rules."""
     _require_manager(actor=actor, organisation=organisation)
+    if organisation.status != Organisation.Status.ACTIVE:
+        raise WorkspaceServiceError("Reactivate the organisation before creating a workspace.")
     workspace = Workspace(
         organisation=organisation,
         name=name,

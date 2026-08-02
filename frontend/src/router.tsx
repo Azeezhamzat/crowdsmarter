@@ -1,5 +1,7 @@
 import { createBrowserRouter } from "react-router-dom";
 
+import { RouteAccessibility } from "./components/RouteAccessibility";
+
 import { OrganisationAuditPage } from "./features/audit/OrganisationAuditPage";
 import { DecisionAIReviewPage } from "./features/ai-assistance/DecisionAIReviewPage";
 import { DecisionCollaborationPage } from "./features/collaboration/DecisionCollaborationPage";
@@ -26,11 +28,14 @@ import { DecisionGovernancePage } from "./features/governance/DecisionGovernance
 import { AcceptInvitationPage } from "./features/invitations/AcceptInvitationPage";
 import { NotificationsPage } from "./features/notifications/NotificationsPage";
 import { LandingPage } from "./features/landing/LandingPage";
+import { NotFoundPage } from "./features/not-found/NotFoundPage";
 import { OrganisationAdministrationPage } from "./features/organisations/OrganisationAdministrationPage";
 import { OrganisationDetailPage } from "./features/organisations/OrganisationDetailPage";
 import { OrganisationMethodsPage } from "./features/organisations/OrganisationMethodsPage";
 import { OrganisationListPage } from "./features/organisations/OrganisationListPage";
 import { OrganisationPortfolioPage } from "./features/portfolio/OrganisationPortfolioPage";
+import { PlatformAdminPage } from "./features/platform-admin/PlatformAdminPage";
+import { PlatformOrganisationSupportPage } from "./features/platform-admin/PlatformOrganisationSupportPage";
 import { DecisionOutcomesPage } from "./features/outcomes/DecisionOutcomesPage";
 import { DecisionReasoningPage } from "./features/reasoning/DecisionReasoningPage";
 import { OrganisationSearchPage } from "./features/search/OrganisationSearchPage";
@@ -38,7 +43,10 @@ import { WorkspaceDetailPage } from "./features/workspaces/WorkspaceDetailPage";
 import { WorkspaceListPage } from "./features/workspaces/WorkspaceListPage";
 
 export const router = createBrowserRouter([
-  { path: "/", element: <LandingPage /> },
+  {
+    element: <RouteAccessibility />,
+    children: [
+      { path: "/", element: <LandingPage /> },
   { path: "/login", element: <LoginPage /> },
   { path: "/request-demo", element: <RequestDemoPage /> },
   { path: "/forgot-password", element: <ForgotPasswordPage /> },
@@ -51,6 +59,8 @@ export const router = createBrowserRouter([
       { path: "/notifications", element: <NotificationsPage /> },
       { path: "/contributions", element: <MyContributionsPage /> },
       { path: "/account", element: <AccountSettingsPage /> },
+      { path: "/platform-admin", element: <PlatformAdminPage /> },
+      { path: "/platform-admin/organisations/:organisationId", element: <PlatformOrganisationSupportPage /> },
       { path: "/organisations/:organisationId", element: <OrganisationDetailPage /> },
       { path: "/organisations/:organisationId/methods", element: <OrganisationMethodsPage /> },
       { path: "/organisations/:organisationId/administration", element: <OrganisationAdministrationPage /> },
@@ -76,6 +86,9 @@ export const router = createBrowserRouter([
       { path: "/decisions/:decisionId/contributions", element: <DecisionContributionsPage /> },
       { path: "/organisations/:organisationId/audit", element: <OrganisationAuditPage /> },
       { path: "/decisions/:decisionId/reasoning/:section", element: <DecisionReasoningPage /> },
+    ],
+  },
+      { path: "*", element: <NotFoundPage /> },
     ],
   },
 ]);

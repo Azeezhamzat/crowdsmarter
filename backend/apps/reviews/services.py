@@ -14,6 +14,8 @@ from apps.decisions.models import Decision
 from apps.decisions.policies import can_transition_decision
 from apps.decisions.services import append_transition_record
 from apps.organisations.models import Membership
+from apps.notifications.models import Notification
+from apps.notifications.services import create_notification
 
 from .models import DecisionReview
 
@@ -106,6 +108,20 @@ def record_commitment(
         to_status=Decision.Status.COMMITMENT,
         rationale=rationale,
     )
+    if owner.id != actor.id:
+        create_notification(
+            recipient=owner,
+            organisation=current.organisation,
+            decision=current,
+            kind=Notification.Kind.ASSIGNMENT,
+            title="You own decision implementation",
+            message=(
+                f"You were assigned implementation ownership for “{current.title}”. "
+                f"The outcome review is due {review.review_due_date.isoformat()}."
+            ),
+            url=f"/decisions/{current.id}/outcomes",
+            dedup_key=f"implementation-owner:{review.id}:{owner.id}",
+        )
     record_event(
         action="decision.commitment_recorded",
         object_type="decision_review",
@@ -323,6 +339,17 @@ def change_implementation_owner(
     review.implementation_owner = owner
     review.full_clean(validate_unique=False, validate_constraints=False)
     review.save(update_fields=["implementation_owner", "updated_at"])
+    if owner.id != actor.id and owner.id != previous_owner_id:
+        create_notification(
+            recipient=owner,
+            organisation=current.organisation,
+            decision=current,
+            kind=Notification.Kind.ASSIGNMENT,
+            title="You now own decision implementation",
+            message=f"Implementation ownership for “{current.title}” was transferred to you.",
+            url=f"/decisions/{current.id}/outcomes",
+            dedup_key=f"implementation-owner:{review.id}:{owner.id}",
+        )
     record_event(
         action="decision.implementation_owner_changed",
         object_type="decision_review",
