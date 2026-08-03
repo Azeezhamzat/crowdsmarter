@@ -5,6 +5,24 @@ is resolved; do not delete history from this file, mark it resolved instead.
 
 ## Closed without action
 
+### Phase 20.4 (role-differentiated "My work" home) — already implemented
+
+The plan assumed a gap here based on the master prompt's roadmap wording; a
+close reading of the actual code shows this is already handled, and
+building the assumed feature (a role-based "mode switch" on the home
+dashboard) would be wrong for how the domain actually works. Every
+decision computes a per-user, per-role, per-lifecycle-stage next action
+server-side (`apps/portfolio/services.py:_next_action_for` — e.g. a
+decision owner in `READY_FOR_DECISION` sees "Review positions and
+finalise", a decision-maker without a submitted position sees "Submit your
+stakeholder position", a contributor in `OPEN_FOR_CONTRIBUTION` sees
+"Contribute options, evidence, assumptions, or risks"), and `MyWorkPanel`
+already surfaces this per-card alongside a role badge. A single "mode"
+per dashboard visit wouldn't make sense here anyway, since one person can
+hold different roles on different decisions simultaneously (owner on one,
+contributor on another) — the existing per-card approach is the correct
+architecture for that, not a gap to fix. No code change made.
+
 ### Old failed-phase Docker volumes remain on disk (by design)
 
 The failed-phase containers, their custom-built images, and the build cache

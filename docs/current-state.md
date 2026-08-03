@@ -1,4 +1,4 @@
-# Current state (Phase 19 baseline)
+# Current state (Phase 19/20 baseline)
 
 Verified against the running system on 2026-08-03. Update this document
 whenever the baseline materially changes; do not let it drift into aspiration.
@@ -16,7 +16,7 @@ source of truth. See `docs/development-workflow.md`.
 
 - Python 3.12.13, Django 5.2.16, Django REST Framework 3.16.1
 - PostgreSQL 17 (Docker image `postgres:17-alpine`), Redis 7 (`redis:7-alpine`)
-- React 19.2.0, TypeScript 5.9.3, Vite 8.1.5, Vitest 4.1.10
+- React 19.2.8, TypeScript 5.9.3, Vite 8.1.5, Vitest 4.1.10, React Router 8.3.0
 - `frontend/package.json` and `backend/pyproject.toml` both report `0.18.2`
 
 ## Migrations
@@ -66,10 +66,31 @@ Four services running under the `crowdsmarter` project (`db`, `redis`,
 cleanly. `docker buildx` is not installed locally; Compose falls back from
 Bake without disrupting the working setup.
 
+## Phase 20 (product experience) progress
+
+- **20.1 — WCAG 2.2 AA audit**: real `axe-core` scan across ~33 authenticated
+  and public route templates using live session data. Found and fixed 9
+  violations (5 colour-contrast, one a genuine dark-on-dark bug; a
+  non-keyboard-focusable scrollable region; a critical ARIA-tablist
+  structure violation; a prohibited `aria-label`; an unlabelled `<select>`).
+- **20.2 — First-run onboarding**: organisations with zero decisions now see
+  a direct "frame your first decision" CTA on the organisation page instead
+  of a neutral section nav.
+- **20.3 — Contextual help**: added a small reusable `PageHelp` disclosure
+  component, used on the foresight, prioritisation, and decision-analysis
+  screens to explain their domain-specific concepts.
+- **20.4 — Role-differentiated home**: investigated, found already
+  substantially implemented server-side (`_next_action_for` in
+  `apps/portfolio/services.py` computes a role- and lifecycle-stage-aware
+  next action per decision); no code change needed — see
+  `docs/known-issues.md`.
+
+All committed on `claude/phase-20-product-experience`, not yet pushed.
+
 ## Known risks not yet resolved
 
-See `docs/known-issues.md` for the full list with recommended next steps,
-including: a personal email address already committed to `origin/main`
-history, a `react-router` CVE requiring a deliberate major-version upgrade,
-significant reclaimable Docker disk usage from historical failed-phase
-containers/volumes, and the missing backend dependency lockfile.
+See `docs/known-issues.md` for the full list with recommended next steps:
+significant-but-optional reclaimable Docker volume space from historical
+failed-phase stacks (deliberately left alone), the missing backend
+dependency lockfile, and the pre-existing 93-error `eslint` backlog
+surfaced (not caused) during the react-router upgrade.
