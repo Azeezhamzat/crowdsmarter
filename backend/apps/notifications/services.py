@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
 from uuid import UUID
 
@@ -141,4 +141,114 @@ def deliver_due_review_notifications(*, on_date: date | None = None) -> int:
         )
         if not before:
             delivered += 1
+    return delivered
+
+
+_SIGNPOST_CADENCE_DAYS = {
+    "monthly": 30,
+    "quarterly": 90,
+    "semiannual": 182,
+    "annual": 365,
+}
+
+
+def deliver_signpost_watchlist_notifications(*, on_date: date | None = None) -> int:
+    """Notify accountable people when a signpost moves sharply or falls overdue for review."""
+    from apps.foresight.models import Signpost, SignpostObservation
+
+    due_date = on_date or timezone.localdate()
+    delivered = 0
+
+    strong_observations = SignpostObservation.objects.filter(
+        assessment__in=[
+            SignpostObservation.Assessment.STRONG,
+            SignpostObservation.Assessment.CONTRADICTORY,
+        ],
+    ).select_related(
+        "signpost__owner",
+        "signpost__scenario_set__linked_decision__owner",
+        "signpost__scenario_set__canvas__organisation",
+    ).prefetch_related(
+        "signpost__assumption_links__assumption__owner",
+        "signpost__risk_links__risk__owner",
+    )
+    for observation in strong_observations:
+        signpost = observation.signpost
+        organisation = signpost.scenario_set.canvas.organisation
+        recipients = {signpost.owner}
+        linked_decision = signpost.scenario_set.linked_decision
+        if linked_decision is not None:
+            recipients.add(linked_decision.owner)
+        for link in signpost.assumption_links.all():
+            recipients.add(link.assumption.owner)
+        for link in signpost.risk_links.all():
+            recipients.add(link.risk.owner)
+        message = (
+            f"“{signpost.title}” recorded {observation.get_assessment_display().lower()} "
+            f"on {observation.observed_on.isoformat()}: {observation.value}"
+        )
+        url = f"/foresight/scenario-sets/{signpost.scenario_set_id}"
+        for recipient in recipients:
+            dedup_key = f"signpost-observation:{observation.id}:{recipient.id}"
+            before = Notification.objects.filter(
+                recipient=recipient, dedup_key=dedup_key
+            ).exists()
+            create_notification(
+                recipient=recipient,
+                organisation=organisation,
+                decision=linked_decision,
+                kind=Notification.Kind.SIGNPOST_WATCH,
+                title="Signpost moved: revisit linked work",
+                message=message,
+                url=url,
+                dedup_key=dedup_key,
+                metadata={
+                    "signpost_id": str(signpost.id),
+                    "observation_id": str(observation.id),
+                    "assessment": observation.assessment,
+                },
+            )
+            if not before:
+                delivered += 1
+
+    active_signposts = (
+        Signpost.objects.filter(status=Signpost.Status.ACTIVE)
+        .exclude(review_cadence=Signpost.Cadence.EVENT_DRIVEN)
+        .select_related(
+            "owner", "scenario_set__linked_decision", "scenario_set__canvas__organisation"
+        )
+        .prefetch_related("observations")
+    )
+    for signpost in active_signposts:
+        cadence_days = _SIGNPOST_CADENCE_DAYS.get(signpost.review_cadence)
+        if not cadence_days:
+            continue
+        observations = list(signpost.observations.all())
+        anchor = observations[0].observed_on if observations else signpost.created_at.date()
+        next_due = anchor + timedelta(days=cadence_days)
+        if next_due > due_date:
+            continue
+        organisation = signpost.scenario_set.canvas.organisation
+        dedup_key = f"signpost-overdue:{signpost.id}:{anchor.isoformat()}"
+        before = Notification.objects.filter(
+            recipient=signpost.owner, dedup_key=dedup_key
+        ).exists()
+        create_notification(
+            recipient=signpost.owner,
+            organisation=organisation,
+            decision=signpost.scenario_set.linked_decision,
+            kind=Notification.Kind.SIGNPOST_WATCH,
+            title="Signpost is due for review",
+            message=(
+                f"“{signpost.title}” has had no observation recorded since "
+                f"{anchor.isoformat()}, past its "
+                f"{signpost.get_review_cadence_display().lower()} cadence."
+            ),
+            url=f"/foresight/scenario-sets/{signpost.scenario_set_id}",
+            dedup_key=dedup_key,
+            metadata={"signpost_id": str(signpost.id), "anchor_date": anchor.isoformat()},
+        )
+        if not before:
+            delivered += 1
+
     return delivered

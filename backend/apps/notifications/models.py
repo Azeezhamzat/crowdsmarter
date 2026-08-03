@@ -20,6 +20,7 @@ class Notification(UUIDTimeStampedModel):
         AI_REVIEW = "ai_review", "AI Review"
         MEMBERSHIP = "membership", "Membership"
         COLLABORATION = "collaboration", "Collaboration"
+        SIGNPOST_WATCH = "signpost_watch", "Signpost Watch"
         SYSTEM = "system", "System"
 
     organisation = models.ForeignKey(
@@ -63,6 +64,7 @@ class Notification(UUIDTimeStampedModel):
                         "ai_review",
                         "membership",
                         "collaboration",
+                        "signpost_watch",
                         "system",
                     ]
                 ),

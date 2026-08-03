@@ -1,4 +1,4 @@
-# Current state (Phase 19/20/21 baseline)
+# Current state (Phase 19/20/21/22 baseline)
 
 Verified against the running system on 2026-08-03. Update this document
 whenever the baseline materially changes; do not let it drift into aspiration.
@@ -21,21 +21,29 @@ source of truth. See `docs/development-workflow.md`.
 
 ## Migrations
 
-58 backend migrations applied cleanly across all apps, including two added in
-Phase 21 (`apps.criteria.0001_initial` — new app — and
-`apps.decision_options.0002_decisionoption_cost_notes_decisionoption_depends_on_and_more`).
-No migration drift (`makemigrations --check --dry-run` reports no changes). A
-pre-verification `pg_dump` backup was taken before this phase's test run
+60 backend migrations applied cleanly across all apps, including two added in
+Phase 22 (`apps.foresight.0005_signpostassumptionlink_signpostrisklink` and
+`apps.notifications.0003_remove_notification_notification_kind_valid_and_more`,
+which adds the `signpost_watch` notification kind). No migration drift
+(`makemigrations --check --dry-run` reports no changes). A pre-verification
+`pg_dump` backup was taken before Phase 21's test run
 (`backups/phase21-pre-verify-*.sql`, not committed).
+
+Note: the running `backend` container only auto-applies migrations on
+container start, not live — after generating a migration mid-session, run
+`docker compose exec backend python manage.py migrate <app>` explicitly
+before relying on the dev database matching the models (this bit Phase 22's
+browser verification: the API 500'd with `relation ... does not exist` until
+the two new migrations above were applied by hand).
 
 ## Test suites
 
-- Backend: `docker compose exec backend pytest` — **354 passed, 0 failed**
-  (was 340 passed at the end of Phase 20; +14 tests from the new `criteria`
-  app and deepened `decision_options` coverage).
+- Backend: `docker compose exec backend pytest` — **361 passed, 0 failed**
+  (was 354 passed at the end of Phase 21; +7 tests for the Phase 22
+  signpost-watchlist feature).
 - Frontend: `docker compose exec frontend npx vitest run` — **36 test files /
-  48 tests, all passing** (was 34 files / 43 tests at the end of Phase 20;
-  +2 tests each for `CriteriaSection` and `OptionsSection`).
+  48 tests, all passing** (unchanged from Phase 21 — the watchlist UI has no
+  dedicated test file yet; verified live in the browser instead, see below).
 - `docker compose exec backend python manage.py check` — clean, 0 warnings.
 - `docker compose exec backend python manage.py makemigrations --check --dry-run` — clean.
 - Frontend `npx tsc -b` and `npm run build` — clean.
@@ -122,7 +130,48 @@ decision and two options with a real dependency link, confirmed the form
 saved correctly and the card rendered cost, reversibility, experiment, and
 "Depends on: <title>" as expected, then deleted the throwaway decision.
 
-Committed on `claude/phase-21-decision-workspace`, not yet pushed.
+Committed on `claude/phase-21-decision-workspace`, pushed, and fast-forward
+merged into `main` (solo-maintainer repo — no PR needed; see
+`docs/development-workflow.md`).
+
+## Phase 22 (foresight adaptive-strategy watchlist) progress
+
+Audited the full `apps/foresight` app (sources, signals, feeds, systems
+mapping, scenario planning, wind-tunnelling, signposts) against the master
+prompt's foresight roadmap. Found the workspace, horizon-scanning, systems
+mapping, and scenario-planning sub-areas already substantially built; the
+one genuine, realistically-scoped gap was **adaptive strategy** — signposts
+had no connection to assumptions, risks, or notifications, so an
+organisation had no way to know a specific assumption or risk should be
+revisited when a signpost moved. Addressed that gap only:
+
+- New `SignpostAssumptionLink` and `SignpostRiskLink` models (mirroring the
+  existing `SignalDecisionLink` pattern), linking a `Signpost` to a specific
+  `Assumption` or `Risk` in the same organisation, with a required rationale.
+- New `deliver_signpost_watchlist_notifications()` in
+  `apps.notifications.services`, following the exact `DecisionReview` due-
+  notification pattern: notifies the signpost owner, the linked decision's
+  owner, and the owners of any linked assumptions/risks when a
+  `SignpostObservation` records `strong` or `contradictory` movement, and
+  separately nudges the signpost owner when an active signpost has gone past
+  its review cadence with no new observation. Wired to a Celery task, a
+  management command (`send_signpost_watchlist_notifications`), and a daily
+  `CELERY_BEAT_SCHEDULE` entry, all mirroring the existing due-review job.
+- New API endpoints (`/foresight/signposts/<id>/assumption-links/` and
+  `/risk-links/`) and UI: `ForesightScenarioSetPage.tsx`'s signposts tab
+  gained an "Add to watchlist" panel (shown when the scenario set is linked
+  to a decision, since that's what makes the assumption/risk pickers
+  meaningful) and each signpost card now shows its linked assumptions/risks.
+
+Verified live in the browser end to end: created a decision with a linked
+assumption and risk, a foresight canvas/scenario set linked to that decision,
+and a signpost; linked the signpost to the assumption through the new UI;
+recorded a `strong` observation; ran the new management command and
+confirmed exactly one `signpost_watch` notification was created and
+displayed correctly on `/notifications`. Then deleted all the throwaway
+foresight/decision test data.
+
+Committed on `claude/phase-22-foresight-adaptive-strategy`, not yet pushed.
 
 ## Known risks not yet resolved
 

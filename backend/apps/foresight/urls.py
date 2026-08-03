@@ -75,8 +75,10 @@ from .scenario_views import (
     ScenarioReviewView,
     ScenarioSetDetailView,
     ScenarioSetListCreateView,
+    SignpostAssumptionLinkView,
     SignpostListCreateView,
     SignpostObservationCreateView,
+    SignpostRiskLinkView,
     WindTunnelAssessmentView,
 )
 
@@ -130,5 +132,15 @@ urlpatterns += [
         "foresight/signposts/<uuid:signpost_id>/observations/",
         SignpostObservationCreateView.as_view(),
         name="signpost-observations",
+    ),
+    path(
+        "foresight/signposts/<uuid:signpost_id>/assumption-links/",
+        SignpostAssumptionLinkView.as_view(),
+        name="signpost-assumption-links",
+    ),
+    path(
+        "foresight/signposts/<uuid:signpost_id>/risk-links/",
+        SignpostRiskLinkView.as_view(),
+        name="signpost-risk-links",
     ),
 ]

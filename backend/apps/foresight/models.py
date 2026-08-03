@@ -1432,6 +1432,82 @@ class SignpostObservation(UUIDTimeStampedModel):
                 )
 
 
+class SignpostAssumptionLink(UUIDTimeStampedModel):
+    """An explicit explanation of why a signpost should trigger re-review of an assumption."""
+
+    signpost = models.ForeignKey(
+        Signpost, on_delete=models.CASCADE, related_name="assumption_links"
+    )
+    assumption = models.ForeignKey(
+        "assumptions.Assumption", on_delete=models.CASCADE, related_name="signpost_links"
+    )
+    rationale = models.TextField()
+    linked_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="linked_signpost_assumptions",
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["signpost", "assumption"], name="unique_signpost_assumption_link"
+            ),
+        ]
+
+    def clean(self) -> None:
+        super().clean()
+        self.rationale = self.rationale.strip()
+        if not self.rationale:
+            raise ValidationError({"rationale": "Explain this watchlist relationship."})
+        if (
+            self.assumption_id
+            and self.assumption.organisation_id != self.signpost.scenario_set.canvas.organisation_id
+        ):
+            raise ValidationError(
+                {"assumption": "The assumption must share the signpost's organisation."}
+            )
+
+
+class SignpostRiskLink(UUIDTimeStampedModel):
+    """An explicit explanation of why a signpost should trigger re-review of a risk."""
+
+    signpost = models.ForeignKey(
+        Signpost, on_delete=models.CASCADE, related_name="risk_links"
+    )
+    risk = models.ForeignKey(
+        "risks.Risk", on_delete=models.CASCADE, related_name="signpost_links"
+    )
+    rationale = models.TextField()
+    linked_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="linked_signpost_risks",
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["signpost", "risk"], name="unique_signpost_risk_link"
+            ),
+        ]
+
+    def clean(self) -> None:
+        super().clean()
+        self.rationale = self.rationale.strip()
+        if not self.rationale:
+            raise ValidationError({"rationale": "Explain this watchlist relationship."})
+        if (
+            self.risk_id
+            and self.risk.organisation_id != self.signpost.scenario_set.canvas.organisation_id
+        ):
+            raise ValidationError(
+                {"risk": "The risk must share the signpost's organisation."}
+            )
+
+
 class ScenarioImplicationLink(UUIDTimeStampedModel):
     """A traceable explanation of how one implication changes in one scenario."""
 

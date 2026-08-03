@@ -8,10 +8,12 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import IntegrityError, transaction
 
 from apps.accounts.models import User
+from apps.assumptions.models import Assumption
 from apps.audit.services import record_event
 from apps.decision_options.models import DecisionOption
 from apps.decisions.models import Decision
 from apps.organisations.models import Membership
+from apps.risks.models import Risk
 
 from .models import (
     Driver,
@@ -23,7 +25,9 @@ from .models import (
     ScenarioSet,
     ScenarioSignpost,
     Signpost,
+    SignpostAssumptionLink,
     SignpostObservation,
+    SignpostRiskLink,
     Source,
     StrategicImplication,
     WindTunnelAssessment,
@@ -464,6 +468,64 @@ def create_signpost_observation(
         },
     )
     return item
+
+
+@transaction.atomic
+def link_signpost_to_assumption(
+    *, actor: User, signpost: Signpost, assumption_id: Any, rationale: str
+) -> SignpostAssumptionLink:
+    _require_scenario_set_contributor(actor=actor, scenario_set=signpost.scenario_set)
+    organisation = signpost.scenario_set.canvas.organisation
+    try:
+        assumption = Assumption.objects.get(id=assumption_id, organisation=organisation)
+    except Assumption.DoesNotExist as exc:
+        raise ScenarioServiceError(
+            {"assumption_id": "The assumption does not belong to this organisation."}
+        ) from exc
+    link, created = SignpostAssumptionLink.objects.update_or_create(
+        signpost=signpost,
+        assumption=assumption,
+        defaults={"rationale": rationale, "linked_by": actor},
+    )
+    link.full_clean(validate_unique=False, validate_constraints=False)
+    record_event(
+        action="foresight.signpost.linked_to_assumption" if created else "foresight.signpost_assumption_link.updated",
+        object_type="foresight_signpost_assumption_link",
+        object_id=str(link.id),
+        actor=actor,
+        organisation=organisation,
+        metadata={"signpost_id": str(signpost.id), "assumption_id": str(assumption.id)},
+    )
+    return link
+
+
+@transaction.atomic
+def link_signpost_to_risk(
+    *, actor: User, signpost: Signpost, risk_id: Any, rationale: str
+) -> SignpostRiskLink:
+    _require_scenario_set_contributor(actor=actor, scenario_set=signpost.scenario_set)
+    organisation = signpost.scenario_set.canvas.organisation
+    try:
+        risk = Risk.objects.get(id=risk_id, organisation=organisation)
+    except Risk.DoesNotExist as exc:
+        raise ScenarioServiceError(
+            {"risk_id": "The risk does not belong to this organisation."}
+        ) from exc
+    link, created = SignpostRiskLink.objects.update_or_create(
+        signpost=signpost,
+        risk=risk,
+        defaults={"rationale": rationale, "linked_by": actor},
+    )
+    link.full_clean(validate_unique=False, validate_constraints=False)
+    record_event(
+        action="foresight.signpost.linked_to_risk" if created else "foresight.signpost_risk_link.updated",
+        object_type="foresight_signpost_risk_link",
+        object_id=str(link.id),
+        actor=actor,
+        organisation=organisation,
+        metadata={"signpost_id": str(signpost.id), "risk_id": str(risk.id)},
+    )
+    return link
 
 
 @transaction.atomic

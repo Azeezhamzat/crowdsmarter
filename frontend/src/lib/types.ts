@@ -1275,6 +1275,18 @@ export type ForesightSignpost = {
     assessment: string;
     assessment_label: string;
   } | null;
+  assumption_links: Array<{
+    id: string;
+    assumption_id: string;
+    assumption_statement: string;
+    rationale: string;
+  }>;
+  risk_links: Array<{
+    id: string;
+    risk_id: string;
+    risk_title: string;
+    rationale: string;
+  }>;
   created_at: string;
   updated_at: string;
 };

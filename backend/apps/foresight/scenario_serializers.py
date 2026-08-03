@@ -15,7 +15,9 @@ from .models import (
     ScenarioSet,
     ScenarioSignpost,
     Signpost,
+    SignpostAssumptionLink,
     SignpostObservation,
+    SignpostRiskLink,
     WindTunnelAssessment,
 )
 from .policies import can_manage_record
@@ -505,6 +507,8 @@ class SignpostSerializer(serializers.ModelSerializer):
     scenario_links = serializers.SerializerMethodField()
     observations = SignpostObservationSerializer(many=True, read_only=True)
     latest_observation = serializers.SerializerMethodField()
+    assumption_links = serializers.SerializerMethodField()
+    risk_links = serializers.SerializerMethodField()
 
     class Meta:
         model = Signpost
@@ -527,6 +531,8 @@ class SignpostSerializer(serializers.ModelSerializer):
             "scenario_links",
             "observations",
             "latest_observation",
+            "assumption_links",
+            "risk_links",
             "created_at",
             "updated_at",
         ]
@@ -543,6 +549,28 @@ class SignpostSerializer(serializers.ModelSerializer):
                 "rationale": link.rationale,
             }
             for link in obj.scenario_links.all()
+        ]
+
+    def get_assumption_links(self, obj: Signpost):
+        return [
+            {
+                "id": str(link.id),
+                "assumption_id": str(link.assumption_id),
+                "assumption_statement": link.assumption.statement,
+                "rationale": link.rationale,
+            }
+            for link in obj.assumption_links.select_related("assumption").all()
+        ]
+
+    def get_risk_links(self, obj: Signpost):
+        return [
+            {
+                "id": str(link.id),
+                "risk_id": str(link.risk_id),
+                "risk_title": link.risk.title,
+                "rationale": link.rationale,
+            }
+            for link in obj.risk_links.select_related("risk").all()
         ]
 
     def get_latest_observation(self, obj: Signpost):
@@ -571,6 +599,16 @@ class ScenarioImplicationLinkWriteSerializer(StrictSerializer):
     implication_id = serializers.UUIDField()
     effect = serializers.ChoiceField(choices=ScenarioImplicationLink.Effect.choices)
     rationale = serializers.CharField(max_length=12000, trim_whitespace=True)
+
+
+class SignpostAssumptionLinkWriteSerializer(StrictSerializer):
+    assumption_id = serializers.UUIDField()
+    rationale = serializers.CharField(max_length=4000, trim_whitespace=True)
+
+
+class SignpostRiskLinkWriteSerializer(StrictSerializer):
+    risk_id = serializers.UUIDField()
+    rationale = serializers.CharField(max_length=4000, trim_whitespace=True)
 
 
 class ScenarioSetWorkspaceSerializer(ScenarioSetSerializer):

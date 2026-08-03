@@ -285,3 +285,17 @@ export function linkScenarioImplication(scenarioId: string, input: Record<string
     { method: "POST", body: JSON.stringify(input) },
   );
 }
+
+export function linkSignpostToAssumption(signpostId: string, input: Record<string, unknown>) {
+  return apiRequest<import("../../lib/types").ForesightSignpost>(
+    `/foresight/signposts/${signpostId}/assumption-links/`,
+    { method: "POST", body: JSON.stringify(input) },
+  );
+}
+
+export function linkSignpostToRisk(signpostId: string, input: Record<string, unknown>) {
+  return apiRequest<import("../../lib/types").ForesightSignpost>(
+    `/foresight/signposts/${signpostId}/risk-links/`,
+    { method: "POST", body: JSON.stringify(input) },
+  );
+}

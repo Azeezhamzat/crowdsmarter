@@ -27,8 +27,10 @@ from .scenario_serializers import (
     ScenarioSetWorkspaceSerializer,
     ScenarioSetWriteSerializer,
     ScenarioWriteSerializer,
+    SignpostAssumptionLinkWriteSerializer,
     SignpostObservationSerializer,
     SignpostObservationWriteSerializer,
+    SignpostRiskLinkWriteSerializer,
     SignpostSerializer,
     SignpostWriteSerializer,
     WindTunnelAssessmentSerializer,
@@ -41,6 +43,8 @@ from .scenario_services import (
     create_signpost,
     create_signpost_observation,
     link_scenario_implication,
+    link_signpost_to_assumption,
+    link_signpost_to_risk,
     set_scenario_driver_state,
     submit_scenario_review,
     update_scenario,
@@ -212,6 +216,42 @@ class SignpostObservationCreateView(APIView):
         )
         return Response(
             SignpostObservationSerializer(item).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class SignpostAssumptionLinkView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, signpost_id):  # type: ignore[no-untyped-def]
+        signpost = signpost_for_user(user=request.user, signpost_id=signpost_id)
+        serializer = SignpostAssumptionLinkWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        link_signpost_to_assumption(
+            actor=request.user,
+            signpost=signpost,
+            **serializer.validated_data,
+        )
+        return Response(
+            SignpostSerializer(signpost_for_user(user=request.user, signpost_id=signpost_id)).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class SignpostRiskLinkView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, signpost_id):  # type: ignore[no-untyped-def]
+        signpost = signpost_for_user(user=request.user, signpost_id=signpost_id)
+        serializer = SignpostRiskLinkWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        link_signpost_to_risk(
+            actor=request.user,
+            signpost=signpost,
+            **serializer.validated_data,
+        )
+        return Response(
+            SignpostSerializer(signpost_for_user(user=request.user, signpost_id=signpost_id)).data,
             status=status.HTTP_201_CREATED,
         )
 

@@ -234,6 +234,10 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.notifications.tasks.send_due_review_notifications",
         "schedule": 86400.0,
     },
+    "send-signpost-watchlist-notifications-daily": {
+        "task": "apps.notifications.tasks.send_signpost_watchlist_notifications",
+        "schedule": 86400.0,
+    },
     "send-contribution-reminders-and-digests-daily": {
         "task": "apps.contributions.tasks.send_contribution_reminders_and_digests",
         "schedule": 86400.0,

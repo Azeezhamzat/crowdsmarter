@@ -59,6 +59,25 @@ protection, which this phase deliberately did not do. If you want it gone,
 use the organisation's own deactivation/deletion flow (`/organisations/<id>/administration`)
 rather than a direct database delete.
 
+## Fixed in Phase 22
+
+- Foresight signposts had no connection to the decision-reasoning artifacts
+  they were meant to inform: an assumption or risk could become invalidated
+  by a scenario signal and nobody would be notified. Added
+  `SignpostAssumptionLink`/`SignpostRiskLink` models, watchlist notification
+  delivery (`deliver_signpost_watchlist_notifications`, wired to a daily
+  Celery beat job and a management command), and an "Add to watchlist" panel
+  in `ForesightScenarioSetPage.tsx`. See `docs/current-state.md` for detail.
+- Confirmed a recurring environment gotcha while verifying this phase: the
+  `backend` container only runs `manage.py migrate` on container start, not
+  on a live filesystem change. Generating a migration mid-session (as this
+  phase did twice) leaves the running dev database out of sync until
+  `docker compose exec backend python manage.py migrate <app>` is run by
+  hand — the symptom is a 500 with `relation "..." does not exist` even
+  though `manage.py check` and the test suite (which runs against a freshly
+  migrated test database) are both clean. Not a bug in the code; a step to
+  remember when browser-verifying a change that added a migration.
+
 ## Fixed in Phase 21
 
 - Decision criteria had no home: `decisions`/`decision_options` recorded

@@ -5,6 +5,7 @@ import { Link, useParams, useSearchParams } from "react-router";
 import { StatusMessage } from "../../components/StatusMessage";
 import { ApiError } from "../../lib/api";
 import type { ForesightScenario } from "../../lib/types";
+import { listAssumptions, listRisks } from "../reasoning/api";
 import {
   assessScenarioOption,
   createScenario,
@@ -13,6 +14,8 @@ import {
   getForesightCanvas,
   getScenarioSet,
   linkScenarioImplication,
+  linkSignpostToAssumption,
+  linkSignpostToRisk,
   listSources,
   setScenarioDriverState,
   submitScenarioReview,
@@ -94,6 +97,13 @@ const EMPTY_IMPLICATION = {
   rationale: "",
 };
 
+const EMPTY_WATCHLIST_LINK = {
+  signpost_id: "",
+  kind: "assumption" as "assumption" | "risk",
+  target_id: "",
+  rationale: "",
+};
+
 function errorMessage(error: unknown): string {
   return error instanceof ApiError
     ? error.message
@@ -130,6 +140,7 @@ export function ForesightScenarioSetPage() {
   const [signpostForm, setSignpostForm] = useState(EMPTY_SIGNPOST);
   const [observationForm, setObservationForm] = useState(EMPTY_OBSERVATION);
   const [implicationForm, setImplicationForm] = useState(EMPTY_IMPLICATION);
+  const [watchlistForm, setWatchlistForm] = useState(EMPTY_WATCHLIST_LINK);
 
   const scenarioSet = useQuery({
     queryKey: ["foresight", "scenario-sets", scenarioSetId],
@@ -145,6 +156,17 @@ export function ForesightScenarioSetPage() {
     queryKey: ["organisations", organisationId, "foresight", "sources"],
     queryFn: () => listSources(organisationId),
     enabled: Boolean(organisationId),
+  });
+  const linkedDecisionId = scenarioSet.data?.linked_decision_id ?? null;
+  const linkedAssumptions = useQuery({
+    queryKey: ["decisions", linkedDecisionId, "assumptions"],
+    queryFn: () => listAssumptions(linkedDecisionId as string),
+    enabled: Boolean(linkedDecisionId),
+  });
+  const linkedRisks = useQuery({
+    queryKey: ["decisions", linkedDecisionId, "risks"],
+    queryFn: () => listRisks(linkedDecisionId as string),
+    enabled: Boolean(linkedDecisionId),
   });
 
   const refresh = async () => {
@@ -240,6 +262,18 @@ export function ForesightScenarioSetPage() {
     mutationFn: (status: string) => updateScenarioSet(scenarioSetId, { status }),
     onSuccess: refresh,
   });
+  const linkWatchlist = useMutation({
+    mutationFn: () => {
+      const { signpost_id, kind, target_id, rationale } = watchlistForm;
+      return kind === "assumption"
+        ? linkSignpostToAssumption(signpost_id, { assumption_id: target_id, rationale })
+        : linkSignpostToRisk(signpost_id, { risk_id: target_id, rationale });
+    },
+    onSuccess: async () => {
+      setWatchlistForm(EMPTY_WATCHLIST_LINK);
+      await refresh();
+    },
+  });
 
   const mutations = [
     createWorld,
@@ -250,6 +284,7 @@ export function ForesightScenarioSetPage() {
     observeSignpost,
     linkImplication,
     updateSet,
+    linkWatchlist,
   ];
   const mutationError = mutations.map((item) => item.error).find(Boolean);
 
@@ -542,7 +577,7 @@ export function ForesightScenarioSetPage() {
         <div className="scenario-tab-layout">
           <section className="page-primary">
             <div className="signpost-grid">
-              {data.signposts.map((signpost) => <article className="signpost-card" key={signpost.id}><div className="section-heading"><div><p className="eyebrow">{signpost.review_cadence_label}</p><h3>{signpost.title}</h3></div><span className={`status-badge status-badge--${signpost.status}`}>{signpost.status_label}</span></div><p>{signpost.description}</p><dl><div><dt>Indicator</dt><dd>{signpost.indicator}</dd></div><div><dt>Trigger</dt><dd>{signpost.direction_label}: {signpost.threshold}</dd></div><div><dt>Owner</dt><dd>{personName(signpost.owner)}</dd></div></dl><div className="scenario-state-list">{signpost.scenario_links.map((link) => <span key={link.id}>{link.relationship_label}: {link.scenario_title}</span>)}</div>{signpost.latest_observation ? <div className={`latest-observation latest-observation--${signpost.latest_observation.assessment}`}><strong>{signpost.latest_observation.assessment_label}</strong><span>{signpost.latest_observation.observed_on}</span><p>{signpost.latest_observation.value}</p></div> : <p className="muted-cell">No observations yet.</p>}<details><summary>{signpost.observations.length} observations</summary>{signpost.observations.map((observation) => <blockquote key={observation.id}><strong>{observation.observed_on} · {observation.assessment_label}</strong><p>{observation.value}</p><small>{observation.evidence}</small></blockquote>)}</details></article>)}
+              {data.signposts.map((signpost) => <article className="signpost-card" key={signpost.id}><div className="section-heading"><div><p className="eyebrow">{signpost.review_cadence_label}</p><h3>{signpost.title}</h3></div><span className={`status-badge status-badge--${signpost.status}`}>{signpost.status_label}</span></div><p>{signpost.description}</p><dl><div><dt>Indicator</dt><dd>{signpost.indicator}</dd></div><div><dt>Trigger</dt><dd>{signpost.direction_label}: {signpost.threshold}</dd></div><div><dt>Owner</dt><dd>{personName(signpost.owner)}</dd></div></dl><div className="scenario-state-list">{signpost.scenario_links.map((link) => <span key={link.id}>{link.relationship_label}: {link.scenario_title}</span>)}</div>{signpost.latest_observation ? <div className={`latest-observation latest-observation--${signpost.latest_observation.assessment}`}><strong>{signpost.latest_observation.assessment_label}</strong><span>{signpost.latest_observation.observed_on}</span><p>{signpost.latest_observation.value}</p></div> : <p className="muted-cell">No observations yet.</p>}{(signpost.assumption_links.length || signpost.risk_links.length) ? <div className="scenario-state-list" aria-label="Watchlist links">{signpost.assumption_links.map((link) => <span key={link.id} title={link.rationale}>Assumption: {link.assumption_statement}</span>)}{signpost.risk_links.map((link) => <span key={link.id} title={link.rationale}>Risk: {link.risk_title}</span>)}</div> : null}<details><summary>{signpost.observations.length} observations</summary>{signpost.observations.map((observation) => <blockquote key={observation.id}><strong>{observation.observed_on} · {observation.assessment_label}</strong><p>{observation.value}</p><small>{observation.evidence}</small></blockquote>)}</details></article>)}
               {!data.signposts.length ? <div className="empty-state"><h3>No adaptive signposts</h3><p>Define observable indicators that could support, challenge, or contextualise the scenario worlds.</p></div> : null}
             </div>
           </section>
@@ -572,6 +607,24 @@ export function ForesightScenarioSetPage() {
                 <label htmlFor="observation-source">Existing source</label><select id="observation-source" value={observationForm.source_id} onChange={(event) => setObservationForm({ ...observationForm, source_id: event.target.value })}><option value="">No source link</option>{(sources.data ?? []).map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select>
                 <button className="secondary-button" disabled={observeSignpost.isPending || !data.signposts.length} type="submit">Record observation</button>
               </form>
+            </section>
+            <section className="side-panel foresight-create-panel">
+              <p className="eyebrow">Adaptive strategy</p><h2>Add to watchlist</h2>
+              {linkedDecisionId ? (
+                <form onSubmit={(event) => { event.preventDefault(); linkWatchlist.mutate(); }}>
+                  <label htmlFor="watchlist-signpost">Signpost</label><select id="watchlist-signpost" required value={watchlistForm.signpost_id} onChange={(event) => setWatchlistForm({ ...watchlistForm, signpost_id: event.target.value })}><option value="">Choose signpost</option>{data.signposts.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select>
+                  <label htmlFor="watchlist-kind">Watch</label><select id="watchlist-kind" value={watchlistForm.kind} onChange={(event) => setWatchlistForm({ ...watchlistForm, kind: event.target.value as "assumption" | "risk", target_id: "" })}><option value="assumption">An assumption</option><option value="risk">A risk</option></select>
+                  {watchlistForm.kind === "assumption" ? (
+                    <><label htmlFor="watchlist-assumption">Assumption</label><select id="watchlist-assumption" required value={watchlistForm.target_id} onChange={(event) => setWatchlistForm({ ...watchlistForm, target_id: event.target.value })}><option value="">Choose assumption</option>{(linkedAssumptions.data ?? []).map((item) => <option key={item.id} value={item.id}>{item.statement}</option>)}</select></>
+                  ) : (
+                    <><label htmlFor="watchlist-risk">Risk</label><select id="watchlist-risk" required value={watchlistForm.target_id} onChange={(event) => setWatchlistForm({ ...watchlistForm, target_id: event.target.value })}><option value="">Choose risk</option>{(linkedRisks.data ?? []).map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></>
+                  )}
+                  <label htmlFor="watchlist-rationale">Why this signpost should trigger a re-review</label><textarea id="watchlist-rationale" required rows={3} value={watchlistForm.rationale} onChange={(event) => setWatchlistForm({ ...watchlistForm, rationale: event.target.value })} />
+                  <button className="secondary-button" disabled={linkWatchlist.isPending || !data.signposts.length} type="submit">Add to watchlist</button>
+                </form>
+              ) : (
+                <p className="muted">Link this scenario set to a decision to build an assumption and signpost watchlist.</p>
+              )}
             </section>
           </aside>
         </div>
