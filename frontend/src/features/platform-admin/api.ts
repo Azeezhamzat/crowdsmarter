@@ -1,8 +1,10 @@
 import { apiRequest } from "../../lib/api";
 import type {
+  AIProviderKey,
   PlatformAdministrator,
   PlatformAuditEvent,
   PlatformConfiguration,
+  PlatformContactSettings,
   PlatformDemoRequest,
   PlatformOrganisation,
   PlatformOrganisationDetail,
@@ -116,10 +118,38 @@ export function getPlatformConfiguration(): Promise<PlatformConfiguration> {
 }
 
 export function updatePlatformConfiguration(
-  input: Omit<PlatformConfiguration, "updated_at"> & { rationale: string },
+  input: PlatformContactSettings & { rationale: string },
 ): Promise<PlatformConfiguration> {
   return apiRequest<PlatformConfiguration>("/platform-admin/configuration/", {
     method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export function setAIProvider(input: {
+  provider_key: AIProviderKey;
+  model: string;
+  rationale: string;
+}): Promise<PlatformConfiguration> {
+  return apiRequest<PlatformConfiguration>("/platform-admin/configuration/ai-provider/", {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export function setAIProviderAPIKey(input: {
+  api_key: string;
+  rationale: string;
+}): Promise<PlatformConfiguration> {
+  return apiRequest<PlatformConfiguration>("/platform-admin/configuration/ai-provider/api-key/", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function clearAIProviderAPIKey(input: { rationale: string }): Promise<PlatformConfiguration> {
+  return apiRequest<PlatformConfiguration>("/platform-admin/configuration/ai-provider/api-key/", {
+    method: "DELETE",
     body: JSON.stringify(input),
   });
 }

@@ -144,7 +144,9 @@ export type PlatformUser = User & {
   last_login: string | null;
 };
 
-export type PlatformConfiguration = {
+export type AIProviderKey = "rules" | "anthropic";
+
+export type PlatformContactSettings = {
   public_contact_email: string;
   demo_email: string;
   support_email: string;
@@ -152,6 +154,13 @@ export type PlatformConfiguration = {
   security_email: string;
   notification_sender_email: string;
   support_access_max_hours: number;
+};
+
+export type PlatformConfiguration = PlatformContactSettings & {
+  ai_provider_key: AIProviderKey;
+  ai_provider_key_label: string;
+  ai_provider_model: string;
+  ai_provider_api_key_is_set: boolean;
   updated_at: string;
 };
 

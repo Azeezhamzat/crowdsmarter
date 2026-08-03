@@ -4,9 +4,11 @@ AI is a supporting capability. Human judgement comes first, and no provider can 
 
 ## Provider boundary
 
-Application services depend on the `AIProvider` protocol in `apps.ai_assistance.providers.base`, not a vendor SDK. `AI_PROVIDER_BACKEND` selects a provider by import path. An adapter is responsible for invocation, credentials, timeouts, provider usage metadata, normalised structured output, and safe error translation.
+Application services depend on the `AIProvider` protocol in `apps.ai_assistance.providers.base`, not a vendor SDK. `apps.ai_assistance.providers.registry.get_provider()` selects the active provider from `PlatformConfiguration.ai_provider_key` (settable at runtime from Platform Administration, no redeploy required), falling back to the deploy-time `AI_PROVIDER_BACKEND` setting for any value it doesn't recognise. An adapter is responsible for invocation, credentials, timeouts, provider usage metadata, normalised structured output, and safe error translation.
 
 Phase 6 uses `RuleBasedAIProvider` by default. It is deterministic, local, transparent, and zero-cost. It reviews only the decision snapshot supplied by the service and makes no network request.
+
+A later addition provides `AnthropicAIProvider` (`apps.ai_assistance.providers.anthropic`) as an operator-selectable real-model alternative. It sends the same decision snapshot to the Anthropic Messages API via a forced tool-use call, so the response is structurally validated JSON rather than free text, then strips any `related_id`/`similar_decisions` reference that doesn't match something actually present in the snapshot before constructing `AIReviewOutput` — the model cannot fabricate a reference to organisational data that doesn't exist. Its system prompt explicitly restates the same "advisory only, cannot alter records" boundary this document defines. The API key is supplied by a platform administrator through Platform Administration → Platform settings, encrypted at rest with a key derived from `SECRET_KEY` (`apps.platform_admin.crypto`), and decrypted only at the moment of the API call. It is never returned by any API response, never written to the audit log (which instead records only whether a key was already set and its last 4 characters), and never logged. Selecting Anthropic without a key configured is rejected at the model-validation layer.
 
 ## Assistance record
 

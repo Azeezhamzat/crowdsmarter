@@ -3,6 +3,8 @@ from django.urls import path
 app_name = "platform_admin"
 
 from .views import (
+    AIProviderAPIKeyView,
+    AIProviderConfigurationView,
     PlatformAdministratorActionView,
     PlatformAdministratorListView,
     PlatformAuditListView,
@@ -37,6 +39,8 @@ urlpatterns = [
     path("platform-admin/administrators/", PlatformAdministratorListView.as_view(), name="platform-admin-administrators"),
     path("platform-admin/users/<uuid:user_id>/administrator/", PlatformAdministratorActionView.as_view(), name="platform-admin-administrator-action"),
     path("platform-admin/configuration/", PlatformConfigurationView.as_view(), name="platform-admin-configuration"),
+    path("platform-admin/configuration/ai-provider/", AIProviderConfigurationView.as_view(), name="platform-admin-ai-provider"),
+    path("platform-admin/configuration/ai-provider/api-key/", AIProviderAPIKeyView.as_view(), name="platform-admin-ai-provider-api-key"),
     path("platform-admin/demo-requests/", PlatformDemoRequestListView.as_view(), name="platform-admin-demo-requests"),
     path("platform-admin/demo-requests/<uuid:demo_request_id>/status/", PlatformDemoRequestStatusView.as_view(), name="platform-admin-demo-request-status"),
     path("platform-admin/audit/", PlatformAuditListView.as_view(), name="platform-admin-audit"),

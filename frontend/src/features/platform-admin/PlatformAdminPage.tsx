@@ -8,16 +8,19 @@ import { fetchCurrentUser } from "../auth/api";
 import {
   changePlatformAdministrator,
   changePlatformUserState,
+  clearAIProviderAPIKey,
   getPlatformConfiguration,
   getPlatformOverview,
   listPlatformAudit,
   listPlatformDemoRequests,
   listPlatformOrganisations,
   listPlatformUsers,
+  setAIProvider,
+  setAIProviderAPIKey,
   updatePlatformConfiguration,
   updatePlatformDemoRequestStatus,
 } from "./api";
-import type { PlatformConfiguration, PlatformDemoRequest, PlatformUser } from "./types";
+import type { AIProviderKey, PlatformContactSettings, PlatformDemoRequest, PlatformUser } from "./types";
 
 type AdminTab = "overview" | "organisations" | "users" | "demos" | "configuration" | "audit";
 
@@ -103,13 +106,65 @@ function DemoRequestsPanel() {
 function ConfigurationPanel() {
   const queryClient = useQueryClient();
   const configuration = useQuery({ queryKey: ["platform-admin", "configuration"], queryFn: getPlatformConfiguration });
-  const [form, setForm] = useState<(Omit<PlatformConfiguration, "updated_at"> & { rationale: string }) | null>(null);
-  useEffect(() => { if (configuration.data) setForm({ ...configuration.data, rationale: "" }); }, [configuration.data]);
+  const [form, setForm] = useState<(PlatformContactSettings & { rationale: string }) | null>(null);
+  useEffect(() => { if (configuration.data) setForm({ public_contact_email: configuration.data.public_contact_email, demo_email: configuration.data.demo_email, support_email: configuration.data.support_email, privacy_email: configuration.data.privacy_email, security_email: configuration.data.security_email, notification_sender_email: configuration.data.notification_sender_email, support_access_max_hours: configuration.data.support_access_max_hours, rationale: "" }); }, [configuration.data]);
   const mutation = useMutation({ mutationFn: () => updatePlatformConfiguration(form!), onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ["platform-admin", "configuration"] }); } });
   if (configuration.isPending || !form) return <p>Loading platform settings…</p>;
   if (configuration.isError) return <StatusMessage kind="error">Platform settings could not be loaded.</StatusMessage>;
-  const emailFields: Array<[keyof Omit<PlatformConfiguration, "updated_at" | "support_access_max_hours">, string]> = [["public_contact_email", "General enquiries"], ["demo_email", "Demo requests"], ["support_email", "Customer support"], ["privacy_email", "Privacy requests"], ["security_email", "Security reports"], ["notification_sender_email", "Notification sender"]];
+  const emailFields: Array<[keyof Omit<PlatformContactSettings, "support_access_max_hours">, string]> = [["public_contact_email", "General enquiries"], ["demo_email", "Demo requests"], ["support_email", "Customer support"], ["privacy_email", "Privacy requests"], ["security_email", "Security reports"], ["notification_sender_email", "Notification sender"]];
   return <section className="card-panel"><div className="section-heading"><div><p className="eyebrow">Official channels</p><h2>Contact and support policy</h2><p className="muted">These values are centrally governed and exposed through the public configuration endpoint. All aliases may initially route to hello@crowdsmarter.com.</p></div></div>{mutation.isSuccess ? <StatusMessage kind="success">Platform settings saved.</StatusMessage> : null}{mutation.isError ? <StatusMessage kind="error">Platform settings could not be saved.</StatusMessage> : null}<div className="form-grid form-grid--two">{emailFields.map(([field, label]) => <label key={field}>{label}<input type="email" value={String(form[field])} onChange={(event) => setForm({ ...form, [field]: event.target.value })} /></label>)}<label>Maximum support-access duration<input type="number" min={1} max={72} value={form.support_access_max_hours} onChange={(event) => setForm({ ...form, support_access_max_hours: Number(event.target.value) })} /><small>Hours; each access still requires a recorded reason.</small></label><label>Change rationale<textarea rows={3} value={form.rationale} onChange={(event) => setForm({ ...form, rationale: event.target.value })} /></label></div><button className="button button--primary" type="button" disabled={form.rationale.trim().length < 12 || mutation.isPending} onClick={() => mutation.mutate()}>{mutation.isPending ? "Saving…" : "Save platform settings"}</button></section>;
+}
+
+function AIProviderPanel() {
+  const queryClient = useQueryClient();
+  const configuration = useQuery({ queryKey: ["platform-admin", "configuration"], queryFn: getPlatformConfiguration });
+  const [providerKey, setProviderKey] = useState<AIProviderKey>("rules");
+  const [model, setModel] = useState("claude-sonnet-5");
+  const [providerRationale, setProviderRationale] = useState("");
+  const [apiKey, setApiKey] = useState("");
+  const [keyRationale, setKeyRationale] = useState("");
+  const [clearRationale, setClearRationale] = useState("");
+  useEffect(() => { if (configuration.data) { setProviderKey(configuration.data.ai_provider_key); setModel(configuration.data.ai_provider_model); } }, [configuration.data]);
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ["platform-admin", "configuration"] });
+  const providerMutation = useMutation({ mutationFn: () => setAIProvider({ provider_key: providerKey, model, rationale: providerRationale }), onSuccess: async () => { setProviderRationale(""); await refresh(); } });
+  const keyMutation = useMutation({ mutationFn: () => setAIProviderAPIKey({ api_key: apiKey, rationale: keyRationale }), onSuccess: async () => { setApiKey(""); setKeyRationale(""); await refresh(); } });
+  const clearMutation = useMutation({ mutationFn: () => clearAIProviderAPIKey({ rationale: clearRationale }), onSuccess: async () => { setClearRationale(""); await refresh(); } });
+  if (configuration.isPending) return <p>Loading AI provider settings…</p>;
+  if (configuration.isError || !configuration.data) return <StatusMessage kind="error">AI provider settings could not be loaded.</StatusMessage>;
+  const data = configuration.data;
+  return <section className="card-panel">
+    <div className="section-heading"><div><p className="eyebrow">Decision reviews</p><h2>AI provider</h2><p className="muted">The rule-based reviewer needs no external service or key. Switching to a real model sends decision content to that provider and requires an API key.</p></div></div>
+    {providerMutation.isError ? <StatusMessage kind="error">The provider choice could not be saved.</StatusMessage> : null}
+    {keyMutation.isError ? <StatusMessage kind="error">The API key could not be saved.</StatusMessage> : null}
+    {clearMutation.isError ? <StatusMessage kind="error">The API key could not be removed.</StatusMessage> : null}
+    {keyMutation.isSuccess ? <StatusMessage kind="success">API key saved.</StatusMessage> : null}
+    <div className="ai-quality-metrics">
+      <article><strong>{data.ai_provider_key_label}</strong><span>Active provider</span></article>
+      <article><strong>{data.ai_provider_api_key_is_set ? "Configured" : "Not set"}</strong><span>API key</span></article>
+      <article><strong>{data.ai_provider_model}</strong><span>Model</span></article>
+    </div>
+    <div className="form-grid form-grid--two">
+      <label>Provider<select value={providerKey} onChange={(event) => setProviderKey(event.target.value as AIProviderKey)}><option value="rules">Transparent rules (no external service)</option><option value="anthropic">Anthropic Claude</option></select></label>
+      <label>Model identifier<input value={model} onChange={(event) => setModel(event.target.value)} placeholder="claude-sonnet-5" /><small>e.g. claude-sonnet-5, claude-haiku-4-5-20251001</small></label>
+      <label>Change rationale<textarea rows={2} value={providerRationale} onChange={(event) => setProviderRationale(event.target.value)} /></label>
+    </div>
+    {providerKey === "anthropic" && !data.ai_provider_api_key_is_set ? <p className="field-hint">Set an API key below before selecting Anthropic.</p> : null}
+    <button className="button button--primary" type="button" disabled={providerRationale.trim().length < 12 || providerMutation.isPending} onClick={() => providerMutation.mutate()}>{providerMutation.isPending ? "Saving…" : "Save provider choice"}</button>
+
+    <div className="section-heading"><div><p className="eyebrow">Credential</p><h2>Anthropic API key</h2><p className="muted">Stored encrypted. It is never shown again once saved, including to other platform administrators.</p></div></div>
+    <div className="form-grid form-grid--two">
+      <label>API key<input type="password" autoComplete="off" value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder={data.ai_provider_api_key_is_set ? "Already configured — enter a new key to replace it" : "sk-ant-…"} /></label>
+      <label>Change rationale<textarea rows={2} value={keyRationale} onChange={(event) => setKeyRationale(event.target.value)} /></label>
+    </div>
+    <button className="button button--secondary" type="button" disabled={!apiKey.trim() || keyRationale.trim().length < 12 || keyMutation.isPending} onClick={() => keyMutation.mutate()}>{keyMutation.isPending ? "Saving…" : "Set API key"}</button>
+
+    {data.ai_provider_api_key_is_set ? <>
+      <div className="form-grid form-grid--two">
+        <label>Reason for removing the key<textarea rows={2} value={clearRationale} onChange={(event) => setClearRationale(event.target.value)} /></label>
+      </div>
+      <button className="button button--danger" type="button" disabled={clearRationale.trim().length < 12 || clearMutation.isPending} onClick={() => { if (window.confirm("Remove the configured API key? This reverts to the rules-based reviewer if Anthropic is active.")) clearMutation.mutate(); }}>{clearMutation.isPending ? "Removing…" : "Remove API key"}</button>
+    </> : null}
+  </section>;
 }
 
 function AuditPanel() {
@@ -123,5 +178,5 @@ export function PlatformAdminPage() {
   const [activeTab, setActiveTab] = useState<AdminTab>("overview");
   if (currentUser.isPending) return <p>Checking platform authority…</p>;
   if (currentUser.isError || !currentUser.data?.is_platform_administrator) return <StatusMessage kind="error">This workspace requires an active CrowdSmarter platform-administrator capability.</StatusMessage>;
-  return <div className="platform-admin-page"><div className="page-heading"><div><p className="eyebrow">Platform administration</p><h1>Tenant governance and operational control</h1><p className="muted">Manage the service without silently joining client decisions. Tenant detail access is reasoned, time-bounded and audited.</p></div><a className="button button--secondary" href={contactChannels.adminUrl} target="_blank" rel="noreferrer">Technical Django admin</a></div><nav className="platform-admin-tabs" aria-label="Platform administration sections">{tabs.map((tab) => <button key={tab.id} className={activeTab === tab.id ? "is-active" : ""} type="button" aria-current={activeTab === tab.id ? "page" : undefined} onClick={() => setActiveTab(tab.id)}>{tab.label}</button>)}</nav>{activeTab === "overview" ? <OverviewPanel /> : null}{activeTab === "organisations" ? <OrganisationsPanel /> : null}{activeTab === "users" ? <UsersPanel /> : null}{activeTab === "demos" ? <DemoRequestsPanel /> : null}{activeTab === "configuration" ? <ConfigurationPanel /> : null}{activeTab === "audit" ? <AuditPanel /> : null}</div>;
+  return <div className="platform-admin-page"><div className="page-heading"><div><p className="eyebrow">Platform administration</p><h1>Tenant governance and operational control</h1><p className="muted">Manage the service without silently joining client decisions. Tenant detail access is reasoned, time-bounded and audited.</p></div><a className="button button--secondary" href={contactChannels.adminUrl} target="_blank" rel="noreferrer">Technical Django admin</a></div><nav className="platform-admin-tabs" aria-label="Platform administration sections">{tabs.map((tab) => <button key={tab.id} className={activeTab === tab.id ? "is-active" : ""} type="button" aria-current={activeTab === tab.id ? "page" : undefined} onClick={() => setActiveTab(tab.id)}>{tab.label}</button>)}</nav>{activeTab === "overview" ? <OverviewPanel /> : null}{activeTab === "organisations" ? <OrganisationsPanel /> : null}{activeTab === "users" ? <UsersPanel /> : null}{activeTab === "demos" ? <DemoRequestsPanel /> : null}{activeTab === "configuration" ? <><ConfigurationPanel /><AIProviderPanel /></> : null}{activeTab === "audit" ? <AuditPanel /> : null}</div>;
 }

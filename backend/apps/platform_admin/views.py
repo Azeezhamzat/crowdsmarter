@@ -27,6 +27,7 @@ from .selectors import (
     platform_users,
 )
 from .serializers import (
+    ClearAIProviderAPIKeySerializer,
     PlatformAdministratorGrantSerializer,
     PlatformAdministratorSerializer,
     PlatformConfigurationSerializer,
@@ -40,10 +41,13 @@ from .serializers import (
     PlatformOwnershipTransferSerializer,
     PlatformUserSerializer,
     PlatformUserStateSerializer,
+    SetAIProviderAPIKeySerializer,
+    SetAIProviderSerializer,
     SupportAccessCreateSerializer,
     SupportAccessGrantSerializer,
 )
 from .services import (
+    clear_ai_provider_api_key,
     create_support_access,
     current_support_access,
     grant_platform_administrator,
@@ -52,6 +56,8 @@ from .services import (
     platform_transfer_ownership,
     require_support_access,
     revoke_support_access,
+    set_ai_provider,
+    set_ai_provider_api_key,
     set_user_active,
     suspend_platform_administrator,
     update_demo_request_status,
@@ -308,6 +314,44 @@ class PlatformConfigurationView(PlatformAdminBaseView):
             actor=request.user,
             values=values,
             rationale=rationale,
+        )
+        return Response(PlatformConfigurationSerializer(item).data)
+
+
+class AIProviderConfigurationView(PlatformAdminBaseView):
+    """Choose which AI provider backend serves decision reviews."""
+
+    def patch(self, request):  # type: ignore[no-untyped-def]
+        serializer = SetAIProviderSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        item = set_ai_provider(
+            actor=request.user,
+            provider_key=serializer.validated_data["provider_key"],
+            model=serializer.validated_data["model"],
+            rationale=serializer.validated_data["rationale"],
+        )
+        return Response(PlatformConfigurationSerializer(item).data)
+
+
+class AIProviderAPIKeyView(PlatformAdminBaseView):
+    """Set or clear the configured AI provider's API key. Never returns its value."""
+
+    def post(self, request):  # type: ignore[no-untyped-def]
+        serializer = SetAIProviderAPIKeySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        item = set_ai_provider_api_key(
+            actor=request.user,
+            api_key=serializer.validated_data["api_key"],
+            rationale=serializer.validated_data["rationale"],
+        )
+        return Response(PlatformConfigurationSerializer(item).data)
+
+    def delete(self, request):  # type: ignore[no-untyped-def]
+        serializer = ClearAIProviderAPIKeySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        item = clear_ai_provider_api_key(
+            actor=request.user,
+            rationale=serializer.validated_data["rationale"],
         )
         return Response(PlatformConfigurationSerializer(item).data)
 

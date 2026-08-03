@@ -148,10 +148,10 @@ class FailingProvider:
 
 @pytest.mark.django_db
 def test_provider_failure_is_safe_and_does_not_change_the_decision(
-    api_client, decision_factory, settings
+    api_client, decision_factory, monkeypatch
 ):  # type: ignore[no-untyped-def]
-    settings.AI_PROVIDER_BACKEND = (
-        "apps.ai_assistance.tests.test_api.FailingProvider"
+    monkeypatch.setattr(
+        "apps.ai_assistance.services.get_provider", lambda: FailingProvider()
     )
     decision = decision_factory(status=Decision.Status.UNDER_REVIEW)
     original_status = decision.status

@@ -19,6 +19,7 @@ from apps.invitations.tokens import digest_token, generate_token
 from apps.organisations.models import Membership, MembershipEvent, Organisation
 from apps.organisations.services import organisation_deactivation_blockers
 
+from .crypto import encrypt_secret
 from .models import PlatformAdministrator, PlatformConfiguration, SupportAccessGrant
 from .permissions import is_platform_administrator
 
@@ -512,6 +513,91 @@ def update_platform_configuration(*, actor: Any, values: dict[str, Any], rationa
             "after": {field: getattr(item, field) for field in values},
             "rationale": rationale,
         },
+    )
+    return item
+
+
+@transaction.atomic
+def set_ai_provider(
+    *, actor: Any, provider_key: str, model: str, rationale: str
+) -> PlatformConfiguration:
+    """Choose which AI provider backend serves decision reviews."""
+    _require_platform_administrator(actor)
+    rationale = _meaningful(rationale)
+    item = PlatformConfiguration.objects.select_for_update().get(singleton_key=1)
+    previous_key = item.ai_provider_key
+    previous_model = item.ai_provider_model
+    item.ai_provider_key = provider_key
+    item.ai_provider_model = model.strip()
+    item.full_clean(validate_unique=False, validate_constraints=False)
+    item.save(update_fields=["ai_provider_key", "ai_provider_model", "updated_at"])
+    record_event(
+        action="platform_configuration.ai_provider_changed",
+        object_type="platform_configuration",
+        object_id=str(item.id),
+        actor=actor,
+        metadata={
+            "previous_provider": previous_key,
+            "new_provider": item.ai_provider_key,
+            "previous_model": previous_model,
+            "new_model": item.ai_provider_model,
+            "rationale": rationale,
+        },
+    )
+    return item
+
+
+@transaction.atomic
+def set_ai_provider_api_key(
+    *, actor: Any, api_key: str, rationale: str
+) -> PlatformConfiguration:
+    """Store a new provider API key, encrypted at rest.
+
+    The raw key is never written to the audit log, only whether one was
+    already set and its last 4 characters, enough for an administrator to
+    recognise which key is active without exposing it.
+    """
+    _require_platform_administrator(actor)
+    rationale = _meaningful(rationale)
+    api_key = api_key.strip()
+    if not api_key:
+        raise PlatformAdministrationError({"api_key": "Provide a non-empty API key."})
+    item = PlatformConfiguration.objects.select_for_update().get(singleton_key=1)
+    had_key_before = item.ai_provider_api_key_is_set
+    item.ai_provider_api_key_encrypted = encrypt_secret(api_key)
+    item.save(update_fields=["ai_provider_api_key_encrypted", "updated_at"])
+    record_event(
+        action="platform_configuration.ai_provider_api_key_set",
+        object_type="platform_configuration",
+        object_id=str(item.id),
+        actor=actor,
+        metadata={
+            "had_key_before": had_key_before,
+            "key_last_4": api_key[-4:] if len(api_key) >= 4 else "****",
+            "rationale": rationale,
+        },
+    )
+    return item
+
+
+@transaction.atomic
+def clear_ai_provider_api_key(*, actor: Any, rationale: str) -> PlatformConfiguration:
+    """Remove the stored API key, reverting to the rules provider if Anthropic was active."""
+    _require_platform_administrator(actor)
+    rationale = _meaningful(rationale)
+    item = PlatformConfiguration.objects.select_for_update().get(singleton_key=1)
+    item.ai_provider_api_key_encrypted = ""
+    if item.ai_provider_key == PlatformConfiguration.AIProviderKey.ANTHROPIC:
+        item.ai_provider_key = PlatformConfiguration.AIProviderKey.RULES
+    item.save(
+        update_fields=["ai_provider_api_key_encrypted", "ai_provider_key", "updated_at"]
+    )
+    record_event(
+        action="platform_configuration.ai_provider_api_key_cleared",
+        object_type="platform_configuration",
+        object_id=str(item.id),
+        actor=actor,
+        metadata={"rationale": rationale},
     )
     return item
 

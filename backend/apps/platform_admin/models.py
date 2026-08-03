@@ -79,6 +79,10 @@ class PlatformAdministrator(UUIDTimeStampedModel):
 class PlatformConfiguration(UUIDTimeStampedModel):
     """Singleton operational contact and support-access policy."""
 
+    class AIProviderKey(models.TextChoices):
+        RULES = "rules", "Transparent rules (no external service)"
+        ANTHROPIC = "anthropic", "Anthropic Claude"
+
     singleton_key = models.PositiveSmallIntegerField(default=1, unique=True, editable=False)
     public_contact_email = models.EmailField(default="hello@crowdsmarter.com")
     demo_email = models.EmailField(default="hello@crowdsmarter.com")
@@ -87,6 +91,11 @@ class PlatformConfiguration(UUIDTimeStampedModel):
     security_email = models.EmailField(default="hello@crowdsmarter.com")
     notification_sender_email = models.EmailField(default="hello@crowdsmarter.com")
     support_access_max_hours = models.PositiveSmallIntegerField(default=8)
+    ai_provider_key = models.CharField(
+        max_length=20, choices=AIProviderKey.choices, default=AIProviderKey.RULES
+    )
+    ai_provider_model = models.CharField(max_length=100, default="claude-sonnet-5")
+    ai_provider_api_key_encrypted = models.TextField(blank=True, default="")
 
     class Meta:
         verbose_name = "platform configuration"
@@ -101,12 +110,20 @@ class PlatformConfiguration(UUIDTimeStampedModel):
                 & models.Q(support_access_max_hours__lte=72),
                 name="platform_support_access_hours_range",
             ),
+            models.CheckConstraint(
+                condition=models.Q(ai_provider_key__in=["rules", "anthropic"]),
+                name="platform_ai_provider_key_valid",
+            ),
         ]
 
     @classmethod
     def load(cls) -> "PlatformConfiguration":
         item, _ = cls.objects.get_or_create(singleton_key=1)
         return item
+
+    @property
+    def ai_provider_api_key_is_set(self) -> bool:
+        return bool(self.ai_provider_api_key_encrypted)
 
     def clean(self) -> None:
         super().clean()
@@ -119,6 +136,17 @@ class PlatformConfiguration(UUIDTimeStampedModel):
             "notification_sender_email",
         ):
             setattr(self, field, getattr(self, field).strip().lower())
+        if (
+            self.ai_provider_key == self.AIProviderKey.ANTHROPIC
+            and not self.ai_provider_api_key_encrypted
+        ):
+            raise ValidationError(
+                {
+                    "ai_provider_key": (
+                        "Set an Anthropic API key before selecting this provider."
+                    )
+                }
+            )
 
     def __str__(self) -> str:
         return "CrowdSmarter platform configuration"

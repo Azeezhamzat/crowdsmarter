@@ -290,6 +290,11 @@ class PlatformInvitationActionSerializer(StrictSerializer):
 
 
 class PlatformConfigurationSerializer(serializers.ModelSerializer):
+    ai_provider_key_label = serializers.CharField(
+        source="get_ai_provider_key_display", read_only=True
+    )
+    ai_provider_api_key_is_set = serializers.BooleanField(read_only=True)
+
     class Meta:
         model = PlatformConfiguration
         fields = [
@@ -300,9 +305,19 @@ class PlatformConfigurationSerializer(serializers.ModelSerializer):
             "security_email",
             "notification_sender_email",
             "support_access_max_hours",
+            "ai_provider_key",
+            "ai_provider_key_label",
+            "ai_provider_model",
+            "ai_provider_api_key_is_set",
             "updated_at",
         ]
-        read_only_fields = ["updated_at"]
+        read_only_fields = [
+            "ai_provider_key",
+            "ai_provider_key_label",
+            "ai_provider_model",
+            "ai_provider_api_key_is_set",
+            "updated_at",
+        ]
 
 
 class PlatformConfigurationUpdateSerializer(StrictSerializer):
@@ -313,6 +328,30 @@ class PlatformConfigurationUpdateSerializer(StrictSerializer):
     security_email = serializers.EmailField()
     notification_sender_email = serializers.EmailField()
     support_access_max_hours = serializers.IntegerField(min_value=1, max_value=72)
+    rationale = serializers.CharField(min_length=12, max_length=1000)
+
+    def validate_rationale(self, value: str) -> str:
+        return value.strip()
+
+
+class SetAIProviderSerializer(StrictSerializer):
+    provider_key = serializers.ChoiceField(choices=PlatformConfiguration.AIProviderKey.choices)
+    model = serializers.CharField(max_length=100)
+    rationale = serializers.CharField(min_length=12, max_length=1000)
+
+    def validate_rationale(self, value: str) -> str:
+        return value.strip()
+
+
+class SetAIProviderAPIKeySerializer(StrictSerializer):
+    api_key = serializers.CharField(min_length=1, max_length=2000, trim_whitespace=False)
+    rationale = serializers.CharField(min_length=12, max_length=1000)
+
+    def validate_rationale(self, value: str) -> str:
+        return value.strip()
+
+
+class ClearAIProviderAPIKeySerializer(StrictSerializer):
     rationale = serializers.CharField(min_length=12, max_length=1000)
 
     def validate_rationale(self, value: str) -> str:
@@ -366,6 +405,9 @@ __all__ = [
     "PlatformUserSerializer",
     "PlatformUserStateSerializer",
     "PlatformAdministratorGrantSerializer",
+    "SetAIProviderSerializer",
+    "SetAIProviderAPIKeySerializer",
+    "ClearAIProviderAPIKeySerializer",
     "SupportAccessCreateSerializer",
     "SupportAccessGrantSerializer",
 ]
