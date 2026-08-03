@@ -37,8 +37,15 @@ def _json_default(value: Any) -> str:
 
 
 def _fingerprint(snapshot: dict[str, Any]) -> str:
+    """Hash the substantive decision content only.
+
+    Excludes generated_at: it changes on every snapshot build, so including it
+    would make the fingerprint change even when nothing about the decision
+    record itself did, defeating its purpose as a reproducibility signal.
+    """
+    stable = {key: value for key, value in snapshot.items() if key != "generated_at"}
     encoded = json.dumps(
-        snapshot,
+        stable,
         sort_keys=True,
         separators=(",", ":"),
         default=_json_default,
@@ -246,3 +253,29 @@ def dismiss_ai_review(*, actor: User, review: AIReview, reason: str) -> AIReview
         },
     )
     return current
+
+
+def ai_review_quality_metrics(*, organisation) -> dict[str, Any]:  # type: ignore[no-untyped-def]
+    """Aggregate human disposition of completed AI reviews as an evaluation signal.
+
+    A high dismissal rate suggests the advisory output isn't earning trust;
+    this is the harness the roadmap calls "user correction rate," built
+    entirely from the reviewed_at/dismissed_at fields humans already set.
+    """
+    completed = AIReview.objects.filter(
+        organisation=organisation, status=AIReview.Status.COMPLETED
+    )
+    total_completed = completed.count()
+    reviewed_count = completed.filter(reviewed_at__isnull=False).count()
+    dismissed_count = completed.filter(dismissed_at__isnull=False).count()
+    actioned_count = reviewed_count + dismissed_count
+    correction_rate = (
+        round(dismissed_count / actioned_count * 100, 2) if actioned_count else None
+    )
+    return {
+        "total_completed": total_completed,
+        "reviewed_count": reviewed_count,
+        "dismissed_count": dismissed_count,
+        "pending_disposition_count": total_completed - actioned_count,
+        "correction_rate": correction_rate,
+    }

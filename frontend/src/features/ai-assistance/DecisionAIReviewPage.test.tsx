@@ -34,7 +34,7 @@ describe("DecisionAIReviewPage", () => {
         id: "r1", decision_id: decisionId, status: "completed", status_label: "Completed", provider_key: "rules",
         provider_label: "Transparent rules review", model_identifier: "crowdsmarter-rules-v1", prompt_version: "decision-review-v1",
         input_fingerprint: "abcdef1234567890", requested_by: { id: "u1", email: "owner@example.com", first_name: "", last_name: "" },
-        output: { summary: "One point for human consideration.", missing_evidence: [{ severity: "high", title: "No evidence", detail: "Add evidence.", related_type: "", related_id: "" }], unsupported_assumptions: [], contradictory_evidence: [], missing_stakeholders: [], risk_highlights: [], similar_decisions: [], limitations: ["Humans decide."] },
+        output: { summary: "One point for human consideration.", missing_evidence: [{ severity: "high", title: "No evidence", detail: "Add evidence.", related_type: "", related_id: "" }], unsupported_assumptions: [], contradictory_evidence: [], duplicate_evidence: [], missing_stakeholders: [], risk_highlights: [], review_triggers: [], similar_decisions: [], limitations: ["Humans decide."] },
         error_message: "", started_at: "2026-07-26T12:00:00Z", completed_at: "2026-07-26T12:00:01Z", is_reviewed: false,
         reviewed_by: null, reviewed_at: null, review_notes: "", is_dismissed: false, dismissed_by: null, dismissed_at: null,
         dismissal_reason: "", can_review: true, can_dismiss: true, created_at: "2026-07-26T12:00:00Z",

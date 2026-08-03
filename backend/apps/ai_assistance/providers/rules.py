@@ -4,12 +4,23 @@ from __future__ import annotations
 
 import re
 from collections import defaultdict
+from datetime import date, datetime
 from typing import Any
 
 from .base import AIReviewOutput, ReviewFinding, SimilarDecision
 
 
 _TOKEN_PATTERN = re.compile(r"[a-z0-9]{3,}")
+_DUPLICATE_EVIDENCE_THRESHOLD = 0.6
+
+
+def _as_date(value: Any) -> date | None:
+    if isinstance(value, date):
+        return value
+    if isinstance(value, str) and value:
+        parsed = datetime.fromisoformat(value)
+        return parsed.date()
+    return None
 
 
 def _tokens(value: str) -> set[str]:
@@ -153,6 +164,33 @@ class RuleBasedAIProvider:
                     )
                 )
 
+        duplicate_evidence: list[ReviewFinding] = []
+        seen_pairs: set[frozenset[str]] = set()
+        for left_index, left in enumerate(evidence):
+            left_text = f"{left['title']} {left['summary']}"
+            for right in evidence[left_index + 1 :]:
+                pair_key = frozenset({left["id"], right["id"]})
+                if pair_key in seen_pairs:
+                    continue
+                right_text = f"{right['title']} {right['summary']}"
+                score = _similarity(left_text, right_text)
+                if score >= _DUPLICATE_EVIDENCE_THRESHOLD:
+                    seen_pairs.add(pair_key)
+                    duplicate_evidence.append(
+                        ReviewFinding(
+                            severity="low",
+                            title=f"Possible duplicate evidence: {left['title']!r} and {right['title']!r}",
+                            detail=(
+                                f"These two evidence items overlap by "
+                                f"{round(score * 100)}% of their distinct terms. "
+                                "Confirm they record genuinely separate evidence "
+                                "rather than the same item entered twice."
+                            ),
+                            related_type="evidence",
+                            related_id=left["id"],
+                        )
+                    )
+
         active_roles = {item["role"] for item in participants}
         missing_stakeholders: list[ReviewFinding] = []
         if "decision_maker" not in active_roles:
@@ -242,6 +280,40 @@ class RuleBasedAIProvider:
                 )
             )
 
+        today = _as_date(snapshot.get("generated_at")) or date.today()
+        review_triggers: list[ReviewFinding] = []
+        for assumption in assumptions:
+            review_date = _as_date(assumption.get("review_date"))
+            if review_date and review_date < today:
+                review_triggers.append(
+                    ReviewFinding(
+                        severity="medium",
+                        title=f"Assumption is overdue for re-verification: {assumption['statement']}",
+                        detail=(
+                            f"Its review date ({review_date.isoformat()}) has passed. "
+                            "Confirm whether it still holds before relying on it further."
+                        ),
+                        related_type="assumption",
+                        related_id=assumption["id"],
+                    )
+                )
+        for risk in risks:
+            review_date = _as_date(risk.get("review_date"))
+            if review_date and review_date < today:
+                review_triggers.append(
+                    ReviewFinding(
+                        severity="medium",
+                        title=f"Risk is overdue for review: {risk['title']}",
+                        detail=(
+                            f"Its review date ({review_date.isoformat()}) has passed. "
+                            "Confirm whether the likelihood, impact, or response plan "
+                            "has changed."
+                        ),
+                        related_type="risk",
+                        related_id=risk["id"],
+                    )
+                )
+
         current_text = " ".join(
             [
                 snapshot["decision"]["title"],
@@ -281,8 +353,10 @@ class RuleBasedAIProvider:
                 missing_evidence,
                 unsupported_assumptions,
                 contradictory_evidence,
+                duplicate_evidence,
                 missing_stakeholders,
                 risk_highlights,
+                review_triggers,
             ]
         )
         summary = (
@@ -296,8 +370,10 @@ class RuleBasedAIProvider:
             missing_evidence=missing_evidence,
             unsupported_assumptions=unsupported_assumptions,
             contradictory_evidence=contradictory_evidence,
+            duplicate_evidence=duplicate_evidence,
             missing_stakeholders=missing_stakeholders,
             risk_highlights=risk_highlights,
+            review_triggers=review_triggers,
             similar_decisions=similar[:5],
             limitations=[
                 (

@@ -1,8 +1,12 @@
 import { apiRequest } from "../../lib/api";
-import type { AIReview, AIReviewList } from "../../lib/types";
+import type { AIReview, AIReviewList, AIReviewQualityMetrics } from "../../lib/types";
 
 export function listAIReviews(decisionId: string): Promise<AIReviewList> {
   return apiRequest<AIReviewList>(`/decisions/${decisionId}/ai-reviews/`);
+}
+
+export function getAIReviewQualityMetrics(organisationId: string): Promise<AIReviewQualityMetrics> {
+  return apiRequest<AIReviewQualityMetrics>(`/organisations/${organisationId}/ai-assistance/quality/`);
 }
 
 export function requestAIReview(decisionId: string): Promise<AIReview> {

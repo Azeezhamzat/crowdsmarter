@@ -67,6 +67,31 @@ afterwards, but this account hit the identical `AuditEvent.actor`
 `PROTECT` constraint and was left in place for the same reason as
 `a11y-audit@example.test` above.
 
+## Fixed in Phase 27
+
+- `apps/ai_assistance` had no evaluation harness at all, and two named
+  "appropriate AI functions" (duplicate detection, review triggers) were
+  absent from the deterministic rule provider. Added both to
+  `RuleBasedAIProvider`, plus a genuine offline-testable evaluation harness
+  (`tests/test_evaluation.py`: reproducibility, adversarial-input
+  passthrough safety) and a "user correction rate" quality metric surfaced
+  on `OrganisationAdministrationPage.tsx`. No migration — `AIReview.output`
+  is an unstructured `JSONField`.
+- A test caught a real bug before it shipped: adding a `generated_at` field
+  to the AI review snapshot (needed for review-trigger date comparisons)
+  would have made `input_fingerprint` change on every single review request
+  even when the underlying decision hadn't changed, defeating its purpose
+  as a reproducibility signal. Fixed by excluding `generated_at` from the
+  fingerprint hash — same pattern as excluding `audit_events` from the
+  export content hash in Phase 26.
+- Confirmed for the record: `apps/ai_assistance` has no real LLM provider
+  integration today (`RuleBasedAIProvider` is pure deterministic Python, no
+  external HTTP calls, no API key anywhere in settings). Building one is
+  out of scope for this sandbox — it would be untestable end-to-end without
+  live credentials, and the master prompt explicitly says not to market AI
+  functionality before it meets measurable quality criteria. Not attempted;
+  not regressed.
+
 ## Fixed in Phase 26
 
 - `apps/exports` had no spreadsheet-native output (JSON/CSV only) and no way

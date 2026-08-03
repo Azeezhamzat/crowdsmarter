@@ -83,3 +83,11 @@ class AIReviewAcknowledgeSerializer(StrictSerializer):
 
 class AIReviewDismissSerializer(StrictSerializer):
     reason = serializers.CharField(max_length=8000, trim_whitespace=True)
+
+
+class AIReviewQualityMetricsSerializer(serializers.Serializer):
+    total_completed = serializers.IntegerField()
+    reviewed_count = serializers.IntegerField()
+    dismissed_count = serializers.IntegerField()
+    pending_disposition_count = serializers.IntegerField()
+    correction_rate = serializers.FloatField(allow_null=True)

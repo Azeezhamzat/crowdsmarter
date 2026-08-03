@@ -1,22 +1,31 @@
 """Thin endpoints for attributable AI assistance."""
 
 from rest_framework import status
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from apps.decisions.selectors import decision_for_user
+from apps.organisations.models import Membership
+from apps.organisations.selectors import organisation_for_user
 
 from .permissions import can_request_ai_review
 from .selectors import review_for_user, reviews_for_decision
 from .serializers import (
     AIReviewAcknowledgeSerializer,
     AIReviewDismissSerializer,
+    AIReviewQualityMetricsSerializer,
     AIReviewRequestSerializer,
     AIReviewSerializer,
 )
-from .services import dismiss_ai_review, mark_ai_review_reviewed, request_ai_review
+from .services import (
+    ai_review_quality_metrics,
+    dismiss_ai_review,
+    mark_ai_review_reviewed,
+    request_ai_review,
+)
 
 
 class DecisionAIReviewListCreateView(APIView):
@@ -82,6 +91,28 @@ class AIReviewAcknowledgeView(APIView):
         return Response(
             AIReviewSerializer(review, context={"request": request}).data
         )
+
+
+class OrganisationAIReviewQualityView(APIView):
+    """Owner/admin evaluation-harness view of how humans dispose of AI output."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, organisation_id):  # type: ignore[no-untyped-def]
+        organisation = organisation_for_user(user=request.user, organisation_id=organisation_id)
+        membership = organisation.memberships.filter(
+            user=request.user,
+            status=Membership.Status.ACTIVE,
+        ).first()
+        if membership is None or membership.role not in {
+            Membership.Role.OWNER,
+            Membership.Role.ADMIN,
+        }:
+            raise PermissionDenied(
+                "Only organisation owners and administrators can view AI review quality metrics."
+            )
+        metrics = ai_review_quality_metrics(organisation=organisation)
+        return Response(AIReviewQualityMetricsSerializer(metrics).data)
 
 
 class AIReviewDismissView(APIView):

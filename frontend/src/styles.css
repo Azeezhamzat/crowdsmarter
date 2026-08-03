@@ -827,6 +827,10 @@ kbd { display: inline-grid; place-items: center; min-width: 23px; min-height: 21
 .dashboard-hero p:last-child { max-width: 720px; margin: 0; color: #bed1c7; font-size: 1rem; }
 .dashboard-hero .button--secondary { background: rgba(255,255,255,.1); border-color: rgba(255,255,255,.18); color: white; box-shadow: none; }
 .dashboard-hero .button--secondary:hover { background: rgba(255,255,255,.16); }
+.ai-quality-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: .85rem; margin-top: .75rem; }
+.ai-quality-metrics article { padding: .9rem 1rem; border: 1px solid var(--line); border-radius: 12px; }
+.ai-quality-metrics strong { display: block; font-size: 1.35rem; }
+.ai-quality-metrics span { color: var(--muted); font-size: .8rem; }
 .dashboard-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .85rem; }
 .dashboard-metrics article, .portfolio-summary--premium article { display: flex; align-items: center; gap: .85rem; padding: 1rem 1.1rem; border: 1px solid var(--line); border-radius: 15px; background: #fff; box-shadow: var(--shadow-xs); }
 .dashboard-metrics article > div, .portfolio-summary--premium article > div { display: grid; gap: .05rem; }

@@ -8,12 +8,14 @@ import type { AIReviewFinding, AIReviewOutput } from "../../lib/types";
 import { getDecision } from "../decisions/api";
 import { acknowledgeAIReview, dismissAIReview, listAIReviews, requestAIReview } from "./api";
 
-const sections: Array<{ key: keyof Pick<AIReviewOutput, "missing_evidence" | "unsupported_assumptions" | "contradictory_evidence" | "missing_stakeholders" | "risk_highlights">; title: string }> = [
+const sections: Array<{ key: keyof Pick<AIReviewOutput, "missing_evidence" | "unsupported_assumptions" | "contradictory_evidence" | "duplicate_evidence" | "missing_stakeholders" | "risk_highlights" | "review_triggers">; title: string }> = [
   { key: "missing_evidence", title: "Missing evidence" },
   { key: "unsupported_assumptions", title: "Unsupported assumptions" },
   { key: "contradictory_evidence", title: "Contradictory evidence" },
+  { key: "duplicate_evidence", title: "Possible duplicate evidence" },
   { key: "missing_stakeholders", title: "Missing stakeholders" },
   { key: "risk_highlights", title: "Risk highlights" },
+  { key: "review_triggers", title: "Overdue for review" },
 ];
 
 function FindingList({ findings }: { findings: AIReviewFinding[] }) {

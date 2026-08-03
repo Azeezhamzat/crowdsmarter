@@ -31,8 +31,10 @@ class AIReviewOutput:
     missing_evidence: list[ReviewFinding] = field(default_factory=list)
     unsupported_assumptions: list[ReviewFinding] = field(default_factory=list)
     contradictory_evidence: list[ReviewFinding] = field(default_factory=list)
+    duplicate_evidence: list[ReviewFinding] = field(default_factory=list)
     missing_stakeholders: list[ReviewFinding] = field(default_factory=list)
     risk_highlights: list[ReviewFinding] = field(default_factory=list)
+    review_triggers: list[ReviewFinding] = field(default_factory=list)
     similar_decisions: list[SimilarDecision] = field(default_factory=list)
     limitations: list[str] = field(default_factory=list)
 

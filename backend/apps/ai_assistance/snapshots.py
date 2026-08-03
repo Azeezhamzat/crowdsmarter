@@ -8,6 +8,8 @@ from enum import Enum
 from typing import Any
 from uuid import UUID
 
+from django.utils import timezone
+
 from apps.assumptions.models import Assumption
 from apps.decision_options.models import DecisionOption
 from apps.decisions.models import Decision
@@ -135,6 +137,7 @@ def build_decision_snapshot(*, decision: Decision) -> dict[str, Any]:
         )
     snapshot = {
         "schema_version": "decision-snapshot-v1",
+        "generated_at": timezone.now(),
         "decision": {
             "id": str(decision.id),
             "organisation_id": str(decision.organisation_id),

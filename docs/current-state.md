@@ -1,4 +1,4 @@
-# Current state (Phase 19/20/21/22/23/24/25/26 baseline)
+# Current state (Phase 19/20/21/22/23/24/25/26/27 baseline)
 
 Verified against the running system on 2026-08-03. Update this document
 whenever the baseline materially changes; do not let it drift into aspiration.
@@ -38,17 +38,17 @@ the two new migrations above were applied by hand).
 
 ## Test suites
 
-- Backend: `docker compose exec backend pytest` — **369 passed, 0 failed**
-  (was 368 passed at the end of Phase 25; +1 new test for Phase 26's
-  XLSX-export/content-hash feature, plus extended assertions added to the
-  existing decision-dossier test).
+- Backend: `docker compose exec backend pytest` — **376 passed, 0 failed**
+  (was 369 passed at the end of Phase 26; +7 new tests for Phase 27's
+  evaluation-harness module: `apps/ai_assistance/tests/test_evaluation.py`).
 - Frontend: `docker compose exec frontend npx vitest run` — **36 test files /
-  48 tests, all passing** (unchanged — Phase 26 only changed static copy on
-  `OrganisationExportPage.tsx`, which has no dedicated test file).
+  48 tests, all passing** (Phase 27 extended the existing
+  `DecisionAIReviewPage.test.tsx` mock with the two new finding-list fields
+  rather than adding a new test file).
 - `docker compose exec backend python manage.py check` — clean, 0 warnings.
 - `docker compose exec backend python manage.py makemigrations --check --dry-run` — clean
-  (Phase 26 added no migration — `apps/exports` has no models, everything is
-  generated on demand).
+  (Phase 27 added no migration — `AIReview.output` is an unstructured
+  `JSONField`, so new finding categories need no schema change).
 - Frontend `npx tsc -b` and `npm run build` — clean.
 - Backend Docker image rebuilt (`docker compose build backend`) to bake in
   the new `openpyxl` dependency, then the full suite re-run against the
@@ -361,7 +361,60 @@ and `build_decision_export` against real data): both produce
 openpyxl-readable workbooks (57 and 48 sheets respectively) with a valid
 64-character `content_sha256` in the manifest.
 
-Committed on `claude/phase-26-exports-data-portability`, not yet pushed.
+Committed on `claude/phase-26-exports-data-portability`, pushed, and
+fast-forward merged into `main`.
+
+## Phase 27 (governed AI copilot) progress
+
+Audited `apps/ai_assistance` against the AI roadmap's "appropriate
+functions," "required controls," and "AI evaluation" sections. The single
+most important finding: **this codebase has no real LLM integration at
+all** — `RuleBasedAIProvider` (the hard default, and the only provider that
+exists) is pure deterministic Python (token-overlap similarity, threshold
+checks), with zero external HTTP calls and no API key referenced anywhere
+in settings or `.env.example`. Most of the roadmap's "required controls"
+were already implemented (explicit initiation, visible provider/model,
+tenant boundaries, source references, uncertainty disclosure, no automatic
+writes, graceful fallback, audit logging of every request/completion/
+dismissal). No AI evaluation harness existed at all. Building a real
+provider integration was correctly out of scope — untestable here without
+live credentials, and the roadmap explicitly says not to market AI
+functionality before it meets measurable quality criteria.
+
+Extended the existing deterministic provider and built a genuine,
+offline-testable evaluation harness instead:
+
+- **Two new "appropriate AI functions"**, both additive to
+  `RuleBasedAIProvider`: duplicate-evidence detection (pairwise text
+  similarity across active evidence, ≥60% term overlap) and review-trigger
+  suggestions (assumptions/risks whose `review_date` has passed). Required
+  adding `generated_at` to `build_decision_snapshot()` so the provider knows
+  "today" without a hidden `datetime.now()` call inside deterministic logic.
+- **A real bug caught by testing**: adding `generated_at` to the snapshot
+  would have defeated `input_fingerprint`'s reproducibility purpose, since
+  the fingerprint hashes the *entire* snapshot and a timestamp that always
+  differs would make it change on every request even when nothing else
+  did. Fixed by excluding `generated_at` from `_fingerprint()` — the same
+  pattern as excluding `audit_events` from Phase 26's export content hash.
+- **An evaluation harness** (`apps/ai_assistance/tests/test_evaluation.py`):
+  reproducibility (same snapshot → byte-identical output, since
+  `AIReviewOutput` is a frozen dataclass), adversarial-input passthrough
+  (script-tag-style content in assumption text round-trips as literal text,
+  not executed or stripped), and the two new finding types.
+- **A quality/"user correction rate" metric** —
+  `ai_review_quality_metrics()` aggregates existing `reviewed_at`/
+  `dismissed_at` dispositions into a correction rate, exposed via an
+  owner/admin-gated endpoint and a new "AI review quality" card on
+  `OrganisationAdministrationPage.tsx`.
+
+Verified live in the browser: created a decision with two near-duplicate
+evidence items and an overdue assumption/risk, ran a real advisory review,
+and confirmed both new finding sections appeared with accurate detail text;
+then marked the review as human-reviewed and confirmed the quality card on
+the administration page showed 1 completed / 1 confirmed / 0% correction
+rate.
+
+Committed on `claude/phase-27-ai-copilot`, not yet pushed.
 
 ## Known risks not yet resolved
 

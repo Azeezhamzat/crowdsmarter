@@ -4,6 +4,7 @@ import { Link, useParams } from "react-router";
 
 import { StatusMessage } from "../../components/StatusMessage";
 import { ApiError } from "../../lib/api";
+import { getAIReviewQualityMetrics } from "../ai-assistance/api";
 import {
   cancelOrganisationDeletion,
   deactivateOrganisation,
@@ -29,6 +30,7 @@ export function OrganisationAdministrationPage() {
   const memberships = useQuery({ queryKey: ["organisations", organisationId, "memberships"], queryFn: () => listMemberships(organisationId), enabled: Boolean(organisationId) });
   const history = useQuery({ queryKey: ["organisations", organisationId, "membership-history"], queryFn: () => listMembershipHistory(organisationId), enabled: Boolean(organisationId) });
   const deletions = useQuery({ queryKey: ["organisations", organisationId, "deletion-requests"], queryFn: () => listOrganisationDeletionRequests(organisationId), enabled: Boolean(organisationId) && organisation.data?.current_user_role === "owner" });
+  const aiQuality = useQuery({ queryKey: ["organisations", organisationId, "ai-review-quality"], queryFn: () => getAIReviewQualityMetrics(organisationId), enabled: Boolean(organisationId) && ["owner", "admin"].includes(organisation.data?.current_user_role ?? "") });
   const [settings, setSettings] = useState({ name: "", description: "", website_url: "", brand_name: "", primary_colour: "#315c54", invitation_policy: "owners_and_admins", default_invitation_role: "contributor", retention_days: "" });
   const [transfer, setTransfer] = useState({ target_membership_id: "", rationale: "" });
   const [deactivation, setDeactivation] = useState({ confirmation: "", reason: "" });
@@ -100,6 +102,22 @@ export function OrganisationAdministrationPage() {
         {history.isError ? <StatusMessage kind="error">Membership history requires an owner or administrator role.</StatusMessage> : null}
         {history.data?.length ? <div className="table-wrap"><table><thead><tr><th>Event</th><th>Member</th><th>Change</th><th>Note</th><th>Actor</th><th>Date</th></tr></thead><tbody>{history.data.map((item) => <tr key={item.id}><td>{item.kind_label}</td><td>{item.user.email}</td><td>{[item.previous_role, item.new_role].filter(Boolean).join(" → ") || "—"}</td><td>{item.note || "—"}</td><td>{item.actor.email}</td><td>{formatDate(item.created_at)}</td></tr>)}</tbody></table></div> : <p className="muted">No membership history is available.</p>}
       </section>
+
+      {canManage ? (
+        <section className="card-panel">
+          <div className="section-heading"><div><p className="eyebrow">Evaluation harness</p><h2>AI review quality</h2><p className="muted">How often humans confirm vs. dismiss the advisory rule engine's output — a rising dismissal rate is a signal to review the rules, not to trust them less by default.</p></div></div>
+          {aiQuality.isError ? <StatusMessage kind="error">AI review quality metrics require an owner or administrator role.</StatusMessage> : null}
+          {aiQuality.data ? (
+            <div className="ai-quality-metrics">
+              <article><strong>{aiQuality.data.total_completed}</strong><span>Completed reviews</span></article>
+              <article><strong>{aiQuality.data.reviewed_count}</strong><span>Confirmed by a human</span></article>
+              <article><strong>{aiQuality.data.dismissed_count}</strong><span>Dismissed by a human</span></article>
+              <article><strong>{aiQuality.data.pending_disposition_count}</strong><span>Awaiting human disposition</span></article>
+              <article><strong>{aiQuality.data.correction_rate != null ? `${aiQuality.data.correction_rate}%` : "—"}</strong><span>Correction rate</span></article>
+            </div>
+          ) : <p className="muted">No completed AI reviews are recorded yet.</p>}
+        </section>
+      ) : null}
 
       {isOwner ? <section className="card-panel governance-danger-section">
         <div><p className="eyebrow">Account state</p><h2>{organisation.data.status === "active" ? "Deactivate this organisation" : "Reactivate this organisation"}</h2><p className="muted">Deactivation requires all decisions to be archived, invitations resolved, and contribution work closed. It does not delete customer data.</p></div>

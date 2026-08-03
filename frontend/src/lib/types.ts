@@ -521,8 +521,10 @@ export type AIReviewOutput = {
   missing_evidence: AIReviewFinding[];
   unsupported_assumptions: AIReviewFinding[];
   contradictory_evidence: AIReviewFinding[];
+  duplicate_evidence: AIReviewFinding[];
   missing_stakeholders: AIReviewFinding[];
   risk_highlights: AIReviewFinding[];
+  review_triggers: AIReviewFinding[];
   similar_decisions: SimilarDecision[];
   limitations: string[];
 };
@@ -558,6 +560,14 @@ export type AIReview = {
 export type AIReviewList = {
   can_request: boolean;
   reviews: AIReview[];
+};
+
+export type AIReviewQualityMetrics = {
+  total_completed: number;
+  reviewed_count: number;
+  dismissed_count: number;
+  pending_disposition_count: number;
+  correction_rate: number | null;
 };
 
 export type AnalyticsStatusCount = {
