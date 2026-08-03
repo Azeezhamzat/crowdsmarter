@@ -3,36 +3,26 @@
 Tracked as of Phase 19 (2026-08-03). Move an item to a release note once it
 is resolved; do not delete history from this file, mark it resolved instead.
 
-## Needs an explicit owner decision
+## Closed without action
 
-### `react-router` high-severity advisory (GHSA-qwww-vcr4-c8h2)
-
-`npm audit` flags `react-router` (pulled in by `react-router-dom@7.18.1`) for
-a CSRF bypass in its RSC/framework server-action mode. This app uses
-`createBrowserRouter` as a plain client-side SPA with no loaders, actions, or
-server mode, so the advisory does not appear to be exploitable here — but the
-installed version is still in the flagged range (`>=7.12.0 <8.3.0`). The only
-fix is a major-version upgrade (7.x → 8.3.0+), which is a real breaking
-change for routing across the whole app and needs deliberate testing, not a
-blind `npm audit fix --force`. Recommended: schedule this as its own small
-branch with full route-by-route manual verification before merging.
-
-### Old failed-phase Docker volumes remain on disk
+### Old failed-phase Docker volumes remain on disk (by design)
 
 The failed-phase containers, their custom-built images, and the build cache
 were removed (see "Fixed in Phase 19" below), reclaiming roughly 50 GB. Their
 named Docker volumes (`crowdsmarter-phaseN-failed-*_postgres_data`,
 `_media_data`, `_frontend_node_modules`, plus `crowdsmarter-v1_crowdsmarter_postgres`
-and the `phase301-backup-*` volumes) were deliberately left untouched — the
-master prompt's non-negotiable rule against deleting PostgreSQL/Redis volumes
-applies regardless of whether the stack is still active. They account for
-only ~1 GB combined, so reclaiming them isn't necessary for disk pressure;
-remove them only if the owner explicitly confirms none contain data worth
-keeping:
+and the `phase301-backup-*` volumes) remain and are not going to be removed
+by an automated pass: the master prompt's non-negotiable rule is "never
+delete PostgreSQL or Redis volumes," stated with no exception clause, and it
+applies regardless of whether the stack that created them is still active.
+They total only ~1 GB, so there's no disk-pressure reason to override that
+rule. If the owner wants them gone, remove them by hand after checking each
+one individually — this is a manual, owner-executed action, not something to
+delegate:
 
 ```bash
 docker volume ls | grep -E "phase.*-failed|phase301-backup|crowdsmarter-v1"
-docker volume rm <ids>          # only after explicit confirmation
+docker volume rm <id>          # one at a time, after checking its contents
 ```
 
 ## Fixed in Phase 19
@@ -51,8 +41,24 @@ docker volume rm <ids>          # only after explicit confirmation
   `crowdsmarter-phase17-failed-*`, `crowdsmarter-phase301-backup-*`,
   `crowdsmarter-v1-*`), then cleared the build cache. Reclaimed ~24 GB of
   build cache and ~35 GB of images; the live stack was unaffected throughout.
-  No volumes were touched — see above.
-
+  No volumes were touched — see "Closed without action" above.
+- `react-router` high-severity advisory (GHSA-qwww-vcr4-c8h2, CSRF bypass in
+  RSC/framework server-action mode — this app doesn't use that mode, but the
+  installed version was still in the flagged range `>=7.12.0 <8.3.0`).
+  `react-router-dom@7.18.1` had no 8.x release available at all: as of v8,
+  React Router dropped the separate `react-router-dom` package entirely and
+  consolidated into `react-router` (DOM APIs like `RouterProvider` now come
+  from the `react-router/dom` subpath). Uninstalled `react-router-dom`,
+  installed `react-router@8.3.0` directly, and updated every import across
+  ~74 files (`from "react-router-dom"` → `from "react-router"`, except
+  `RouterProvider` in `src/main.tsx` → `from "react-router/dom"`). Also
+  bumped `react`/`react-dom` to `19.2.8` (v8's stated minimum is `19.2.7+`)
+  and `engines.node` to `>=22.22` (v8's stated minimum; the container already
+  runs 22.23.2). `npm audit` now reports 0 vulnerabilities. Verified with
+  typecheck, the full test suite (34/34 files), a production build, and a
+  manual browser smoke test of the landing page, `/login`, the `/app`
+  protected-route redirect, and the `/*` not-found route — no console
+  errors, no regressions.
 - DRF `min_value should be an integer or Decimal instance` warning — two
   `DecimalField(min_value=0.01)` float literals in
   `backend/apps/evaluations/serializers.py` changed to `Decimal("0.01")`.
@@ -105,14 +111,29 @@ docker volume rm <ids>          # only after explicit confirmation
   because the same name legitimately appears twice in the rendered page (a
   canvas summary and an owner-select dropdown option).
 - Frontend `npm audit`: `brace-expansion` DoS fixed via `npm audit fix`
-  (non-breaking). `react-router` left open — see above.
+  (non-breaking).
+
+## Newly discovered, not yet fixed
+
+### `npm run lint` fails, independent of anything in Phase 19
+
+93 ESLint errors across ~20 files (`@typescript-eslint/no-misused-promises`
+on async handlers passed where a void return is expected,
+`@typescript-eslint/no-unnecessary-type-assertion`,
+`react-hooks/set-state-in-effect`, `@typescript-eslint/consistent-type-imports`,
+one `@typescript-eslint/triple-slash-reference`). Confirmed pre-existing and
+unrelated to the react-router migration: stashing every Phase 19 change and
+re-running lint against the original code produced *386* errors, not fewer —
+this is accumulated tech debt, not a regression. `.github/workflows/ci.yml`
+runs `npm run lint` as a required step, meaning CI has likely never been
+green on this repository. Out of scope to fix here; needs its own pass.
 
 ## Deferred, not started
 
 - Backend dependency lockfile (`pip-compile` or `uv lock`) — needs a
   Dockerfile change to install the tool, out of scope for this phase's
   "fix what's broken" boundary; flagged for a follow-up.
-- Frontend production bundle is 939.71 kB (one chunk); route-level code
+- Frontend production bundle is ~938 kB (one chunk); route-level code
   splitting was not attempted this phase — it's a performance concern, not a
   correctness one.
 - ADR duplicate numbering (0014, 0015, 0016 each shared by two unrelated
@@ -123,4 +144,5 @@ docker volume rm <ids>          # only after explicit confirmation
 - 13 open Dependabot PRs on `origin` (pip: Django, DRF, dj-database-url,
   gunicorn, pytest-cov; npm: eslint-plugin-react-hooks, eslint/js,
   hookform/resolvers, prettier, react-router-dom; GitHub Actions bumps) —
-  not reviewed or merged in this phase.
+  not reviewed or merged in this phase. The `react-router-dom` one is now
+  moot since that package was removed entirely.

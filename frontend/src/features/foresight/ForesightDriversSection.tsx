@@ -1,5 +1,5 @@
 import type { Dispatch, FormEvent, SetStateAction } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 
 import { Icon } from "../../components/Icon";
 import type { ForesightCanvasWorkspace, Membership } from "../../lib/types";

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router";
 
 import { StatusMessage } from "../../components/StatusMessage";
 import { listNotifications, markAllNotificationsRead, markNotificationRead } from "./api";

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FormEvent, useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams } from "react-router";
 
 import { StatusMessage } from "../../components/StatusMessage";
 import type { DecisionAnalysisIssue, DecisionQualityReview, ExecutiveDecisionSummary } from "../../lib/types";

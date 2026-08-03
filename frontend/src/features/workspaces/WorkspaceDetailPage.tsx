@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams } from "react-router";
 
 import { StatusMessage } from "../../components/StatusMessage";
 import { listDecisions } from "../decisions/api";

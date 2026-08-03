@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Navigate, useLocation } from "react-router-dom";
+import { Navigate, useLocation } from "react-router";
 
 import { AppShell } from "../../components/AppShell";
 import { ApiError } from "../../lib/api";

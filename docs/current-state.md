@@ -40,10 +40,16 @@ migration drift (`makemigrations --check --dry-run` reports no changes).
 ## Dependencies
 
 - Frontend now has a committed lockfile (`frontend/package-lock.json`,
-  generated this phase). `npm audit` reports one remaining high-severity
-  advisory; see `docs/known-issues.md`.
+  generated this phase). `npm audit` reports **0 vulnerabilities**.
+  `react-router-dom` was replaced with `react-router@8.3.0` (the `-dom`
+  package no longer exists as of v8; `react`/`react-dom` bumped to `19.2.8`
+  to meet its minimum version requirement) — see `docs/known-issues.md` for
+  the migration details.
 - Backend has no committed lockfile yet; `pyproject.toml` uses range
   constraints only. See `docs/known-issues.md`.
+- `npm run lint` fails with 93 pre-existing errors unrelated to anything
+  fixed in this phase (confirmed by re-running it against the unmodified
+  code, which fails with 386). Not fixed here; see `docs/known-issues.md`.
 
 ## CI
 
