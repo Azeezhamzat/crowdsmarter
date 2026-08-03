@@ -2,6 +2,7 @@
 
 from django.http import HttpResponse
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.renderers import BaseRenderer
 from rest_framework.views import APIView
 
 from apps.audit.services import record_event
@@ -11,6 +12,20 @@ from apps.organisations.selectors import organisation_for_user
 
 from .services import build_decision_export, build_organisation_export
 from .throttles import ExportRateThrottle
+
+
+class ZipRenderer(BaseRenderer):
+    """Declares application/zip so DRF content negotiation accepts the
+    frontend's Accept: application/zip header. The view returns a raw
+    HttpResponse rather than a DRF Response, so render() is never actually
+    invoked - only the media_type matters here."""
+
+    media_type = "application/zip"
+    format = "zip"
+    charset = None
+
+    def render(self, data, accepted_media_type=None, renderer_context=None):  # type: ignore[no-untyped-def]
+        return data
 
 
 def _zip_response(*, filename: str, content: bytes) -> HttpResponse:
@@ -26,6 +41,7 @@ class OrganisationExportView(APIView):
 
     permission_classes = [IsAuthenticated]
     throttle_classes = [ExportRateThrottle]
+    renderer_classes = [ZipRenderer]
 
     def get(self, request, organisation_id):  # type: ignore[no-untyped-def]
         organisation = organisation_for_user(user=request.user, organisation_id=organisation_id)
@@ -57,6 +73,7 @@ class DecisionExportView(APIView):
 
     permission_classes = [IsAuthenticated]
     throttle_classes = [ExportRateThrottle]
+    renderer_classes = [ZipRenderer]
 
     def get(self, request, decision_id):  # type: ignore[no-untyped-def]
         decision = decision_for_user(user=request.user, decision_id=decision_id)

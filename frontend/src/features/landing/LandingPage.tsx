@@ -9,16 +9,16 @@ import { ForesightDecisionTrace, WorkflowIllustration } from "./WorkflowIllustra
 const workflow = [
   {
     key: "sense",
-    label: "Sense",
+    label: "Anticipate",
     icon: "search" as IconName,
-    title: "Detect consequential change before it becomes an urgent surprise.",
+    title: "Identify and examine consequential change before it is forced onto the agenda.",
     description:
       "Capture attributable sources, weak signals, emerging issues, strategic horizons, and watchlists in one governed organisational record.",
     detail: "Foresight begins with disciplined attention—not confident prediction.",
   },
   {
     key: "interpret",
-    label: "Interpret",
+    label: "Deliberate",
     icon: "layers" as IconName,
     title: "Connect signals, systems, stakeholders, and uncertainty.",
     description:
@@ -81,28 +81,48 @@ const useCases = [
 const sprintSteps = [
   {
     label: "Week 1",
+    stage: "Anticipate",
     title: "Frame the decision",
     description: "Clarify the question, decision authority, objectives, constraints, stakeholders, and deadline.",
   },
   {
     label: "Weeks 1–2",
+    stage: "Anticipate",
     title: "Gather knowledge",
     description: "Collect evidence, assumptions, risks, signals, and independent contributions.",
   },
   {
     label: "Weeks 2–4",
+    stage: "Deliberate",
     title: "Explore uncertainty",
     description: "Build scenarios, test options, and identify the conditions for success.",
   },
   {
     label: "Weeks 4–6",
+    stage: "Decide",
     title: "Evaluate without hiding disagreement",
     description: "Compare options, analyse robustness, and make useful dissent visible.",
   },
   {
     label: "Weeks 6–8",
+    stage: "Decide → Act",
     title: "Decide and organise review",
     description: "Finalise the choice, responsibilities, signposts to monitor, and the review date.",
+  },
+];
+
+const commercialJourney = [
+  {
+    title: "Fit assessment and demonstration",
+    description: "A short conversation and live walkthrough to confirm CrowdSmarter fits your decision.",
+  },
+  {
+    title: "Facilitated Decision Sprint",
+    description: "Run one real, consequential decision through the platform with guided facilitation.",
+  },
+  {
+    title: "Platform adoption and organisational scaling",
+    description: "Continue using the platform independently for future decisions and organisational learning.",
   },
 ];
 
@@ -163,7 +183,7 @@ export function LandingPage() {
         </nav>
         <div className="public-header__actions">
           <Link className="public-nav__signin" to="/login">Sign in</Link>
-          <Link className="public-button public-button--primary public-header__demo" to="/request-demo">Request a demo</Link>
+          <Link className="public-button public-button--primary public-header__demo" to="/request-demo">Book a fit assessment</Link>
         </div>
       </header>
 
@@ -174,14 +194,14 @@ export function LandingPage() {
             <p className="public-eyebrow">Decision intelligence for consequential work</p>
             <h1 id="hero-title">Turn uncertainty into accountable action.</h1>
             <p className="hero__lead">
-              CrowdSmarter connects strategic foresight, collective intelligence, governed decision-making,
-              implementation, and organisational learning in one traceable operating system.
+              CrowdSmarter helps strategy, transformation, and policy teams turn signals, evidence, and
+              diverse stakeholder judgement into traceable decisions, owned actions, and organisational learning.
             </p>
             <div className="hero__actions hero__actions--executive">
               <Link className="public-button public-button--primary public-button--large" to="/request-demo">
-                Request a tailored demo <Icon name="arrow-right" size={18} />
+                Book a fit assessment <Icon name="arrow-right" size={18} />
               </Link>
-              <a className="public-button public-button--secondary public-button--large" href="#workflow">See the workflow</a>
+              <a className="public-button public-button--secondary public-button--large" href="#workflow">See how the workflow works</a>
             </div>
             <p className="hero__microcopy">Built for serious organisational decisions—not generic task management, chat, or automated judgement.</p>
             <div className="hero__trust-row hero__trust-row--executive">
@@ -243,6 +263,15 @@ export function LandingPage() {
           </div>
         </section>
 
+        <section className="proof-strip" aria-label="Product foundation">
+          <p className="public-eyebrow">Where this comes from</p>
+          <p>
+            Built from research in collective intelligence, strategic foresight, and accountable
+            decision-making. CrowdSmarter is currently working with a first cohort of founding-partner
+            organisations on consequential strategy, policy, and transformation decisions.
+          </p>
+        </section>
+
         <section className="public-section use-case-section" id="use-cases" aria-labelledby="use-cases-title">
           <div className="section-intro section-intro--split section-intro--executive">
             <div><p className="public-eyebrow">Built for consequential choices</p><h2 id="use-cases-title">Designed for decisions where uncertainty and stakeholders both matter.</h2></div>
@@ -268,17 +297,18 @@ export function LandingPage() {
               the reasoning behind an important choice does not disappear after the meeting.
             </p>
           </div>
-          <div className="continuity-grid">
+          <div className="continuity-grid continuity-grid--five">
             <article><span className="continuity-grid__number">01</span><Icon name="search" /><h3>Anticipate</h3><p>Sources, signals, drivers, systems maps, critical uncertainties, scenarios, and signposts.</p></article>
             <article><span className="continuity-grid__number">02</span><Icon name="users" /><h3>Deliberate</h3><p>Independent contributions, evidence, assumptions, risks, stakeholder positions, Delphi rounds, and dissent.</p></article>
             <article><span className="continuity-grid__number">03</span><Icon name="decision" /><h3>Decide</h3><p>Option comparison, decision-quality review, executive synthesis, explicit authority, and audit history.</p></article>
-            <article><span className="continuity-grid__number">04</span><Icon name="activity" /><h3>Adapt and learn</h3><p>Implementation ownership, review conditions, outcomes, lessons, and reusable organisational memory.</p></article>
+            <article><span className="continuity-grid__number">04</span><Icon name="activity" /><h3>Act</h3><p>Implementation ownership, review conditions, risks, and signposts as explicit commitments.</p></article>
+            <article><span className="continuity-grid__number">05</span><Icon name="analytics" /><h3>Learn</h3><p>Outcomes, lessons, and reusable organisational memory for the next decision.</p></article>
           </div>
         </section>
 
         <section className="public-section public-section--dark workflow-showcase workflow-showcase--executive" id="workflow" aria-labelledby="workflow-title">
           <div className="section-intro section-intro--workflow">
-            <p className="public-eyebrow">The product is the workflow</p>
+            <p className="public-eyebrow">The platform connects the complete decision workflow</p>
             <h2 id="workflow-title">Move from emerging change to better judgement—without losing the evidence trail.</h2>
           </div>
           <div className="workflow-tabs workflow-tabs--executive" role="tablist" aria-label="CrowdSmarter workflow stages" aria-orientation="horizontal">
@@ -334,15 +364,28 @@ export function LandingPage() {
 
         <section className="public-section sprint-section" id="sprint" aria-labelledby="sprint-title">
           <div className="section-intro section-intro--split section-intro--executive">
-            <div><p className="public-eyebrow">A guided way to start</p><h2 id="sprint-title">Bring one real decision through a structured first engagement.</h2></div>
-            <p>Most teams get the most value from CrowdSmarter by running their first governed decision as a facilitated Decision Sprint—typically four to eight weeks—before scaling the platform across the organisation.</p>
+            <div><p className="public-eyebrow">Platform and service, as one journey</p><h2 id="sprint-title">Bring one real decision through a structured first engagement.</h2></div>
+            <p>
+              CrowdSmarter combines a governed decision-intelligence platform with a facilitated Decision Sprint.
+              Start with one consequential decision, establish the workflow, and continue using the platform for
+              future decisions and organisational learning.
+            </p>
           </div>
+          <div className="commercial-journey">
+            {commercialJourney.map((stage, index) => (
+              <article className="commercial-journey__step" key={stage.title}>
+                <span>{index + 1}</span>
+                <div><h3>{stage.title}</h3><p>{stage.description}</p></div>
+              </article>
+            ))}
+          </div>
+          <p className="sprint-timeline-intro">Inside the Decision Sprint, the same Anticipate → Deliberate → Decide → Act lifecycle plays out over four to eight weeks:</p>
           <div className="sprint-timeline">
             {sprintSteps.map((step, index) => (
               <article className="sprint-step" key={step.title}>
                 <span className="sprint-step__number">{index + 1}</span>
                 <div>
-                  <p className="sprint-step__label">{step.label}</p>
+                  <p className="sprint-step__label">{step.label}<span className="sprint-step__stage">{step.stage}</span></p>
                   <h3>{step.title}</h3>
                   <p>{step.description}</p>
                 </div>
@@ -351,25 +394,25 @@ export function LandingPage() {
           </div>
           <div className="pilot-panel">
             <div className="pilot-panel__copy">
-              <p className="public-eyebrow">Pilot programme</p>
+              <p className="public-eyebrow">Founding partner programme</p>
               <h3>Start with one real, important decision.</h3>
-              <p>We work with a limited number of organisations at a time to run a first Decision Sprint and measure the value created before wider rollout.</p>
+              <p>Founding partners run a first Decision Sprint and help shape the platform's development before wider release.</p>
             </div>
             <div className="pilot-stats">
               {pilotStats.map(([label, value]) => <div key={label}><small>{label}</small><strong>{value}</strong></div>)}
             </div>
-            <Link className="public-button public-button--primary" to="/request-demo">Apply for the pilot programme <Icon name="arrow-right" size={18} /></Link>
+            <Link className="public-button public-button--primary" to="/request-demo">Apply as a founding partner <Icon name="arrow-right" size={18} /></Link>
           </div>
         </section>
 
         <section className="public-section public-difference-section" id="difference" aria-labelledby="difference-title">
           <div className="section-intro section-intro--split section-intro--executive">
-            <div><p className="public-eyebrow">A deliberately different product category</p><h2 id="difference-title">Not another place where important reasoning becomes invisible.</h2></div>
-            <p>CrowdSmarter is the workflow and intelligence spine around specialist tools. It does not attempt to replace financial modelling, GIS, statistical software, document editing, or team chat.</p>
+            <div><p className="public-eyebrow">A deliberately different product category</p><h2 id="difference-title">Keep important reasoning visible across the tools you already use.</h2></div>
+            <p>CrowdSmarter connects the decision work around specialist tools such as financial models, GIS, statistical software, documents, and team collaboration platforms.</p>
           </div>
           <div className="difference-layout">
             <div className="difference-statement">
-              <span>Conventional workflow</span>
+              <span>A commonly fragmented workflow</span>
               <p>Signals in one database. Workshop notes in slides. Evidence in folders. Voting in another app. Approval in email. Outcomes rarely revisited.</p>
             </div>
             <div className="difference-connector" aria-hidden="true"><Icon name="arrow-right" size={25} /></div>
@@ -408,7 +451,7 @@ export function LandingPage() {
             <div className="trust-panel__copy">
               <p className="public-eyebrow">Designed for organisational trust</p>
               <h2 id="trust-title">Your decision records should remain inspectable, portable, and under human authority.</h2>
-              <p>CrowdSmarter is built as a maintainable modular monolith using open technologies, explicit permissions, tenant isolation, audit history, and customer-controlled exports.</p>
+              <p>Your organisation keeps authority over every decision, exports its own records at any time, and can inspect the full history behind each choice.</p>
               <Link className="public-text-link" to="/request-demo">Discuss your governance requirements <Icon name="arrow-right" size={16} /></Link>
               <div className="trust-contact-links" aria-label="Governance contact channels">
                 <a href={buildMailto(contactChannels.privacy, "CrowdSmarter privacy enquiry")}>Privacy enquiries</a>
@@ -433,7 +476,7 @@ export function LandingPage() {
             <p>We will tailor the demonstration to your context and give you an honest assessment of product fit.</p>
           </div>
           <div className="public-cta__actions">
-            <Link className="public-button public-button--light public-button--large" to="/request-demo">Request a tailored demo <Icon name="arrow-right" size={18} /></Link>
+            <Link className="public-button public-button--light public-button--large" to="/request-demo">Book a fit assessment <Icon name="arrow-right" size={18} /></Link>
             <Link className="public-cta__signin" to="/login">Existing user? Sign in</Link>
           </div>
         </section>
@@ -445,7 +488,7 @@ export function LandingPage() {
           <span>General enquiries and partnerships</span>
           <a href={buildMailto(contactChannels.general, "CrowdSmarter enquiry")}>{contactChannels.general}</a>
         </div>
-        <div className="public-footer__links"><Link to="/request-demo">Request a demo</Link><Link to="/login">Sign in</Link><span>Human authority retained</span><span>Global · Africa · Europe · MENA</span></div>
+        <div className="public-footer__links"><Link to="/request-demo">Book a fit assessment</Link><Link to="/login">Sign in</Link><span>Human authority retained</span><span>Working with organisations across Africa, Europe, and the Middle East</span></div>
       </footer>
     </div>
   );

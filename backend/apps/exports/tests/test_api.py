@@ -45,6 +45,28 @@ def test_owner_can_download_complete_export_without_secrets(
 
 
 @pytest.mark.django_db
+def test_organisation_export_succeeds_with_the_browser_accept_header(
+    api_client, user_factory, organisation_factory
+):  # type: ignore[no-untyped-def]
+    """The real frontend sends Accept: application/zip (see downloadApiFile in
+    lib/api.ts). A prior regression only surfaced with this exact header: DRF's
+    default content negotiation rejected it with 406 before the view ever ran,
+    since APIClient.get() without an explicit Accept header trivially matches
+    JSONRenderer and masks the bug."""
+    owner = user_factory(email="owner2@example.com")
+    organisation = organisation_factory(owner=owner)
+    api_client.force_authenticate(owner)
+
+    response = api_client.get(
+        reverse("exports:organisation-complete", kwargs={"organisation_id": organisation.id}),
+        HTTP_ACCEPT="application/zip",
+    )
+
+    assert response.status_code == 200
+    assert response["Content-Type"] == "application/zip"
+
+
+@pytest.mark.django_db
 def test_organisation_export_includes_xlsx_workbook_and_stable_content_hash(
     api_client, user_factory, organisation_factory, decision_factory
 ):  # type: ignore[no-untyped-def]
@@ -142,6 +164,22 @@ def test_visible_member_can_download_decision_dossier(
 
         workbook = load_workbook(io.BytesIO(archive.read("xlsx/export.xlsx")))
         assert "options" in workbook.sheetnames
+
+
+@pytest.mark.django_db
+def test_decision_export_succeeds_with_the_browser_accept_header(
+    api_client, user_factory, decision_factory
+):  # type: ignore[no-untyped-def]
+    decision = decision_factory()
+    api_client.force_authenticate(decision.owner)
+
+    response = api_client.get(
+        reverse("exports:decision-dossier", kwargs={"decision_id": decision.id}),
+        HTTP_ACCEPT="application/zip",
+    )
+
+    assert response.status_code == 200
+    assert response["Content-Type"] == "application/zip"
 
 
 @pytest.mark.django_db
