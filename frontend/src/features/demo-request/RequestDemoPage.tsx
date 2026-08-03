@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { FieldError } from "../../components/FieldError";
 import { Icon } from "../../components/Icon";
+import { LogoMark } from "../../components/Logo";
 import { StatusMessage } from "../../components/StatusMessage";
 import { buildMailto, contactChannels } from "../../config/contact";
 import { ApiError } from "../../lib/api";
@@ -54,9 +55,9 @@ export function RequestDemoPage() {
   return (
     <main id="main-content" className="demo-request-page" tabIndex={-1}>
       <header className="demo-request-header">
-        <Link className="public-brand" to="/" aria-label="The CrowdSmarter home">
-          <span className="public-brand__mark" aria-hidden="true"><span /><span /><span /></span>
-          <span><strong>The CrowdSmarter</strong><small>Foresight-to-decision intelligence</small></span>
+        <Link className="public-brand" to="/" aria-label="CrowdSmarter home">
+          <LogoMark size={38} />
+          <span><strong>CrowdSmarter</strong><small>Foresight-to-decision intelligence</small></span>
         </Link>
         <Link className="demo-request-header__signin" to="/login">Already have access? Sign in</Link>
       </header>

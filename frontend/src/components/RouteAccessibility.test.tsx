@@ -25,11 +25,11 @@ describe("RouteAccessibility", () => {
     );
 
     expect(screen.getByRole("link", { name: /skip to main content/i })).toHaveAttribute("href", "#main-content");
-    expect(document.title).toBe("Foresight-to-decision intelligence — The CrowdSmarter");
+    expect(document.title).toBe("Foresight-to-decision intelligence — CrowdSmarter");
 
     fireEvent.click(screen.getByRole("button", { name: /go to sign in/i }));
 
-    await waitFor(() => expect(document.title).toBe("Sign in — The CrowdSmarter"));
+    await waitFor(() => expect(document.title).toBe("Sign in — CrowdSmarter"));
     await waitFor(() => expect(screen.getByText("Sign-in content")).toHaveFocus());
     expect(screen.getByText("Sign in", { selector: ".route-announcer" })).toBeInTheDocument();
   });

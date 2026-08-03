@@ -1,14 +1,15 @@
 import { Link } from "react-router";
 
 import { Icon } from "../../components/Icon";
+import { LogoMark } from "../../components/Logo";
 
 export function NotFoundPage() {
   return (
     <div className="public-site public-site--executive not-found-page">
       <header className="public-header public-header--executive">
-        <Link className="public-brand" to="/" aria-label="The CrowdSmarter home">
-          <span className="public-brand__mark" aria-hidden="true"><span /><span /><span /></span>
-          <span><strong>The CrowdSmarter</strong><small>Foresight-to-decision intelligence</small></span>
+        <Link className="public-brand" to="/" aria-label="CrowdSmarter home">
+          <LogoMark size={38} />
+          <span><strong>CrowdSmarter</strong><small>Foresight-to-decision intelligence</small></span>
         </Link>
         <div className="public-header__actions">
           <Link className="public-nav__signin" to="/login">Sign in</Link>

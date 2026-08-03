@@ -7,6 +7,7 @@ import { fetchCurrentUser, logoutSession } from "../features/auth/api";
 import { listNotifications } from "../features/notifications/api";
 import { listOrganisations } from "../features/organisations/api";
 import { Icon, type IconName } from "./Icon";
+import { LogoMark } from "./Logo";
 
 type CommandItem = {
   label: string;
@@ -258,9 +259,9 @@ export function AppShell() {
 
       <aside id="application-sidebar" className="app-sidebar" aria-label="Primary application navigation">
         <div className="app-sidebar__brand-row">
-          <Link to="/app" className="brand brand--sidebar" aria-label="The CrowdSmarter application home">
-            <span className="brand-mark brand-mark--premium" aria-hidden="true"><span /><span /><span /></span>
-            <span className="brand-copy"><strong>The CrowdSmarter</strong><small>Decision intelligence</small></span>
+          <Link to="/app" className="brand brand--sidebar" aria-label="CrowdSmarter application home">
+            <LogoMark variant="inverse" size={34} />
+            <span className="brand-copy"><strong>CrowdSmarter</strong><small>Decision intelligence</small></span>
           </Link>
           <button ref={sidebarCloseButtonRef} className="icon-button app-sidebar__close" type="button" onClick={() => closeSidebar()} aria-label="Close navigation">
             <Icon name="close" />

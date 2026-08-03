@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router";
 
 import { Icon, type IconName } from "../../components/Icon";
+import { LogoMark } from "../../components/Logo";
 import { buildMailto, contactChannels } from "../../config/contact";
 import { ForesightDecisionTrace, WorkflowIllustration } from "./WorkflowIllustrations";
 
@@ -69,9 +70,9 @@ export function LandingPage() {
   return (
     <div className="public-site public-site--executive">
       <header className="public-header public-header--executive">
-        <Link className="public-brand" to="/" aria-label="The CrowdSmarter home">
-          <span className="public-brand__mark" aria-hidden="true"><span /><span /><span /></span>
-          <span><strong>The CrowdSmarter</strong><small>Foresight-to-decision intelligence</small></span>
+        <Link className="public-brand" to="/" aria-label="CrowdSmarter home">
+          <LogoMark size={38} />
+          <span><strong>CrowdSmarter</strong><small>Foresight-to-decision intelligence</small></span>
         </Link>
         <nav className="public-nav public-nav--executive" aria-label="Primary navigation">
           <a href="#platform">Platform</a>
@@ -301,7 +302,7 @@ export function LandingPage() {
       </main>
 
       <footer className="public-footer public-footer--executive">
-        <div className="public-brand"><span className="public-brand__mark" aria-hidden="true"><span /><span /><span /></span><span><strong>The CrowdSmarter</strong><small>Foresight-driven organisational decision intelligence</small></span></div>
+        <div className="public-brand"><LogoMark size={38} /><span><strong>CrowdSmarter</strong><small>Foresight-driven organisational decision intelligence</small></span></div>
         <div className="public-footer__contact">
           <span>General enquiries and partnerships</span>
           <a href={buildMailto(contactChannels.general, "CrowdSmarter enquiry")}>{contactChannels.general}</a>

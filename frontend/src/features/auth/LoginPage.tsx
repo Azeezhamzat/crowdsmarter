@@ -7,6 +7,7 @@ import { z } from "zod";
 
 import { FieldError } from "../../components/FieldError";
 import { Icon } from "../../components/Icon";
+import { LogoMark } from "../../components/Logo";
 import { buildMailto, contactChannels } from "../../config/contact";
 import { ApiError } from "../../lib/api";
 import { loginWithPassword, verifyMfaCode } from "./api";
@@ -100,8 +101,8 @@ export function LoginPage() {
     <main id="main-content" className="auth-layout auth-layout--executive" tabIndex={-1}>
       <section className="auth-introduction auth-introduction--executive" aria-labelledby="product-title">
         <Link className="auth-brand" to="/">
-          <span className="public-brand__mark" aria-hidden="true"><span /><span /><span /></span>
-          <span><strong>The CrowdSmarter</strong><small>Foresight-to-decision intelligence</small></span>
+          <LogoMark size={38} variant="inverse" />
+          <span><strong>CrowdSmarter</strong><small>Foresight-to-decision intelligence</small></span>
         </Link>
         <div className="auth-introduction__content auth-introduction__content--executive">
           <div className="auth-context-pill"><Icon name="shield" size={16} />Secure organisational workspace</div>

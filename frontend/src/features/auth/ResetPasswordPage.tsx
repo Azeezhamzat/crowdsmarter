@@ -7,6 +7,7 @@ import { z } from "zod";
 
 import { FieldError } from "../../components/FieldError";
 import { Icon } from "../../components/Icon";
+import { LogoMark } from "../../components/Logo";
 import { StatusMessage } from "../../components/StatusMessage";
 import { ApiError } from "../../lib/api";
 import { confirmPasswordReset } from "./api";
@@ -34,7 +35,7 @@ export function ResetPasswordPage() {
   return (
     <main id="main-content" className="auth-layout auth-layout--premium" tabIndex={-1}>
       <section className="auth-introduction auth-introduction--premium" aria-labelledby="new-password-product-title">
-        <Link className="auth-brand" to="/"><span className="public-brand__mark" aria-hidden="true"><span /><span /><span /></span><strong>The CrowdSmarter</strong></Link>
+        <Link className="auth-brand" to="/"><LogoMark size={38} variant="inverse" /><strong>CrowdSmarter</strong></Link>
         <div className="auth-introduction__content">
           <p className="eyebrow">Account security</p>
           <h1 id="new-password-product-title">Choose a new password.</h1>
