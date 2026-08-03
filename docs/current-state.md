@@ -1,4 +1,4 @@
-# Current state (Phase 19/20/21/22/23/24/25 baseline)
+# Current state (Phase 19/20/21/22/23/24/25/26 baseline)
 
 Verified against the running system on 2026-08-03. Update this document
 whenever the baseline materially changes; do not let it drift into aspiration.
@@ -38,19 +38,21 @@ the two new migrations above were applied by hand).
 
 ## Test suites
 
-- Backend: `docker compose exec backend pytest` — **368 passed, 0 failed**
-  (was 366 passed at the end of Phase 24; +2 tests for Phase 25's
-  portfolio-watchlist feature).
+- Backend: `docker compose exec backend pytest` — **369 passed, 0 failed**
+  (was 368 passed at the end of Phase 25; +1 new test for Phase 26's
+  XLSX-export/content-hash feature, plus extended assertions added to the
+  existing decision-dossier test).
 - Frontend: `docker compose exec frontend npx vitest run` — **36 test files /
-  48 tests, all passing** (still 48 — Phase 25 extended the existing
-  `OrganisationPortfolioPage.test.tsx` with new watchlist assertions rather
-  than adding a new test file, unlike Phase 22–24's UI work which was
-  verified live in the browser only; see known-issues.md).
+  48 tests, all passing** (unchanged — Phase 26 only changed static copy on
+  `OrganisationExportPage.tsx`, which has no dedicated test file).
 - `docker compose exec backend python manage.py check` — clean, 0 warnings.
 - `docker compose exec backend python manage.py makemigrations --check --dry-run` — clean
-  (Phase 25 added no migration — `apps/portfolio` has no models, it's a
-  pure read-model over other apps' data, same as Phase 23/24).
+  (Phase 26 added no migration — `apps/exports` has no models, everything is
+  generated on demand).
 - Frontend `npx tsc -b` and `npm run build` — clean.
+- Backend Docker image rebuilt (`docker compose build backend`) to bake in
+  the new `openpyxl` dependency, then the full suite re-run against the
+  rebuilt container to confirm — see "Dependencies" below.
 
 ## Dependencies
 
@@ -62,6 +64,12 @@ the two new migrations above were applied by hand).
   the migration details.
 - Backend has no committed lockfile yet; `pyproject.toml` uses range
   constraints only. See `docs/known-issues.md`.
+- Phase 26 added `openpyxl>=3.1,<4` to `backend/pyproject.toml` (XLSX export
+  generation). Installed at runtime first (`pip install openpyxl`) to
+  iterate, then the backend image was properly rebuilt
+  (`docker compose build backend && docker compose up -d backend`) so the
+  dependency is baked in rather than only present in the live container's
+  ephemeral filesystem.
 - `npm run lint` fails with 93 pre-existing errors unrelated to anything
   fixed in this phase (confirmed by re-running it against the unmodified
   code, which fails with 386). Not fixed here; see `docs/known-issues.md`.
@@ -299,7 +307,61 @@ foresight signpost with a strong observation; all five categories rendered
 correctly with accurate counts and working drill-down links, then deleted
 the throwaway data.
 
-Committed on `claude/phase-25-portfolio-executive`, not yet pushed.
+Committed on `claude/phase-25-portfolio-executive`, pushed, and fast-forward
+merged into `main`.
+
+## Phase 26 (integrations and customer outputs — exports) progress
+
+Audited "high-quality exports," "imports," "API/webhooks," "selected
+work-management integrations," and "data portability" against
+`apps/exports` and the whole codebase. Confirmed: no real third-party OAuth
+integration (Slack, Teams, Jira, Microsoft 365, Google Workspace, SSO/SCIM)
+is buildable or testable in this sandboxed environment regardless of scope
+choice — none were attempted. `apps/exports` already produces a solid
+portable ZIP (JSON + curated CSV, RBAC-gated, audit-logged, secrets
+stripped) for both a full organisation and a single decision, but had zero
+spreadsheet-native output and no way to verify two exports came from
+identical underlying records — a direct gap against the decision-record
+roadmap's named "export hash / immutable snapshot" concept. No REST API
+versioning, API-key model, or webhook delivery mechanism exists anywhere in
+the codebase; establishing those is a much larger, more novel effort than
+fits one phase and was deferred.
+
+Addressed the two best-bounded, purely-additive gaps in `apps/exports/services.py`:
+
+- **XLSX export** — a single multi-sheet workbook (`xlsx/export.xlsx`, one
+  sheet per dataset, Excel's 31-character/uniqueness sheet-name limits
+  handled) added to both the organisation and decision archives, using the
+  new `openpyxl` dependency. Mirrors the same "curated key registers" set
+  already used for CSV on the organisation export; the decision export gets
+  every dataset (it's already small enough).
+- **Export integrity hash** — `manifest.json` now includes
+  `content_sha256`, a SHA-256 over the canonical JSON of every dataset, so
+  two exports of the same underlying state hash identically and any change
+  is detectable. Bumped `EXPORT_SCHEMA_VERSION` to `1.8`.
+
+A test written for the hash caught a real bug before it shipped: the first
+implementation hashed the `audit_events` dataset too, but downloading an
+export is itself an audited action, so the hash was never stable across two
+back-to-back exports of otherwise-identical data. Fixed by excluding
+`audit_events` from the hash computation (documented inline — the export
+still includes the full audit trail in JSON/CSV/XLSX, it just isn't part of
+the content fingerprint).
+
+`OrganisationExportPage.tsx`'s copy was updated to mention the workbook and
+the content fingerprint.
+
+The backend Docker image was rebuilt (`docker compose build backend`) so
+`openpyxl` is baked in rather than only present via a runtime `pip install`
+in the live container's ephemeral filesystem; the full test suite was
+re-run against the rebuilt container to confirm.
+
+Verified directly (via `manage.py shell`, calling `build_organisation_export`
+and `build_decision_export` against real data): both produce
+openpyxl-readable workbooks (57 and 48 sheets respectively) with a valid
+64-character `content_sha256` in the manifest.
+
+Committed on `claude/phase-26-exports-data-portability`, not yet pushed.
 
 ## Known risks not yet resolved
 

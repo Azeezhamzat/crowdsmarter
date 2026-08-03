@@ -45,6 +45,54 @@ def test_owner_can_download_complete_export_without_secrets(
 
 
 @pytest.mark.django_db
+def test_organisation_export_includes_xlsx_workbook_and_stable_content_hash(
+    api_client, user_factory, organisation_factory, decision_factory
+):  # type: ignore[no-untyped-def]
+    from openpyxl import load_workbook
+
+    owner = user_factory(email="owner@example.com")
+    organisation = organisation_factory(owner=owner)
+    decision_factory(
+        workspace=organisation.workspaces.get(is_default=True), owner=owner,
+        title="Repeatable export decision",
+    )
+    api_client.force_authenticate(owner)
+    url = reverse("exports:organisation-complete", kwargs={"organisation_id": organisation.id})
+
+    first = api_client.get(url)
+    second = api_client.get(url)
+    assert first.status_code == 200 and second.status_code == 200
+
+    with zipfile.ZipFile(io.BytesIO(bytes(first.content))) as archive:
+        assert "xlsx/export.xlsx" in archive.namelist()
+        manifest = json.loads(archive.read("manifest.json"))
+        assert len(manifest["content_sha256"]) == 64
+        first_hash = manifest["content_sha256"]
+
+        workbook = load_workbook(io.BytesIO(archive.read("xlsx/export.xlsx")))
+        assert "decisions" in workbook.sheetnames
+        sheet = workbook["decisions"]
+        headers = [cell.value for cell in sheet[1]]
+        assert "title" in headers
+        title_column = headers.index("title") + 1
+        titles = [row[0].value for row in sheet.iter_rows(min_row=2, min_col=title_column, max_col=title_column)]
+        assert "Repeatable export decision" in titles
+
+    with zipfile.ZipFile(io.BytesIO(bytes(second.content))) as archive:
+        second_hash = json.loads(archive.read("manifest.json"))["content_sha256"]
+    assert first_hash == second_hash
+
+    decision_factory(
+        workspace=organisation.workspaces.get(is_default=True), owner=owner,
+        title="A newly added decision",
+    )
+    third = api_client.get(url)
+    with zipfile.ZipFile(io.BytesIO(bytes(third.content))) as archive:
+        third_hash = json.loads(archive.read("manifest.json"))["content_sha256"]
+    assert third_hash != first_hash
+
+
+@pytest.mark.django_db
 def test_contributor_cannot_download_complete_organisation_export(
     api_client, user_factory, organisation_factory
 ):  # type: ignore[no-untyped-def]
@@ -86,6 +134,14 @@ def test_visible_member_can_download_decision_dossier(
         assert "summary.txt" in archive.namelist()
         assert "json/decision.json" in archive.namelist()
         assert decision.title in archive.read("summary.txt").decode()
+        assert "xlsx/export.xlsx" in archive.namelist()
+        manifest = json.loads(archive.read("manifest.json"))
+        assert len(manifest["content_sha256"]) == 64
+
+        from openpyxl import load_workbook
+
+        workbook = load_workbook(io.BytesIO(archive.read("xlsx/export.xlsx")))
+        assert "options" in workbook.sheetnames
 
 
 @pytest.mark.django_db

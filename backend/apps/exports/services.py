@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import io
 import json
 import zipfile
@@ -16,6 +17,7 @@ from uuid import UUID
 from django.db import models
 from django.utils import timezone
 from django.utils.text import slugify
+from openpyxl import Workbook
 
 from apps.accounts.models import User
 from apps.ai_assistance.models import AIReview
@@ -52,7 +54,7 @@ from apps.reviews.models import DecisionReview
 from apps.risks.models import Risk
 from apps.workspaces.models import Workspace
 
-EXPORT_SCHEMA_VERSION = "1.7"
+EXPORT_SCHEMA_VERSION = "1.8"
 SENSITIVE_FIELD_NAMES = {"password", "token_digest"}
 
 
@@ -134,6 +136,60 @@ def _csv_bytes(records: list[dict[str, Any]]) -> bytes:
             }
         )
     return output.getvalue().encode("utf-8")
+
+
+def _content_hash(datasets: dict[str, list[dict[str, Any]]]) -> str:
+    """SHA-256 over every dataset's canonical JSON, so two exports of the same
+    underlying state hash identically and any change is detectable.
+
+    Excludes audit_events: downloading an export is itself an audited action,
+    so including the audit trail would make the hash change on every export
+    even when nothing else in the record did."""
+    hasher = hashlib.sha256()
+    for name in sorted(datasets):
+        if name == "audit_events":
+            continue
+        hasher.update(name.encode("utf-8"))
+        hasher.update(_json_bytes(datasets[name]))
+    return hasher.hexdigest()
+
+
+def _sheet_title(name: str, used: set[str]) -> str:
+    """Excel worksheet titles are capped at 31 characters and must be unique."""
+    title = name[:31]
+    suffix = 1
+    while title in used:
+        marker = f"_{suffix}"
+        title = f"{name[: 31 - len(marker)]}{marker}"
+        suffix += 1
+    used.add(title)
+    return title
+
+
+def _xlsx_bytes(datasets: dict[str, list[dict[str, Any]]], *, sheet_names: Iterable[str]) -> bytes:
+    workbook = Workbook()
+    workbook.remove(workbook.active)
+    used_titles: set[str] = set()
+    for name in sheet_names:
+        records = datasets.get(name, [])
+        sheet = workbook.create_sheet(title=_sheet_title(name, used_titles))
+        if not records:
+            sheet.append(["No records"])
+            continue
+        fieldnames = sorted({key for record in records for key in record})
+        sheet.append(fieldnames)
+        for record in records:
+            sheet.append(
+                [
+                    json.dumps(record.get(field), ensure_ascii=False, sort_keys=True)
+                    if isinstance(record.get(field), (dict, list))
+                    else record.get(field)
+                    for field in fieldnames
+                ]
+            )
+    output = io.BytesIO()
+    workbook.save(output)
+    return output.getvalue()
 
 
 def _write_dataset(
@@ -276,18 +332,23 @@ def build_organisation_export(*, organisation: Organisation) -> ExportArchive:
 
     generated_at = timezone.now()
     datasets = _organisation_datasets(organisation)
+    content_hash = _content_hash(datasets)
     files: dict[str, bytes] = {
         "README.txt": (
             "The CrowdSmarter organisation export\n\n"
             "This archive belongs to the customer organisation named below. JSON files "
-            "preserve complete structured records; CSV files provide convenient tabular "
-            "copies for key registers. Passwords and invitation token digests are never exported.\n"
+            "preserve complete structured records; CSV files and a single multi-sheet "
+            "xlsx/export.xlsx workbook provide tabular copies for key registers. "
+            "manifest.json's content_sha256 is a fingerprint of every dataset's JSON "
+            "content, letting you confirm two exports were generated from identical "
+            "underlying records. Passwords and invitation token digests are never exported.\n"
         ).encode("utf-8"),
         "manifest.json": _json_bytes(
             {
                 "schema_version": EXPORT_SCHEMA_VERSION,
                 "export_type": "organisation",
                 "generated_at": generated_at.isoformat(),
+                "content_sha256": content_hash,
                 "organisation": {
                     "id": str(organisation.id),
                     "name": organisation.name,
@@ -363,6 +424,7 @@ def build_organisation_export(*, organisation: Organisation) -> ExportArchive:
             archive.writestr(name, content)
         for name, records in sorted(datasets.items()):
             _write_dataset(archive, name, records, csv_copy=name in csv_names)
+        archive.writestr("xlsx/export.xlsx", _xlsx_bytes(datasets, sheet_names=sorted(csv_names)))
         _write_source_attachment_files(
             archive,
             SourceAttachment.objects.filter(source__organisation=organisation).select_related("source"),
@@ -502,24 +564,30 @@ def build_decision_export(*, decision: Decision) -> ExportArchive:
 
     generated_at = timezone.now()
     datasets = _decision_datasets(decision)
+    content_hash = _content_hash(datasets)
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, mode="w", compression=zipfile.ZIP_DEFLATED) as archive:
         archive.writestr("README.txt", (
             "The CrowdSmarter decision dossier\n\n"
             "summary.txt provides a readable overview. JSON preserves complete structured "
-            "records, and CSV provides tabular registers suitable for spreadsheet review.\n"
+            "records; CSV and a single multi-sheet xlsx/export.xlsx workbook provide "
+            "tabular registers suitable for spreadsheet review. manifest.json's "
+            "content_sha256 is a fingerprint of every dataset's JSON content, letting you "
+            "confirm two exports were generated from identical underlying records.\n"
         ).encode("utf-8"))
         archive.writestr("summary.txt", _decision_summary_text(decision, datasets).encode("utf-8"))
         archive.writestr("manifest.json", _json_bytes({
             "schema_version": EXPORT_SCHEMA_VERSION,
             "export_type": "decision",
             "generated_at": generated_at.isoformat(),
+            "content_sha256": content_hash,
             "decision": {"id": str(decision.id), "title": decision.title, "status": decision.status},
             "datasets": {name: len(records) for name, records in datasets.items()},
         }))
         archive.writestr("json/decision.json", _json_bytes(_serialise_instance(decision)))
         for name, records in sorted(datasets.items()):
             _write_dataset(archive, name, records, csv_copy=True)
+        archive.writestr("xlsx/export.xlsx", _xlsx_bytes(datasets, sheet_names=sorted(datasets)))
         related_source_ids = [record["id"] for record in datasets.get("foresight_sources", [])]
         _write_source_attachment_files(
             archive,

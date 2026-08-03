@@ -67,6 +67,23 @@ afterwards, but this account hit the identical `AuditEvent.actor`
 `PROTECT` constraint and was left in place for the same reason as
 `a11y-audit@example.test` above.
 
+## Fixed in Phase 26
+
+- `apps/exports` had no spreadsheet-native output (JSON/CSV only) and no way
+  to verify two exports came from identical underlying records — a direct
+  gap against the decision-record roadmap's "export hash / immutable
+  snapshot" concept. Added a multi-sheet `xlsx/export.xlsx` workbook to both
+  the organisation and decision archives, and a `content_sha256` field to
+  `manifest.json` (SHA-256 over every dataset's canonical JSON, excluding
+  `audit_events` since downloading an export is itself an audited action
+  and would otherwise make the hash unstable across back-to-back exports —
+  caught by a test before it shipped). New `openpyxl` dependency; the
+  backend image was rebuilt so it's baked in, not just runtime-installed.
+- Real third-party integrations (Slack, Teams, Jira, Microsoft 365, Google
+  Workspace, SSO/SCIM) and a general REST API/webhook platform are
+  explicitly out of scope for this environment — no OAuth credentials
+  exist here to build or test against them. Not attempted; not regressed.
+
 ## Fixed in Phase 25
 
 - Risk, assumption, signpost, and outcome-review data all existed
