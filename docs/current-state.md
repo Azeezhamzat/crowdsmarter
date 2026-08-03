@@ -1,4 +1,4 @@
-# Current state (Phase 19/20 baseline)
+# Current state (Phase 19/20/21 baseline)
 
 Verified against the running system on 2026-08-03. Update this document
 whenever the baseline materially changes; do not let it drift into aspiration.
@@ -21,21 +21,24 @@ source of truth. See `docs/development-workflow.md`.
 
 ## Migrations
 
-57 backend migrations applied cleanly, plus one new migration added in this
-phase (`decision_analysis.0002_alter_decisionqualityreview_answers`). No
-migration drift (`makemigrations --check --dry-run` reports no changes).
+58 backend migrations applied cleanly across all apps, including two added in
+Phase 21 (`apps.criteria.0001_initial` — new app — and
+`apps.decision_options.0002_decisionoption_cost_notes_decisionoption_depends_on_and_more`).
+No migration drift (`makemigrations --check --dry-run` reports no changes). A
+pre-verification `pg_dump` backup was taken before this phase's test run
+(`backups/phase21-pre-verify-*.sql`, not committed).
 
 ## Test suites
 
-- Backend: `docker compose exec backend pytest` — **340 passed, 0 failed**
-  (was 40 failed / 300 passed at the start of Phase 19).
-- Frontend: `docker compose run --rm frontend npm test -- --run` — **34 test
-  files / 43 tests, all passing** (was 8 files / 4 tests failing, plus 4 files
-  colliding with Playwright specs, at the start of Phase 19).
-- `docker compose exec backend python manage.py check` — clean, 0 warnings
-  (the DRF `min_value` warning is fixed).
+- Backend: `docker compose exec backend pytest` — **354 passed, 0 failed**
+  (was 340 passed at the end of Phase 20; +14 tests from the new `criteria`
+  app and deepened `decision_options` coverage).
+- Frontend: `docker compose exec frontend npx vitest run` — **36 test files /
+  48 tests, all passing** (was 34 files / 43 tests at the end of Phase 20;
+  +2 tests each for `CriteriaSection` and `OptionsSection`).
+- `docker compose exec backend python manage.py check` — clean, 0 warnings.
 - `docker compose exec backend python manage.py makemigrations --check --dry-run` — clean.
-- Frontend `npm run typecheck` and `npm run build` — clean.
+- Frontend `npx tsc -b` and `npm run build` — clean.
 
 ## Dependencies
 
@@ -85,7 +88,41 @@ Bake without disrupting the working setup.
   next action per decision); no code change needed — see
   `docs/known-issues.md`.
 
-All committed on `claude/phase-20-product-experience`, not yet pushed.
+All committed on `claude/phase-20-product-experience`, pushed to origin.
+
+## Phase 21 (decision workspace depth) progress
+
+Audited the reasoning artifacts (options, evidence, assumptions, risks) and
+the decision lifecycle's readiness gate against the master prompt's
+"deepen the decision workspace" intent. Found two real, specific gaps and
+addressed both:
+
+- **Standalone decision criteria**: new `apps/criteria` Django app
+  (`Criterion` model — title, description, measurement note, direction
+  maximize/minimize, 0–100 weight with rationale, optional must-have +
+  threshold, owner, order, active/retired status), following the exact
+  service-layer/permission/audit pattern already used by `apps/risks`. Wired
+  into the decision reasoning UI as a new `CriteriaSection.tsx`, a new
+  "Criteria" tab, and an additive `active_criteria` count on the readiness
+  gate (not added to `blockers`, so decisions already in flight are not
+  newly gated).
+- **Deeper option modelling**: `DecisionOption` gained `estimated_cost`,
+  `cost_notes`, `resource_notes`, `implementation_time_estimate`,
+  `reversibility` (easily/partially/difficult/irreversible),
+  `is_experiment` + `experiment_notes` (MVP-style bounded experiments), and
+  two self-referential option relationships — `depends_on` (asymmetric) and
+  `mutually_exclusive_with` (symmetric) — both tenant- and
+  self-reference-validated in `services.py`. `OptionsSection.tsx`'s form and
+  option cards were extended to capture and display all of the above,
+  including resolving dependency/exclusivity IDs to option titles.
+
+Verified live in the browser (not just unit tests): logged in as the
+existing `a11y-audit@example.test` test account, created a throwaway
+decision and two options with a real dependency link, confirmed the form
+saved correctly and the card rendered cost, reversibility, experiment, and
+"Depends on: <title>" as expected, then deleted the throwaway decision.
+
+Committed on `claude/phase-21-decision-workspace`, not yet pushed.
 
 ## Known risks not yet resolved
 

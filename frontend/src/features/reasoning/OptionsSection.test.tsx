@@ -23,4 +23,18 @@ describe("OptionsSection", () => {
     expect(await screen.findByText("Enter a clear option title.")).toBeInTheDocument();
     expect(screen.getByText("Describe what this option involves.")).toBeInTheDocument();
   });
+
+  it("requires experiment scope when marked as an experiment", async () => {
+    renderSection();
+    fireEvent.click(screen.getByLabelText(/minimum-viable experiment/i));
+    fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Run a pilot" } });
+    fireEvent.change(screen.getByLabelText("Description"), {
+      target: { value: "Test the approach with a limited group before wider rollout." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add option" }));
+
+    expect(
+      await screen.findByText("Describe the bounded experiment this option represents."),
+    ).toBeInTheDocument();
+  });
 });

@@ -152,6 +152,12 @@ export type ReasoningSummary = {
   blockers: string[];
 };
 
+export type OptionReversibility =
+  | "easily_reversible"
+  | "partially_reversible"
+  | "difficult_to_reverse"
+  | "irreversible";
+
 export type DecisionOption = {
   id: string;
   decision_id: string;
@@ -160,6 +166,16 @@ export type DecisionOption = {
   expected_benefits: string;
   tradeoffs: string;
   is_status_quo: boolean;
+  estimated_cost: string | null;
+  cost_notes: string;
+  resource_notes: string;
+  implementation_time_estimate: string;
+  reversibility: OptionReversibility | "";
+  reversibility_label: string;
+  is_experiment: boolean;
+  experiment_notes: string;
+  depends_on_ids: string[];
+  mutually_exclusive_with_ids: string[];
   status: "active" | "withdrawn";
   status_label: string;
   proposed_by: User;

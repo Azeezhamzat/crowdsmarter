@@ -33,6 +33,21 @@ def _active_member(*, decision: Decision, user_id: Any) -> User:
         ) from exc
 
 
+def _related_options(
+    *, decision: Decision, option_id: Any, ids: list[Any], field_name: str
+) -> list[DecisionOption]:
+    """Resolve related-option ids, rejecting self-reference and cross-decision links."""
+    ids = [str(item) for item in ids]
+    if str(option_id) in ids:
+        raise DecisionOptionServiceError({field_name: "An option cannot reference itself."})
+    related = list(DecisionOption.objects.filter(decision=decision, id__in=ids))
+    if len(related) != len(set(ids)):
+        raise DecisionOptionServiceError(
+            {field_name: "Every related option must belong to this decision."}
+        )
+    return related
+
+
 @transaction.atomic
 def create_option(
     *,
@@ -44,6 +59,15 @@ def create_option(
     tradeoffs: str = "",
     is_status_quo: bool = False,
     proposed_by_id: Any | None = None,
+    estimated_cost: Any | None = None,
+    cost_notes: str = "",
+    resource_notes: str = "",
+    implementation_time_estimate: str = "",
+    reversibility: str = "",
+    is_experiment: bool = False,
+    experiment_notes: str = "",
+    depends_on_ids: list[Any] | None = None,
+    mutually_exclusive_with_ids: list[Any] | None = None,
 ) -> DecisionOption:
     if not can_contribute_reasoning(actor=actor, decision=decision):
         raise PermissionDenied("You cannot add options in this decision state.")
@@ -58,6 +82,13 @@ def create_option(
         expected_benefits=expected_benefits,
         tradeoffs=tradeoffs,
         is_status_quo=is_status_quo,
+        estimated_cost=estimated_cost,
+        cost_notes=cost_notes,
+        resource_notes=resource_notes,
+        implementation_time_estimate=implementation_time_estimate,
+        reversibility=reversibility,
+        is_experiment=is_experiment,
+        experiment_notes=experiment_notes,
         proposed_by=proposer,
         created_by=actor,
     )
@@ -68,6 +99,21 @@ def create_option(
         raise DecisionOptionServiceError(
             {"is_status_quo": "Only one active status quo option is allowed."}
         ) from exc
+    if depends_on_ids:
+        option.depends_on.set(
+            _related_options(
+                decision=decision, option_id=option.id, ids=depends_on_ids, field_name="depends_on_ids"
+            )
+        )
+    if mutually_exclusive_with_ids:
+        option.mutually_exclusive_with.set(
+            _related_options(
+                decision=decision,
+                option_id=option.id,
+                ids=mutually_exclusive_with_ids,
+                field_name="mutually_exclusive_with_ids",
+            )
+        )
     record_event(
         action="decision_option.created",
         object_type="decision_option",
@@ -92,8 +138,10 @@ def update_option(
         created_by_id=option.created_by_id,
     ):
         raise PermissionDenied("You cannot edit this option in the current decision state.")
-    before = {field: getattr(option, field) for field in fields}
     requested_status = fields.pop("status", None)
+    depends_on_ids = fields.pop("depends_on_ids", None)
+    mutually_exclusive_with_ids = fields.pop("mutually_exclusive_with_ids", None)
+    before = {field: getattr(option, field) for field in fields}
     for field, value in fields.items():
         setattr(option, field, value)
     if requested_status is not None:
@@ -105,6 +153,24 @@ def update_option(
         raise DecisionOptionServiceError(
             {"is_status_quo": "Only one active status quo option is allowed."}
         ) from exc
+    if depends_on_ids is not None:
+        option.depends_on.set(
+            _related_options(
+                decision=option.decision,
+                option_id=option.id,
+                ids=depends_on_ids,
+                field_name="depends_on_ids",
+            )
+        )
+    if mutually_exclusive_with_ids is not None:
+        option.mutually_exclusive_with.set(
+            _related_options(
+                decision=option.decision,
+                option_id=option.id,
+                ids=mutually_exclusive_with_ids,
+                field_name="mutually_exclusive_with_ids",
+            )
+        )
     after = {field: getattr(option, field) for field in before}
     record_event(
         action="decision_option.updated",

@@ -56,6 +56,37 @@ def test_option_endpoint_rejects_unknown_field(
 
 
 @pytest.mark.django_db
+def test_option_endpoint_creates_dependency_between_two_options(
+    api_client,
+    decision_factory,
+):  # type: ignore[no-untyped-def]
+    decision = decision_factory(status=Decision.Status.FRAMING)
+    api_client.force_authenticate(decision.owner)
+    collection = reverse("decision_options:list-create", kwargs={"decision_id": decision.id})
+
+    prerequisite = api_client.post(
+        collection,
+        {"title": "Data migration", "description": "Migrate legacy records first."},
+        format="json",
+    ).json()
+    dependent = api_client.post(
+        collection,
+        {
+            "title": "New reporting suite",
+            "description": "Requires migrated data to function.",
+            "estimated_cost": "12000.00",
+            "reversibility": "partially_reversible",
+            "depends_on_ids": [prerequisite["id"]],
+        },
+        format="json",
+    )
+
+    assert dependent.status_code == 201
+    assert dependent.json()["depends_on_ids"] == [prerequisite["id"]]
+    assert dependent.json()["estimated_cost"] == "12000.00"
+
+
+@pytest.mark.django_db
 def test_option_endpoint_is_tenant_isolated(
     api_client,
     user_factory,

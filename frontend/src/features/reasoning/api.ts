@@ -5,6 +5,7 @@ import type {
   DecisionOption,
   EvidenceItem,
   EvidenceSourceType,
+  OptionReversibility,
   Risk,
 } from "../../lib/types";
 
@@ -14,6 +15,15 @@ export type DecisionOptionInput = {
   expected_benefits?: string;
   tradeoffs?: string;
   is_status_quo?: boolean;
+  estimated_cost?: number | null;
+  cost_notes?: string;
+  resource_notes?: string;
+  implementation_time_estimate?: string;
+  reversibility?: OptionReversibility | "";
+  is_experiment?: boolean;
+  experiment_notes?: string;
+  depends_on_ids?: string[];
+  mutually_exclusive_with_ids?: string[];
 };
 
 export function listOptions(decisionId: string): Promise<DecisionOption[]> {

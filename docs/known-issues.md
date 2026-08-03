@@ -59,6 +59,26 @@ protection, which this phase deliberately did not do. If you want it gone,
 use the organisation's own deactivation/deletion flow (`/organisations/<id>/administration`)
 rather than a direct database delete.
 
+## Fixed in Phase 21
+
+- Decision criteria had no home: `decisions`/`decision_options` recorded
+  alternatives, but there was no standalone place to record and weigh the
+  criteria used to judge them. Added a new `apps/criteria` app (title,
+  description, measurement note, maximize/minimize direction, 0–100 weight
+  with rationale, optional must-have + threshold, owner, order, active/
+  retired status) with the same service/permission/audit-log pattern as
+  `apps/risks`, plus a `CriteriaSection.tsx` UI tab and an additive
+  `active_criteria` readiness-gate count.
+- `DecisionOption` was too shallow to support real comparison: it had no
+  cost, resourcing, timeline, reversibility, experiment framing, or
+  cross-option relationships. Added `estimated_cost`, `cost_notes`,
+  `resource_notes`, `implementation_time_estimate`, `reversibility`,
+  `is_experiment`/`experiment_notes`, and two self-referential
+  relationships — `depends_on` (asymmetric) and `mutually_exclusive_with`
+  (symmetric) — validated against self-reference and cross-decision leakage
+  in `services.py`. `OptionsSection.tsx`'s form and cards were extended to
+  match, including resolving related-option IDs to titles for display.
+
 ## Fixed in Phase 20
 
 - WCAG 2.2 AA audit across ~33 route templates (`axe-core`, real

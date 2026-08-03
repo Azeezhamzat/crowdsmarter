@@ -8,17 +8,42 @@ import { StatusMessage } from "../../components/StatusMessage";
 import { ApiError } from "../../lib/api";
 import { createOption, listOptions, updateOption } from "./api";
 
-const optionSchema = z.object({
-  title: z.string().trim().min(3, "Enter a clear option title.").max(240),
-  description: z
-    .string()
-    .trim()
-    .min(10, "Describe what this option involves.")
-    .max(12000),
-  expected_benefits: z.string().trim().max(8000),
-  tradeoffs: z.string().trim().max(8000),
-  is_status_quo: z.boolean(),
-});
+const optionSchema = z
+  .object({
+    title: z.string().trim().min(3, "Enter a clear option title.").max(240),
+    description: z
+      .string()
+      .trim()
+      .min(10, "Describe what this option involves.")
+      .max(12000),
+    expected_benefits: z.string().trim().max(8000),
+    tradeoffs: z.string().trim().max(8000),
+    is_status_quo: z.boolean(),
+    estimated_cost: z.string().trim(),
+    cost_notes: z.string().trim().max(4000),
+    resource_notes: z.string().trim().max(4000),
+    implementation_time_estimate: z.string().trim().max(120),
+    reversibility: z.enum([
+      "",
+      "easily_reversible",
+      "partially_reversible",
+      "difficult_to_reverse",
+      "irreversible",
+    ]),
+    is_experiment: z.boolean(),
+    experiment_notes: z.string().trim().max(4000),
+    depends_on_ids: z.array(z.string()),
+    mutually_exclusive_with_ids: z.array(z.string()),
+  })
+  .superRefine((value, context) => {
+    if (value.is_experiment && !value.experiment_notes) {
+      context.addIssue({
+        code: "custom",
+        path: ["experiment_notes"],
+        message: "Describe the bounded experiment this option represents.",
+      });
+    }
+  });
 
 type OptionForm = z.infer<typeof optionSchema>;
 
@@ -44,6 +69,15 @@ export function OptionsSection({
       expected_benefits: "",
       tradeoffs: "",
       is_status_quo: false,
+      estimated_cost: "",
+      cost_notes: "",
+      resource_notes: "",
+      implementation_time_estimate: "",
+      reversibility: "",
+      is_experiment: false,
+      experiment_notes: "",
+      depends_on_ids: [],
+      mutually_exclusive_with_ids: [],
     },
   });
 
@@ -55,7 +89,12 @@ export function OptionsSection({
   };
 
   const create = useMutation({
-    mutationFn: (input: OptionForm) => createOption(decisionId, input),
+    mutationFn: (values: OptionForm) =>
+      createOption(decisionId, {
+        ...values,
+        estimated_cost: values.estimated_cost ? Number(values.estimated_cost) : null,
+        reversibility: values.reversibility || undefined,
+      }),
     onSuccess: async () => {
       form.reset();
       await refresh();
@@ -71,6 +110,9 @@ export function OptionsSection({
     }) => updateOption(id, { status }),
     onSuccess: refresh,
   });
+
+  const activeOptions = (query.data ?? []).filter((item) => item.status === "active");
+  const titleFor = (id: string) => query.data?.find((item) => item.id === id)?.title ?? id;
 
   return (
     <div className="reasoning-grid">
@@ -100,6 +142,12 @@ export function OptionsSection({
                     <span className="status-badge">{option.status_label}</span>
                     {option.is_status_quo ? (
                       <span className="role-badge">Status quo</span>
+                    ) : null}
+                    {option.is_experiment ? (
+                      <span className="role-badge">Experiment</span>
+                    ) : null}
+                    {option.reversibility ? (
+                      <span className="status-badge">{option.reversibility_label}</span>
                     ) : null}
                   </div>
                 </div>
@@ -132,6 +180,39 @@ export function OptionsSection({
                   <strong>Trade-offs</strong>
                   <p>{option.tradeoffs}</p>
                 </div>
+              ) : null}
+              {option.estimated_cost ? (
+                <p>
+                  <strong>Estimated cost:</strong> {option.estimated_cost}
+                  {option.cost_notes ? ` — ${option.cost_notes}` : ""}
+                </p>
+              ) : null}
+              {option.resource_notes ? (
+                <p>
+                  <strong>Resources:</strong> {option.resource_notes}
+                </p>
+              ) : null}
+              {option.implementation_time_estimate ? (
+                <p>
+                  <strong>Implementation time:</strong> {option.implementation_time_estimate}
+                </p>
+              ) : null}
+              {option.is_experiment && option.experiment_notes ? (
+                <p>
+                  <strong>Experiment:</strong> {option.experiment_notes}
+                </p>
+              ) : null}
+              {option.depends_on_ids.length ? (
+                <p>
+                  <strong>Depends on:</strong>{" "}
+                  {option.depends_on_ids.map(titleFor).join(", ")}
+                </p>
+              ) : null}
+              {option.mutually_exclusive_with_ids.length ? (
+                <p>
+                  <strong>Cannot combine with:</strong>{" "}
+                  {option.mutually_exclusive_with_ids.map(titleFor).join(", ")}
+                </p>
               ) : null}
               <p className="table-secondary">
                 Proposed by {option.proposed_by.email}
@@ -181,6 +262,102 @@ export function OptionsSection({
               rows={3}
               {...form.register("tradeoffs")}
             />
+
+            <div className="form-row">
+              <div>
+                <label htmlFor="option-cost">Estimated cost</label>
+                <input
+                  id="option-cost"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  {...form.register("estimated_cost")}
+                />
+              </div>
+              <div>
+                <label htmlFor="option-implementation-time">Implementation time</label>
+                <input
+                  id="option-implementation-time"
+                  placeholder="e.g. 3-6 months"
+                  {...form.register("implementation_time_estimate")}
+                />
+              </div>
+            </div>
+
+            <label htmlFor="option-cost-notes">Cost notes</label>
+            <textarea id="option-cost-notes" rows={2} {...form.register("cost_notes")} />
+
+            <label htmlFor="option-resources">Resources required</label>
+            <textarea id="option-resources" rows={2} {...form.register("resource_notes")} />
+
+            <label htmlFor="option-reversibility">Reversibility</label>
+            <select id="option-reversibility" {...form.register("reversibility")}>
+              <option value="">Not assessed</option>
+              <option value="easily_reversible">Easily reversible</option>
+              <option value="partially_reversible">Partially reversible</option>
+              <option value="difficult_to_reverse">Difficult to reverse</option>
+              <option value="irreversible">Irreversible</option>
+            </select>
+
+            <label className="checkbox-row" htmlFor="option-is-experiment">
+              <input
+                id="option-is-experiment"
+                type="checkbox"
+                {...form.register("is_experiment")}
+              />
+              This is a minimum-viable experiment, not the full commitment
+            </label>
+            <label htmlFor="option-experiment-notes">Experiment scope</label>
+            <textarea
+              id="option-experiment-notes"
+              rows={2}
+              {...form.register("experiment_notes")}
+            />
+            <FieldError message={form.formState.errors.experiment_notes?.message} />
+
+            {activeOptions.length ? (
+              <>
+                <label htmlFor="option-depends-on">Depends on</label>
+                <select
+                  id="option-depends-on"
+                  multiple
+                  size={Math.min(4, activeOptions.length)}
+                  value={form.watch("depends_on_ids")}
+                  onChange={(event) =>
+                    form.setValue(
+                      "depends_on_ids",
+                      Array.from(event.target.selectedOptions, (item) => item.value),
+                    )
+                  }
+                >
+                  {activeOptions.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.title}
+                    </option>
+                  ))}
+                </select>
+
+                <label htmlFor="option-mutually-exclusive">Cannot be combined with</label>
+                <select
+                  id="option-mutually-exclusive"
+                  multiple
+                  size={Math.min(4, activeOptions.length)}
+                  value={form.watch("mutually_exclusive_with_ids")}
+                  onChange={(event) =>
+                    form.setValue(
+                      "mutually_exclusive_with_ids",
+                      Array.from(event.target.selectedOptions, (item) => item.value),
+                    )
+                  }
+                >
+                  {activeOptions.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.title}
+                    </option>
+                  ))}
+                </select>
+              </>
+            ) : null}
 
             <label className="checkbox-row" htmlFor="option-status-quo">
               <input

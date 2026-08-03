@@ -17,6 +17,12 @@ class DecisionOption(UUIDTimeStampedModel):
         ACTIVE = "active", "Active"
         WITHDRAWN = "withdrawn", "Withdrawn"
 
+    class Reversibility(models.TextChoices):
+        EASILY_REVERSIBLE = "easily_reversible", "Easily reversible"
+        PARTIALLY_REVERSIBLE = "partially_reversible", "Partially reversible"
+        DIFFICULT_TO_REVERSE = "difficult_to_reverse", "Difficult to reverse"
+        IRREVERSIBLE = "irreversible", "Irreversible"
+
     organisation = models.ForeignKey(
         "organisations.Organisation",
         on_delete=models.CASCADE,
@@ -32,6 +38,31 @@ class DecisionOption(UUIDTimeStampedModel):
     expected_benefits = models.TextField(blank=True)
     tradeoffs = models.TextField(blank=True)
     is_status_quo = models.BooleanField(default=False)
+    estimated_cost = models.DecimalField(
+        max_digits=14, decimal_places=2, null=True, blank=True,
+        help_text="Estimated cost in the organisation's reporting currency.",
+    )
+    cost_notes = models.TextField(blank=True)
+    resource_notes = models.TextField(blank=True)
+    implementation_time_estimate = models.CharField(
+        max_length=120, blank=True, help_text="Plain-language estimate, e.g. '3-6 months'.",
+    )
+    reversibility = models.CharField(
+        max_length=30, choices=Reversibility.choices, blank=True,
+    )
+    is_experiment = models.BooleanField(
+        default=False,
+        help_text="A bounded, minimum-viable way to test this option before committing further.",
+    )
+    experiment_notes = models.TextField(blank=True)
+    depends_on = models.ManyToManyField(
+        "self", symmetrical=False, related_name="required_by", blank=True,
+        help_text="Options that must also be adopted for this option to work.",
+    )
+    mutually_exclusive_with = models.ManyToManyField(
+        "self", symmetrical=True, blank=True,
+        help_text="Options that cannot be selected together with this one.",
+    )
     status = models.CharField(
         max_length=20,
         choices=Status.choices,
@@ -91,6 +122,10 @@ class DecisionOption(UUIDTimeStampedModel):
         self.description = self.description.strip()
         self.expected_benefits = self.expected_benefits.strip()
         self.tradeoffs = self.tradeoffs.strip()
+        self.cost_notes = self.cost_notes.strip()
+        self.resource_notes = self.resource_notes.strip()
+        self.implementation_time_estimate = self.implementation_time_estimate.strip()
+        self.experiment_notes = self.experiment_notes.strip()
         if self.decision_id and self.organisation_id:
             if self.decision.organisation_id != self.organisation_id:
                 raise ValidationError(
@@ -100,6 +135,10 @@ class DecisionOption(UUIDTimeStampedModel):
             raise ValidationError("Active options cannot contain withdrawal metadata.")
         if self.status == self.Status.WITHDRAWN and not self.withdrawn_at:
             raise ValidationError("Withdrawn options require a withdrawal timestamp.")
+        if self.is_experiment and not self.experiment_notes:
+            raise ValidationError(
+                {"experiment_notes": "Describe the bounded experiment this option represents."}
+            )
 
     def mark_status(self, *, status: str, actor) -> None:  # type: ignore[no-untyped-def]
         """Apply explicit soft-state metadata before validation."""
