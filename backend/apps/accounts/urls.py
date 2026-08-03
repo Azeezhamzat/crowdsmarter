@@ -5,6 +5,11 @@ from django.urls import path
 from .views import (
     CsrfCookieView,
     CurrentUserView,
+    MFADisableView,
+    MFAEnrollBeginView,
+    MFAEnrollConfirmView,
+    MFAStatusView,
+    MFAVerifyView,
     PasswordChangeView,
     PasswordResetConfirmView,
     PasswordResetRequestView,
@@ -22,4 +27,9 @@ urlpatterns = [
     path("password/change/", PasswordChangeView.as_view(), name="password-change"),
     path("password/reset/", PasswordResetRequestView.as_view(), name="password-reset-request"),
     path("password/reset/confirm/", PasswordResetConfirmView.as_view(), name="password-reset-confirm"),
+    path("mfa/verify/", MFAVerifyView.as_view(), name="mfa-verify"),
+    path("mfa/status/", MFAStatusView.as_view(), name="mfa-status"),
+    path("mfa/enroll/begin/", MFAEnrollBeginView.as_view(), name="mfa-enroll-begin"),
+    path("mfa/enroll/confirm/", MFAEnrollConfirmView.as_view(), name="mfa-enroll-confirm"),
+    path("mfa/disable/", MFADisableView.as_view(), name="mfa-disable"),
 ]

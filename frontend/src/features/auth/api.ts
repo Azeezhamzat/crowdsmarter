@@ -1,5 +1,5 @@
 import { apiRequest, ensureCsrfCookie } from "../../lib/api";
-import type { User } from "../../lib/types";
+import type { LoginResult, MFAEnrollment, MFAStatus, User } from "../../lib/types";
 
 export async function fetchCurrentUser(): Promise<User> {
   return apiRequest<User>("/auth/me/");
@@ -15,14 +15,43 @@ export async function updateProfile(input: { first_name: string; last_name: stri
 export async function loginWithPassword(input: {
   email: string;
   password: string;
-}): Promise<User> {
+}): Promise<LoginResult> {
   await ensureCsrfCookie();
-  return apiRequest<User>("/auth/session/", {
+  return apiRequest<LoginResult>("/auth/session/", {
     method: "POST",
     body: JSON.stringify({
       email: input.email.trim().toLowerCase(),
       password: input.password,
     }),
+  });
+}
+
+export async function verifyMfaCode(code: string): Promise<User> {
+  return apiRequest<User>("/auth/mfa/verify/", {
+    method: "POST",
+    body: JSON.stringify({ code }),
+  });
+}
+
+export async function getMfaStatus(): Promise<MFAStatus> {
+  return apiRequest<MFAStatus>("/auth/mfa/status/");
+}
+
+export async function beginMfaEnrollment(): Promise<MFAEnrollment> {
+  return apiRequest<MFAEnrollment>("/auth/mfa/enroll/begin/", { method: "POST", body: JSON.stringify({}) });
+}
+
+export async function confirmMfaEnrollment(code: string): Promise<{ backup_codes: string[] }> {
+  return apiRequest<{ backup_codes: string[] }>("/auth/mfa/enroll/confirm/", {
+    method: "POST",
+    body: JSON.stringify({ code }),
+  });
+}
+
+export async function disableMfa(password: string): Promise<{ detail: string }> {
+  return apiRequest<{ detail: string }>("/auth/mfa/disable/", {
+    method: "POST",
+    body: JSON.stringify({ password }),
   });
 }
 

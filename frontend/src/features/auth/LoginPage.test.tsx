@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -45,5 +45,25 @@ describe("LoginPage", () => {
     expect(await screen.findByText(/we could not sign you in/i)).toBeInTheDocument();
     expect(screen.getByText(/email matching is case-insensitive/i)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /reset your password securely/i })).toHaveAttribute("href", "/forgot-password");
+  });
+
+  it("prompts for a second factor and completes sign-in after a valid code", async () => {
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(JSON.stringify({ detail: "CSRF cookie set." }), { status: 200, headers: { "content-type": "application/json" } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ mfa_required: true }), { status: 200, headers: { "content-type": "application/json" } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: "u1", email: "person@example.com", first_name: "", last_name: "" }), { status: 200, headers: { "content-type": "application/json" } }));
+
+    renderPage();
+    fireEvent.change(screen.getByLabelText("Email address"), { target: { value: "person@example.com" } });
+    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "correct-password" } });
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+
+    expect(await screen.findByText("Enter your authentication code")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Authentication or backup code"), { target: { value: "123456" } });
+    fireEvent.click(screen.getByRole("button", { name: /verify and continue/i }));
+
+    await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(3));
+    const verifyCall = vi.mocked(globalThis.fetch).mock.calls.at(2);
+    expect(String(verifyCall?.[0])).toContain("/auth/mfa/verify/");
   });
 });

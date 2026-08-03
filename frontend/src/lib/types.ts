@@ -7,6 +7,17 @@ export type User = {
   is_platform_administrator?: boolean;
 };
 
+export type LoginResult = User | { mfa_required: true };
+
+export type MFAStatus = {
+  is_enabled: boolean;
+};
+
+export type MFAEnrollment = {
+  secret: string;
+  provisioning_uri: string;
+};
+
 export type OrganisationRole = "owner" | "admin" | "contributor" | "viewer";
 
 export type Organisation = {

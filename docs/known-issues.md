@@ -67,6 +67,31 @@ afterwards, but this account hit the identical `AuditEvent.actor`
 `PROTECT` constraint and was left in place for the same reason as
 `a11y-audit@example.test` above.
 
+## Fixed in Phase 28
+
+- No MFA/two-factor authentication capability existed anywhere in the
+  codebase. Added TOTP (RFC 6238) using the Python standard library only —
+  verified against the official RFC 4226 Appendix D test vectors before
+  being wired into the login flow. New `TOTPDevice`/`MFABackupCode` models,
+  enrollment/verification services, a session-pending two-step login gate
+  (with its own expiry), and enrollment/disable UI. The no-MFA login path
+  is unchanged — confirmed by all pre-existing `apps/accounts` tests
+  passing without modification.
+- Audited the rest of the security/enterprise-readiness checklist (CSRF,
+  session security, password-reset security, rate limiting, file-upload
+  validation, mass-assignment protection, audit-log immutability, tenant
+  isolation) and confirmed it was already substantially in place from prior
+  phases — nothing further to fix there.
+- Confirmed for the record: SSO/SAML/OIDC, SCIM, customer-managed keys,
+  regional hosting/data residency, IP restrictions, legal hold, and SOC
+  2/ISO 27001 attestation all require real external infrastructure or
+  third-party audits unavailable in this sandbox. Not attempted; not
+  regressed. Same reasoning as skipping real OAuth integrations in Phase 26
+  and a real LLM provider in Phase 27.
+- `Organisation.retention_days` is stored but nothing currently enforces it
+  (no purge job consumes it). Left as a known, narrow, well-scoped gap for
+  a future phase rather than folded into this one.
+
 ## Fixed in Phase 27
 
 - `apps/ai_assistance` had no evaluation harness at all, and two named

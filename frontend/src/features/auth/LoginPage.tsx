@@ -9,7 +9,7 @@ import { FieldError } from "../../components/FieldError";
 import { Icon } from "../../components/Icon";
 import { buildMailto, contactChannels } from "../../config/contact";
 import { ApiError } from "../../lib/api";
-import { loginWithPassword } from "./api";
+import { loginWithPassword, verifyMfaCode } from "./api";
 
 const loginSchema = z.object({
   email: z.string().trim().email("Enter a valid email address."),
@@ -22,6 +22,8 @@ export function LoginPage() {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [capsLockOn, setCapsLockOn] = useState(false);
+  const [mfaRequired, setMfaRequired] = useState(false);
+  const [mfaCode, setMfaCode] = useState("");
   const [searchParams] = useSearchParams();
   const requestedNext = searchParams.get("next") ?? "/app";
   const nextPath = requestedNext.startsWith("/") && !requestedNext.startsWith("//") ? requestedNext : "/app";
@@ -32,6 +34,17 @@ export function LoginPage() {
   });
   const login = useMutation({
     mutationFn: loginWithPassword,
+    onSuccess: async (result) => {
+      if ("mfa_required" in result) {
+        setMfaRequired(true);
+        return;
+      }
+      queryClient.setQueryData(["current-user"], result);
+      await navigate(nextPath, { replace: true });
+    },
+  });
+  const verifyMfa = useMutation({
+    mutationFn: () => verifyMfaCode(mfaCode.trim()),
     onSuccess: async (user) => {
       queryClient.setQueryData(["current-user"], user);
       await navigate(nextPath, { replace: true });
@@ -39,6 +52,49 @@ export function LoginPage() {
   });
 
   const hasCredentialError = login.error instanceof ApiError && login.error.status === 400;
+
+  if (mfaRequired) {
+    return (
+      <main id="main-content" className="auth-layout auth-layout--executive" tabIndex={-1}>
+        <section className="auth-card auth-card--executive" aria-labelledby="mfa-title">
+          <div className="auth-card__content auth-card__content--executive">
+            <div className="auth-card__heading">
+              <span className="auth-card__icon"><Icon name="shield" size={23} /></span>
+              <div><p className="public-eyebrow">Two-factor authentication</p><h2 id="mfa-title">Enter your authentication code</h2></div>
+            </div>
+            <p className="muted">Open your authenticator app and enter the current 6-digit code, or use one of your backup codes.</p>
+            {verifyMfa.error ? (
+              <div className="auth-error-panel" role="alert" aria-live="assertive">
+                <div className="auth-error-panel__heading"><Icon name="warning" size={19} /><strong>That code did not work.</strong></div>
+                <p>{verifyMfa.error instanceof ApiError ? verifyMfa.error.message : "The verification request could not be completed."}</p>
+              </div>
+            ) : null}
+            <form onSubmit={(event) => { event.preventDefault(); verifyMfa.mutate(); }} noValidate>
+              <label htmlFor="mfa-code">Authentication or backup code</label>
+              <input
+                id="mfa-code"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                autoFocus
+                value={mfaCode}
+                onChange={(event) => setMfaCode(event.target.value)}
+              />
+              <button className="button button--primary button--full button--large auth-submit" type="submit" disabled={verifyMfa.isPending || !mfaCode.trim()}>
+                {verifyMfa.isPending ? "Verifying…" : <>Verify and continue <Icon name="arrow-right" size={18} /></>}
+              </button>
+            </form>
+            <button
+              className="public-text-link auth-back-link"
+              type="button"
+              onClick={() => { setMfaRequired(false); setMfaCode(""); login.reset(); }}
+            >
+              <Icon name="arrow-right" size={16} />Start over
+            </button>
+          </div>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main id="main-content" className="auth-layout auth-layout--executive" tabIndex={-1}>

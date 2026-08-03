@@ -25,3 +25,13 @@ class AccountSecurityThrottle(UserRateThrottle):
     """Limit sensitive authenticated account changes."""
 
     scope = "account_security"
+
+
+class MFAVerifyThrottle(AnonRateThrottle):
+    """Limit two-factor code guesses during login by source address.
+
+    Anonymous (not user-scoped): at this point in the flow the request has
+    not been logged in yet, so there is no authenticated user to key on.
+    """
+
+    scope = "mfa_verify"

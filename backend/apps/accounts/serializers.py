@@ -85,3 +85,15 @@ class PasswordResetConfirmSerializer(StrictSerializer):
     def validate_new_password(self, value: str) -> str:
         validate_password(value, user=self.context.get("user"))
         return value
+
+
+class MFACodeSerializer(StrictSerializer):
+    """A six-digit authenticator code or a formatted backup code."""
+
+    code = serializers.CharField(max_length=32, trim_whitespace=True)
+
+
+class MFADisableSerializer(StrictSerializer):
+    """Require the current password before turning off two-factor authentication."""
+
+    password = serializers.CharField(trim_whitespace=False, write_only=True)

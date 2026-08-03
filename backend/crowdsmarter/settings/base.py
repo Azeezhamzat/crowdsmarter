@@ -152,6 +152,7 @@ REST_FRAMEWORK = {
         "password_reset_request": os.getenv("API_PASSWORD_RESET_REQUEST_THROTTLE_RATE", "5/hour"),
         "password_reset_confirm": os.getenv("API_PASSWORD_RESET_CONFIRM_THROTTLE_RATE", "20/hour"),
         "account_security": os.getenv("API_ACCOUNT_SECURITY_THROTTLE_RATE", "20/hour"),
+        "mfa_verify": os.getenv("API_MFA_VERIFY_THROTTLE_RATE", "10/min"),
         "data_export": os.getenv("API_DATA_EXPORT_THROTTLE_RATE", "20/hour"),
         "invitation_management": os.getenv("API_INVITATION_MANAGEMENT_THROTTLE_RATE", "120/hour"),
         "invitation_acceptance": os.getenv("API_INVITATION_ACCEPTANCE_THROTTLE_RATE", "60/hour"),
@@ -189,6 +190,7 @@ DEMO_REQUEST_SEND_ACKNOWLEDGEMENT = env_bool(
 FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "http://localhost:5173")
 INVITATION_EXPIRY_HOURS = int(os.getenv("INVITATION_EXPIRY_HOURS", "168"))
 PASSWORD_RESET_TIMEOUT = int(os.getenv("PASSWORD_RESET_TIMEOUT", "3600"))
+MFA_PENDING_SESSION_SECONDS = int(os.getenv("MFA_PENDING_SESSION_SECONDS", "300"))
 
 SOURCE_ATTACHMENT_MAX_BYTES = int(os.getenv("SOURCE_ATTACHMENT_MAX_BYTES", str(15 * 1024 * 1024)))
 SOURCE_ATTACHMENT_ALLOWED_CONTENT_TYPES = env_list(

@@ -1,4 +1,4 @@
-# Current state (Phase 19/20/21/22/23/24/25/26/27 baseline)
+# Current state (Phase 19/20/21/22/23/24/25/26/27/28 baseline)
 
 Verified against the running system on 2026-08-03. Update this document
 whenever the baseline materially changes; do not let it drift into aspiration.
@@ -21,13 +21,16 @@ source of truth. See `docs/development-workflow.md`.
 
 ## Migrations
 
-60 backend migrations applied cleanly across all apps, including two added in
-Phase 22 (`apps.foresight.0005_signpostassumptionlink_signpostrisklink` and
+61 backend migrations applied cleanly across all apps, including
+`apps.accounts.0003_totpdevice_mfabackupcode` (Phase 28) and two from Phase 22
+(`apps.foresight.0005_signpostassumptionlink_signpostrisklink` and
 `apps.notifications.0003_remove_notification_notification_kind_valid_and_more`,
 which adds the `signpost_watch` notification kind). No migration drift
 (`makemigrations --check --dry-run` reports no changes). A pre-verification
 `pg_dump` backup was taken before Phase 21's test run
-(`backups/phase21-pre-verify-*.sql`, not committed).
+(`backups/phase21-pre-verify-*.sql`, not committed). Phase 28's migration was
+applied to the dev DB immediately after generation, avoiding the Phase 22
+"migrate on container start only" gotcha documented below.
 
 Note: the running `backend` container only auto-applies migrations on
 container start, not live — after generating a migration mid-session, run
@@ -38,17 +41,15 @@ the two new migrations above were applied by hand).
 
 ## Test suites
 
-- Backend: `docker compose exec backend pytest` — **376 passed, 0 failed**
-  (was 369 passed at the end of Phase 26; +7 new tests for Phase 27's
-  evaluation-harness module: `apps/ai_assistance/tests/test_evaluation.py`).
+- Backend: `docker compose exec backend pytest` — **384 passed, 0 failed**
+  (was 376 passed at the end of Phase 27; +8 new tests for Phase 28's MFA
+  feature: `apps/accounts/tests/test_mfa.py`).
 - Frontend: `docker compose exec frontend npx vitest run` — **36 test files /
-  48 tests, all passing** (Phase 27 extended the existing
-  `DecisionAIReviewPage.test.tsx` mock with the two new finding-list fields
-  rather than adding a new test file).
+  50 tests, all passing** (+2 new tests: an MFA-enrollment walkthrough in
+  `AccountSettingsPage.test.tsx` and a login-gate test in
+  `LoginPage.test.tsx`).
 - `docker compose exec backend python manage.py check` — clean, 0 warnings.
-- `docker compose exec backend python manage.py makemigrations --check --dry-run` — clean
-  (Phase 27 added no migration — `AIReview.output` is an unstructured
-  `JSONField`, so new finding categories need no schema change).
+- `docker compose exec backend python manage.py makemigrations --check --dry-run` — clean.
 - Frontend `npx tsc -b` and `npm run build` — clean.
 - Backend Docker image rebuilt (`docker compose build backend`) to bake in
   the new `openpyxl` dependency, then the full suite re-run against the
@@ -414,7 +415,62 @@ then marked the review as human-reviewed and confirmed the quality card on
 the administration page showed 1 completed / 1 confirmed / 0% correction
 rate.
 
-Committed on `claude/phase-27-ai-copilot`, not yet pushed.
+Committed on `claude/phase-27-ai-copilot`, pushed, and fast-forward merged
+into `main`.
+
+## Phase 28 (enterprise security and compliance) progress
+
+Audited the full security checklist, GDPR-adjacent capability, and
+enterprise-controls roadmap (section 15) against the codebase, which has
+already been through 19+ phases of hardening. Confirmed most of the review
+checklist already holds: CSRF (`CsrfViewMiddleware` + `@csrf_protect` on
+every mutating auth view), session security (`SESSION_COOKIE_HTTPONLY`,
+`SECURE_*` settings in production), password-reset security (single-use
+timed tokens, constant public response, dedicated throttles), real
+per-endpoint rate limiting across 6+ apps, keyed-digest invitation tokens,
+magic-byte file-upload validation, `StrictSerializer` mass-assignment
+protection, and a genuinely append-only, `PROTECT`-enforced audit log.
+Export (Phase 26) and a real deletion-request/offboarding workflow already
+exist. SSO/SAML/OIDC, SCIM, customer-managed keys, and multi-region hosting
+are all correctly out of scope here — no real identity provider, directory
+service, KMS, or region infrastructure exists in this sandbox to build or
+test against, the same constraint that ruled out Phase 26/27's equivalent
+externals.
+
+The one confirmed, genuinely unbuilt, fully self-contained gap: **MFA**.
+Implemented TOTP (RFC 6238) two-factor authentication using only the Python
+standard library — no new runtime dependency, verified against the official
+RFC 4226 Appendix D test vectors before being wired into the app (all 10
+matched exactly):
+
+- New `TOTPDevice` (secret, `confirmed_at`) and `MFABackupCode` (keyed
+  digest, matching the invitation-token pattern — plaintext codes are shown
+  exactly once) models on `apps.accounts`.
+- `begin_mfa_enrollment`/`confirm_mfa_enrollment`/`disable_mfa`/
+  `verify_mfa_code` service functions, each audit-logged.
+- `SessionLoginView` now gates on confirmed MFA via a session-stored
+  pending marker (`mfa_pending_user_id` + a timestamp, expiring after
+  `MFA_PENDING_SESSION_SECONDS`, default 300s) instead of logging in
+  directly — the normal no-MFA path is byte-for-byte unchanged, confirmed
+  by all 15 pre-existing `apps/accounts` tests passing untouched.
+- A new `MFAVerifyView` (rate-limited, `mfa_verify` throttle scope)
+  completes the pending login on a valid TOTP or backup code.
+- Frontend: a "Two-factor authentication" section on
+  `AccountSettingsPage.tsx` (enroll → confirm → one-time backup-code
+  reveal → disable-with-password), and a second-factor step in
+  `LoginPage.tsx` that appears only when the login response is
+  `{mfa_required: true}`.
+
+Verified live in the browser end to end — the real, hardest-to-fake path:
+enrolled MFA on the shared `a11y-audit@example.test` test account, computed
+matching 6-digit TOTP codes from the actual issued secret using the same
+`apps.accounts.totp` module via `manage.py shell` (not a mock), completed a
+real gated login with a fresh code, then **disabled MFA again on that
+account** before finishing, since it's reused for every phase's browser
+verification and leaving it MFA-enabled would have silently broken every
+future phase's login step.
+
+Committed on `claude/phase-28-mfa-enterprise-security`, not yet pushed.
 
 ## Known risks not yet resolved
 

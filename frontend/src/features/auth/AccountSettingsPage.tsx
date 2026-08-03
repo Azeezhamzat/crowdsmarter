@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -9,7 +9,16 @@ import { Icon } from "../../components/Icon";
 import { buildMailto, contactChannels } from "../../config/contact";
 import { StatusMessage } from "../../components/StatusMessage";
 import { ApiError } from "../../lib/api";
-import { changePassword, fetchCurrentUser, updateProfile } from "./api";
+import type { MFAEnrollment } from "../../lib/types";
+import {
+  beginMfaEnrollment,
+  changePassword,
+  confirmMfaEnrollment,
+  disableMfa,
+  fetchCurrentUser,
+  getMfaStatus,
+  updateProfile,
+} from "./api";
 
 const profileSchema = z.object({ first_name: z.string().max(150), last_name: z.string().max(150) });
 const passwordSchema = z.object({
@@ -35,6 +44,30 @@ export function AccountSettingsPage() {
   const password = useMutation({
     mutationFn: (input: PasswordInput) => changePassword({ current_password: input.current_password, new_password: input.new_password }),
     onSuccess: () => passwordForm.reset(),
+  });
+
+  const mfaStatus = useQuery({ queryKey: ["mfa-status"], queryFn: getMfaStatus });
+  const [enrollment, setEnrollment] = useState<MFAEnrollment | null>(null);
+  const [enrollCode, setEnrollCode] = useState("");
+  const [backupCodes, setBackupCodes] = useState<string[] | null>(null);
+  const [disablePassword, setDisablePassword] = useState("");
+  const refreshMfaStatus = () => queryClient.invalidateQueries({ queryKey: ["mfa-status"] });
+  const beginEnroll = useMutation({
+    mutationFn: beginMfaEnrollment,
+    onSuccess: (data) => { setEnrollment(data); setEnrollCode(""); setBackupCodes(null); },
+  });
+  const confirmEnroll = useMutation({
+    mutationFn: () => confirmMfaEnrollment(enrollCode.trim()),
+    onSuccess: async (data) => {
+      setBackupCodes(data.backup_codes);
+      setEnrollment(null);
+      setEnrollCode("");
+      await refreshMfaStatus();
+    },
+  });
+  const disable = useMutation({
+    mutationFn: () => disableMfa(disablePassword),
+    onSuccess: async () => { setDisablePassword(""); await refreshMfaStatus(); },
   });
 
   return (
@@ -64,6 +97,44 @@ export function AccountSettingsPage() {
             <label htmlFor="confirm-account-password">Confirm new password</label><input id="confirm-account-password" type="password" autoComplete="new-password" {...passwordForm.register("confirm_password")} /><FieldError message={passwordForm.formState.errors.confirm_password?.message} />
             <button className="button button--primary" type="submit" disabled={password.isPending}>{password.isPending ? "Changing…" : "Change password"}</button>
           </form>
+        </section>
+        <section className="overview-card" aria-labelledby="mfa-title">
+          <h2 id="mfa-title">Two-factor authentication</h2>
+          <p className="muted">Require a code from an authenticator app in addition to your password when signing in.</p>
+          {beginEnroll.error ? <StatusMessage kind="error">{beginEnroll.error instanceof ApiError ? beginEnroll.error.message : "Enrollment could not be started."}</StatusMessage> : null}
+          {confirmEnroll.error ? <StatusMessage kind="error">{confirmEnroll.error instanceof ApiError ? confirmEnroll.error.message : "That code did not match."}</StatusMessage> : null}
+          {disable.error ? <StatusMessage kind="error">{disable.error instanceof ApiError ? disable.error.message : "Two-factor authentication could not be disabled."}</StatusMessage> : null}
+
+          {backupCodes ? (
+            <div className="mfa-backup-codes">
+              <StatusMessage kind="success">Two-factor authentication is enabled. Save these backup codes now — each one only appears once, and any of them can sign you in if you lose access to your authenticator app.</StatusMessage>
+              <ul className="mfa-backup-codes__list">{backupCodes.map((code) => <li key={code}><code>{code}</code></li>)}</ul>
+              <button className="button button--secondary" type="button" onClick={() => setBackupCodes(null)}>Done</button>
+            </div>
+          ) : mfaStatus.data?.is_enabled ? (
+            <div>
+              <p><Icon name="shield" size={16} /> Two-factor authentication is currently enabled.</p>
+              <label htmlFor="mfa-disable-password">Current password</label>
+              <input id="mfa-disable-password" type="password" autoComplete="current-password" value={disablePassword} onChange={(event) => setDisablePassword(event.target.value)} />
+              <button className="button button--danger-quiet" type="button" disabled={disable.isPending || !disablePassword} onClick={() => disable.mutate()}>
+                {disable.isPending ? "Disabling…" : "Disable two-factor authentication"}
+              </button>
+            </div>
+          ) : enrollment ? (
+            <div>
+              <p>Add this key to your authenticator app (Google Authenticator, 1Password, Authy, or similar):</p>
+              <p className="mfa-secret"><code>{enrollment.secret}</code></p>
+              <label htmlFor="mfa-enroll-code">Enter the 6-digit code it shows</label>
+              <input id="mfa-enroll-code" inputMode="numeric" autoComplete="one-time-code" value={enrollCode} onChange={(event) => setEnrollCode(event.target.value)} />
+              <button className="button button--primary" type="button" disabled={confirmEnroll.isPending || !enrollCode.trim()} onClick={() => confirmEnroll.mutate()}>
+                {confirmEnroll.isPending ? "Confirming…" : "Confirm and enable"}
+              </button>
+            </div>
+          ) : (
+            <button className="button button--primary" type="button" disabled={beginEnroll.isPending} onClick={() => beginEnroll.mutate()}>
+              {beginEnroll.isPending ? "Starting…" : "Enable two-factor authentication"}
+            </button>
+          )}
         </section>
       </div>
       <div className="account-operations-grid">

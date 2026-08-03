@@ -2,9 +2,12 @@
 
 import uuid
 
+from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.db.models.functions import Lower
+
+from apps.core.models import UUIDTimeStampedModel
 
 from .managers import UserManager
 
@@ -34,3 +37,45 @@ class User(AbstractUser):
 
     def __str__(self) -> str:
         return self.email
+
+
+class TOTPDevice(UUIDTimeStampedModel):
+    """One time-based one-time-password enrollment for a user's account.
+
+    A row exists as soon as enrollment begins; `confirmed_at` is null until
+    the user proves possession of the secret with a valid code, so an
+    abandoned enrollment attempt never silently enables MFA.
+    """
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="totp_device"
+    )
+    secret = models.CharField(max_length=64)
+    confirmed_at = models.DateTimeField(null=True, blank=True)
+
+    @property
+    def is_confirmed(self) -> bool:
+        return self.confirmed_at is not None
+
+    def __str__(self) -> str:
+        return f"TOTP device for {self.user.email} ({'confirmed' if self.is_confirmed else 'pending'})"
+
+
+class MFABackupCode(UUIDTimeStampedModel):
+    """A single-use recovery code for when the authenticator app is unavailable.
+
+    Only the keyed digest is stored, matching how invitation tokens are kept -
+    the plaintext code is shown to the user exactly once, at generation time.
+    """
+
+    device = models.ForeignKey(
+        TOTPDevice, on_delete=models.CASCADE, related_name="backup_codes"
+    )
+    code_digest = models.CharField(max_length=64, unique=True)
+    used_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["created_at"]
+
+    def __str__(self) -> str:
+        return f"Backup code for {self.device.user.email} ({'used' if self.used_at else 'unused'})"

@@ -1,5 +1,8 @@
 """Session authentication and account self-service API views."""
 
+import time
+
+from django.conf import settings
 from django.contrib.auth import (
     authenticate,
     get_user_model,
@@ -20,20 +23,35 @@ from rest_framework.views import APIView
 from .serializers import (
     CurrentUserSerializer,
     LoginSerializer,
+    MFACodeSerializer,
+    MFADisableSerializer,
     PasswordChangeSerializer,
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
     ProfileUpdateSerializer,
 )
-from .services import request_password_reset, set_new_password, update_profile
+from .services import (
+    begin_mfa_enrollment,
+    confirm_mfa_enrollment,
+    disable_mfa,
+    mfa_is_enabled,
+    request_password_reset,
+    set_new_password,
+    update_profile,
+    verify_mfa_code,
+)
 from .throttles import (
     AccountSecurityThrottle,
     LoginRateThrottle,
+    MFAVerifyThrottle,
     PasswordResetConfirmThrottle,
     PasswordResetRequestThrottle,
 )
 
 User = get_user_model()
+
+_MFA_PENDING_USER_KEY = "mfa_pending_user_id"
+_MFA_PENDING_STARTED_KEY = "mfa_pending_started_at"
 
 
 @method_decorator(ensure_csrf_cookie, name="dispatch")
@@ -69,6 +87,10 @@ class SessionLoginView(APIView):
                 {"detail": "Invalid email or password."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        if mfa_is_enabled(user=user):
+            request.session[_MFA_PENDING_USER_KEY] = str(user.id)
+            request.session[_MFA_PENDING_STARTED_KEY] = time.time()
+            return Response({"mfa_required": True})
         login(request, user)
         return Response(CurrentUserSerializer(user).data)
 
@@ -186,3 +208,103 @@ class PasswordResetConfirmView(APIView):
         response = Response({"detail": "Password reset successfully."})
         response["Cache-Control"] = "no-store"
         return response
+
+
+@method_decorator(csrf_protect, name="dispatch")
+class MFAVerifyView(APIView):
+    """Complete a sign-in that is pending a second factor."""
+
+    permission_classes = [AllowAny]
+    authentication_classes: list[type] = []
+    throttle_classes = [MFAVerifyThrottle]
+
+    def post(self, request):  # type: ignore[no-untyped-def]
+        pending_user_id = request.session.get(_MFA_PENDING_USER_KEY)
+        started_at = request.session.get(_MFA_PENDING_STARTED_KEY)
+        if not pending_user_id or not started_at:
+            return Response(
+                {"detail": "No sign-in is awaiting a second factor."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if time.time() - started_at > settings.MFA_PENDING_SESSION_SECONDS:
+            request.session.pop(_MFA_PENDING_USER_KEY, None)
+            request.session.pop(_MFA_PENDING_STARTED_KEY, None)
+            return Response(
+                {"detail": "This sign-in attempt has expired. Sign in again."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        serializer = MFACodeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            user = User.objects.get(id=pending_user_id, is_active=True)
+        except (User.DoesNotExist, ValueError):
+            user = None
+        if user is None or not verify_mfa_code(
+            user=user, code=serializer.validated_data["code"]
+        ):
+            return Response(
+                {"detail": "That code is incorrect or has expired."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        request.session.pop(_MFA_PENDING_USER_KEY, None)
+        request.session.pop(_MFA_PENDING_STARTED_KEY, None)
+        login(request, user)
+        return Response(CurrentUserSerializer(user).data)
+
+
+class MFAStatusView(APIView):
+    """Whether the authenticated user currently has two-factor authentication enabled."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):  # type: ignore[no-untyped-def]
+        return Response({"is_enabled": mfa_is_enabled(user=request.user)})
+
+
+class MFAEnrollBeginView(APIView):
+    """Issue a fresh, unconfirmed TOTP secret to enroll or restart enrollment."""
+
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [AccountSecurityThrottle]
+
+    def post(self, request):  # type: ignore[no-untyped-def]
+        enrollment = begin_mfa_enrollment(user=request.user)
+        return Response(
+            {
+                "secret": enrollment.secret,
+                "provisioning_uri": enrollment.provisioning_uri,
+            }
+        )
+
+
+class MFAEnrollConfirmView(APIView):
+    """Prove possession of the enrolled secret and receive one-time backup codes."""
+
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [AccountSecurityThrottle]
+
+    def post(self, request):  # type: ignore[no-untyped-def]
+        serializer = MFACodeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        backup_codes = confirm_mfa_enrollment(
+            user=request.user, code=serializer.validated_data["code"]
+        )
+        return Response({"backup_codes": backup_codes})
+
+
+class MFADisableView(APIView):
+    """Turn off two-factor authentication after confirming the current password."""
+
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [AccountSecurityThrottle]
+
+    def post(self, request):  # type: ignore[no-untyped-def]
+        serializer = MFADisableSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        if not request.user.check_password(serializer.validated_data["password"]):
+            return Response(
+                {"password": ["The current password is incorrect."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        disable_mfa(user=request.user)
+        return Response({"detail": "Two-factor authentication has been turned off."})
