@@ -28,5 +28,22 @@ describe("LandingPage", () => {
     expect(screen.getByRole("tab", { name: /interpret/i })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("img", { name: /systems and scenario interpretation/i })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /connect signals, systems, stakeholders, and uncertainty/i })).toBeInTheDocument();
+
+    expect(screen.getByRole("heading", { name: /designed for decisions where uncertainty and stakeholders both matter/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /investment and transformation/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /policy and programmes/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /resilience and scenarios/i })).toBeInTheDocument();
+
+    expect(screen.getByRole("heading", { name: /bring one real decision through a structured first engagement/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /frame the decision/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /decide and organise review/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /start with one real, important decision/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /apply for the pilot programme/i })).toHaveAttribute("href", "/request-demo");
+
+    expect(screen.getByRole("heading", { name: /a concrete result, not just a workshop/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /a robustness analysis/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /a monitoring system/i })).toBeInTheDocument();
+
+    expect(screen.getByText(/global · africa · europe · mena/i)).toBeInTheDocument();
   });
 });

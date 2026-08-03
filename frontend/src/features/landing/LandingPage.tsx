@@ -54,7 +54,87 @@ const workflow = [
   },
 ];
 
-const audiences = ["Strategy", "Transformation", "Innovation", "Risk", "Policy", "Executive leadership"];
+const useCases = [
+  {
+    key: "investment",
+    icon: "analytics" as IconName,
+    title: "Investment and transformation",
+    description: "Prioritise initiatives, technologies, markets, or assets using transparent, weighted criteria.",
+    examples: ["Capital allocation", "Digital transformation", "Market entry"],
+  },
+  {
+    key: "policy",
+    icon: "building" as IconName,
+    title: "Policy and programmes",
+    description: "Compare interventions and integrate perspectives across institutions or departments.",
+    examples: ["Programme prioritisation", "Stakeholder consultation", "Option appraisal"],
+  },
+  {
+    key: "resilience",
+    icon: "shield" as IconName,
+    title: "Resilience and scenarios",
+    description: "Stress-test strategy against regulatory, climate, and economic disruption.",
+    examples: ["Strategic stress-testing", "Continuity planning", "Signpost monitoring"],
+  },
+];
+
+const sprintSteps = [
+  {
+    label: "Week 1",
+    title: "Frame the decision",
+    description: "Clarify the question, decision authority, objectives, constraints, stakeholders, and deadline.",
+  },
+  {
+    label: "Weeks 1–2",
+    title: "Gather knowledge",
+    description: "Collect evidence, assumptions, risks, signals, and independent contributions.",
+  },
+  {
+    label: "Weeks 2–4",
+    title: "Explore uncertainty",
+    description: "Build scenarios, test options, and identify the conditions for success.",
+  },
+  {
+    label: "Weeks 4–6",
+    title: "Evaluate without hiding disagreement",
+    description: "Compare options, analyse robustness, and make useful dissent visible.",
+  },
+  {
+    label: "Weeks 6–8",
+    title: "Decide and organise review",
+    description: "Finalise the choice, responsibilities, signposts to monitor, and the review date.",
+  },
+];
+
+const pilotStats: Array<[string, string]> = [
+  ["Duration", "4 to 8 weeks"],
+  ["Team", "5 to 25 participants"],
+  ["Format", "Hybrid or remote"],
+  ["Outcome", "Decision + reusable platform"],
+];
+
+const outcomes = [
+  {
+    icon: "layers" as IconName,
+    title: "A complete decision record",
+    description: "Choice, rejected options, evidence, assumptions, dissent, and accountability in one auditable history.",
+  },
+  {
+    icon: "analytics" as IconName,
+    title: "A robustness analysis",
+    description: "Tornado sensitivity, scenario-by-scenario comparison, and rank stability across assumptions.",
+  },
+  {
+    icon: "search" as IconName,
+    title: "A monitoring system",
+    description: "Adaptive signposts, watchlists, and review dates linked to the decisions they inform.",
+  },
+  {
+    icon: "external" as IconName,
+    title: "A reusable method",
+    description: "Approved decision templates and criteria your organisation can apply next time without starting from zero.",
+  },
+];
 
 export function LandingPage() {
   const [activeWorkflow, setActiveWorkflow] = useState(workflow[0]!);
@@ -77,6 +157,7 @@ export function LandingPage() {
         <nav className="public-nav public-nav--executive" aria-label="Primary navigation">
           <a href="#platform">Platform</a>
           <a href="#workflow">How it works</a>
+          <a href="#sprint">Decision Sprint</a>
           <a href="#difference">Why CrowdSmarter</a>
           <a href="#trust">Trust</a>
         </nav>
@@ -162,9 +243,20 @@ export function LandingPage() {
           </div>
         </section>
 
-        <section className="audience-strip" aria-label="Teams CrowdSmarter is designed for">
-          <span>Designed for</span>
-          <div>{audiences.map((audience) => <strong key={audience}>{audience}</strong>)}</div>
+        <section className="public-section use-case-section" id="use-cases" aria-labelledby="use-cases-title">
+          <div className="section-intro section-intro--split section-intro--executive">
+            <div><p className="public-eyebrow">Built for consequential choices</p><h2 id="use-cases-title">Designed for decisions where uncertainty and stakeholders both matter.</h2></div>
+          </div>
+          <div className="use-case-grid">
+            {useCases.map((useCase) => (
+              <article className="use-case" key={useCase.key}>
+                <span className="capability-icon"><Icon name={useCase.icon} /></span>
+                <h3>{useCase.title}</h3>
+                <p>{useCase.description}</p>
+                <ul>{useCase.examples.map((example) => <li key={example}>{example}</li>)}</ul>
+              </article>
+            ))}
+          </div>
         </section>
 
         <section className="public-section public-section--platform" id="platform" aria-labelledby="platform-title">
@@ -240,6 +332,36 @@ export function LandingPage() {
           </div>
         </section>
 
+        <section className="public-section sprint-section" id="sprint" aria-labelledby="sprint-title">
+          <div className="section-intro section-intro--split section-intro--executive">
+            <div><p className="public-eyebrow">A guided way to start</p><h2 id="sprint-title">Bring one real decision through a structured first engagement.</h2></div>
+            <p>Most teams get the most value from CrowdSmarter by running their first governed decision as a facilitated Decision Sprint—typically four to eight weeks—before scaling the platform across the organisation.</p>
+          </div>
+          <div className="sprint-timeline">
+            {sprintSteps.map((step, index) => (
+              <article className="sprint-step" key={step.title}>
+                <span className="sprint-step__number">{index + 1}</span>
+                <div>
+                  <p className="sprint-step__label">{step.label}</p>
+                  <h3>{step.title}</h3>
+                  <p>{step.description}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+          <div className="pilot-panel">
+            <div className="pilot-panel__copy">
+              <p className="public-eyebrow">Pilot programme</p>
+              <h3>Start with one real, important decision.</h3>
+              <p>We work with a limited number of organisations at a time to run a first Decision Sprint and measure the value created before wider rollout.</p>
+            </div>
+            <div className="pilot-stats">
+              {pilotStats.map(([label, value]) => <div key={label}><small>{label}</small><strong>{value}</strong></div>)}
+            </div>
+            <Link className="public-button public-button--primary" to="/request-demo">Apply for the pilot programme <Icon name="arrow-right" size={18} /></Link>
+          </div>
+        </section>
+
         <section className="public-section public-difference-section" id="difference" aria-labelledby="difference-title">
           <div className="section-intro section-intro--split section-intro--executive">
             <div><p className="public-eyebrow">A deliberately different product category</p><h2 id="difference-title">Not another place where important reasoning becomes invisible.</h2></div>
@@ -262,6 +384,22 @@ export function LandingPage() {
             <article className="product-capability"><span className="capability-icon"><Icon name="users" /></span><h3>Governed collective intelligence</h3><p>Support blind rounds, consent, quorum, confidence, minority reports, and transparent prioritisation without forced consensus.</p></article>
             <article className="product-capability"><span className="capability-icon"><Icon name="spark" /></span><h3>Advisory, replaceable AI</h3><p>AI can identify gaps and patterns, but cannot silently edit records, select options, or exercise decision authority.</p></article>
             <article className="product-capability"><span className="capability-icon"><Icon name="analytics" /></span><h3>Learning after the decision</h3><p>Review outcomes against expectations and preserve lessons that improve future sensing, reasoning, and action.</p></article>
+          </div>
+        </section>
+
+        <section className="public-section public-section--dark outcome-section" aria-labelledby="outcomes-title">
+          <div className="section-intro section-intro--split section-intro--executive">
+            <div><p className="public-eyebrow">What you walk away with</p><h2 id="outcomes-title">A concrete result, not just a workshop.</h2></div>
+          </div>
+          <div className="public-outcome-grid">
+            {outcomes.map((outcome, index) => (
+              <article className="public-outcome" key={outcome.title}>
+                <span className="continuity-grid__number">{String(index + 1).padStart(2, "0")}</span>
+                <Icon name={outcome.icon} />
+                <h3>{outcome.title}</h3>
+                <p>{outcome.description}</p>
+              </article>
+            ))}
           </div>
         </section>
 
@@ -307,7 +445,7 @@ export function LandingPage() {
           <span>General enquiries and partnerships</span>
           <a href={buildMailto(contactChannels.general, "CrowdSmarter enquiry")}>{contactChannels.general}</a>
         </div>
-        <div className="public-footer__links"><Link to="/request-demo">Request a demo</Link><Link to="/login">Sign in</Link><span>Human authority retained</span></div>
+        <div className="public-footer__links"><Link to="/request-demo">Request a demo</Link><Link to="/login">Sign in</Link><span>Human authority retained</span><span>Global · Africa · Europe · MENA</span></div>
       </footer>
     </div>
   );
