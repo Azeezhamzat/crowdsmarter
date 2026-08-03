@@ -551,6 +551,8 @@ textarea:disabled, input:disabled, select:disabled { background: #f1f4f1; color:
 .workspace-heading { align-items: center; }
 .empty-state--action { max-width: 760px; margin: 2rem auto; padding: 3.5rem 2rem; background: linear-gradient(180deg, #fff, #f7faf7); }
 .empty-state--action p { max-width: 62ch; margin-left: auto; margin-right: auto; }
+.empty-state--onboarding { max-width: none; margin: 0 0 1.75rem; border: 1px solid var(--line-strong); border-left: 4px solid var(--accent); text-align: left; padding: 1.75rem 2rem; }
+.empty-state--onboarding p { max-width: 68ch; margin: 0 0 1.1rem; }
 .decision-card--portfolio { border-radius: 16px; padding: 1.35rem 1.45rem; }
 
 .guided-create { max-width: 1120px; margin: 0 auto; }

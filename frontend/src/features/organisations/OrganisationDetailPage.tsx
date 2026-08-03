@@ -16,6 +16,8 @@ import {
 } from "../invitations/api";
 import { ApiError } from "../../lib/api";
 import type { OrganisationRole } from "../../lib/types";
+import { getOrganisationPortfolio } from "../portfolio/api";
+import { listWorkspaces } from "../workspaces/api";
 import {
   changeMembershipRole,
   getOrganisation,
@@ -58,6 +60,18 @@ export function OrganisationDetailPage() {
     queryFn: () => listMemberships(organisationId),
     enabled: Boolean(organisationId),
   });
+  const portfolio = useQuery({
+    queryKey: ["organisations", organisationId, "portfolio", {}],
+    queryFn: () => getOrganisationPortfolio(organisationId, {}),
+    enabled: Boolean(organisationId),
+  });
+  const workspaces = useQuery({
+    queryKey: ["organisations", organisationId, "workspaces"],
+    queryFn: () => listWorkspaces(organisationId),
+    enabled: Boolean(organisationId),
+  });
+  const defaultWorkspace = workspaces.data?.find((item) => item.is_default) ?? workspaces.data?.[0];
+  const hasNoDecisionsYet = portfolio.data?.summary.total === 0;
 
   const currentRole = organisation.data?.current_user_role;
   const canManage = ["owner", "admin"].includes(currentRole ?? "");
@@ -140,6 +154,21 @@ export function OrganisationDetailPage() {
 
       {organisation.isError || memberships.isError ? (
         <StatusMessage kind="error">The organisation could not be loaded.</StatusMessage>
+      ) : null}
+
+      {hasNoDecisionsYet && canManage && defaultWorkspace ? (
+        <div className="empty-state empty-state--action empty-state--onboarding" aria-labelledby="onboarding-title">
+          <p className="eyebrow">Get started</p>
+          <h2 id="onboarding-title">Frame your first decision</h2>
+          <p>
+            {organisation.data?.name} has no recorded decisions yet. Invite the people who should
+            weigh in below, then use the guided flow to state the question, choose a starting
+            pattern, and assign ownership — it takes a few minutes and every field stays editable.
+          </p>
+          <Link className="button button--primary button-link" to={`/workspaces/${defaultWorkspace.id}/decisions/new`}>
+            Start a guided decision
+          </Link>
+        </div>
       ) : null}
 
       <nav className="organisation-action-nav" aria-label="Organisation sections">
