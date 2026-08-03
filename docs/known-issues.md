@@ -5,19 +5,23 @@ is resolved; do not delete history from this file, mark it resolved instead.
 
 ## Needs an explicit owner decision
 
-### A personal email address is already published in Git history
+### A personal email address needs pushing out of published Git history
 
-`backend/apps/accounts/tests/test_commands.py` contained a real personal
-email address (`the repository owner's personal email address`) as test input, committed at
-`3cc6459` and already pushed to `origin/main` on GitHub. The working copy is
-fixed (reverted to a placeholder `owner@example.test`), but rewriting Git
-history to remove it from past commits is a destructive, force-push
-operation this phase deliberately did not perform. Decide:
+`backend/apps/accounts/tests/test_commands.py` contained the repository
+owner's real personal email address as test input, committed at `3cc6459`
+and already pushed to `origin/main` on GitHub. The working copy is fixed
+(reverted to a placeholder `owner@example.test`).
 
-- whether `github.com/Azeezhamzat/crowdsmarter` is public or private, and
-- whether to rewrite history (`git filter-repo` + force-push, coordinated
-  with anyone else who has cloned the repo) or accept the exposure and move
-  on.
+History has been rewritten locally with `git filter-repo` to strip the
+address from every commit that ever contained it (verified: zero matches
+remain anywhere in the rewritten history, and a full-tree diff against the
+original confirms only that one line changed, nothing else). The rewritten
+history has **not** been pushed yet — this sandboxed environment has no
+GitHub credentials configured, so the force-push has to be run from a
+machine that does. A full backup of the pre-rewrite repository (both this
+tree and the publishing clone) was taken first. Once pushed, note that the
+13 open Dependabot PRs on `origin` will be based on now-superseded commits
+and will need to be recreated by Dependabot's next run.
 
 ### `react-router` high-severity advisory (GHSA-qwww-vcr4-c8h2)
 
