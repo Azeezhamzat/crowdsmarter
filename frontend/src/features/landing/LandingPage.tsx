@@ -267,7 +267,7 @@ export function LandingPage() {
           <p className="public-eyebrow">Where this comes from</p>
           <p>
             Built from research in collective intelligence, strategic foresight, and accountable
-            decision-making. CrowdSmarter is currently working with a first cohort of founding-partner
+            decision-making. CrowdSmarter is currently working with a first cohort of charter customer
             organisations on consequential strategy, policy, and transformation decisions.
           </p>
         </section>
@@ -394,14 +394,14 @@ export function LandingPage() {
           </div>
           <div className="pilot-panel">
             <div className="pilot-panel__copy">
-              <p className="public-eyebrow">Founding partner programme</p>
+              <p className="public-eyebrow">Charter customer programme</p>
               <h3>Start with one real, important decision.</h3>
-              <p>Founding partners run a first Decision Sprint and help shape the platform's development before wider release.</p>
+              <p>Charter customers run a first Decision Sprint and help shape the platform's development before wider release.</p>
             </div>
             <div className="pilot-stats">
               {pilotStats.map(([label, value]) => <div key={label}><small>{label}</small><strong>{value}</strong></div>)}
             </div>
-            <Link className="public-button public-button--primary" to="/request-demo">Apply as a founding partner <Icon name="arrow-right" size={18} /></Link>
+            <Link className="public-button public-button--primary" to="/request-demo">Apply as a charter customer <Icon name="arrow-right" size={18} /></Link>
           </div>
         </section>
 

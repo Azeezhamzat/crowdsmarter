@@ -13,7 +13,7 @@ describe("LandingPage", () => {
     expect(screen.getAllByRole("link", { name: "Sign in" })[0]).toHaveAttribute("href", "/login");
     expect(screen.getByText(/customer-owned records/i)).toBeInTheDocument();
     expect(screen.getByText(/where this comes from/i)).toBeInTheDocument();
-    expect(screen.getByText(/first cohort of founding-partner/i)).toBeInTheDocument();
+    expect(screen.getByText(/first cohort of charter customer/i)).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /missing connection between foresight and accountable decisions/i })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /move from emerging change to better judgement/i })).toBeInTheDocument();
     expect(screen.getByRole("img", { name: /signal sensing workflow/i })).toBeInTheDocument();
@@ -43,8 +43,8 @@ describe("LandingPage", () => {
     expect(screen.getByRole("heading", { name: /frame the decision/i })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /decide and organise review/i })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /start with one real, important decision/i })).toBeInTheDocument();
-    expect(screen.getByText(/founding partners run a first decision sprint/i)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /apply as a founding partner/i })).toHaveAttribute("href", "/request-demo");
+    expect(screen.getByText(/charter customers run a first decision sprint/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /apply as a charter customer/i })).toHaveAttribute("href", "/request-demo");
 
     expect(screen.getByRole("heading", { name: /a concrete result, not just a workshop/i })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /a robustness analysis/i })).toBeInTheDocument();
