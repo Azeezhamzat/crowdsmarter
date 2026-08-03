@@ -130,7 +130,10 @@ def test_notification_failure_does_not_lose_demo_request(
         "user": "100/hour",
     },
 })
-def test_demo_request_is_rate_limited():
+def test_demo_request_is_rate_limited(monkeypatch):  # type: ignore[no-untyped-def]
+    from apps.demo_requests.throttles import DemoRequestThrottle
+
+    monkeypatch.setattr(DemoRequestThrottle, "rate", "1/hour", raising=False)
     cache.clear()
     client = APIClient(enforce_csrf_checks=True)
     csrf_token = client.get(reverse("accounts:csrf")).cookies["csrftoken"].value

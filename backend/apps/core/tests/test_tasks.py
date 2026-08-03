@@ -23,6 +23,6 @@ def test_queue_failure_is_logged_without_raising():
     ):
         enqueue_after_commit(task, "decision-id")
 
-    callback = on_commit.call_args.args[0]
-    callback()
-    log_exception.assert_called_once()
+        callback = on_commit.call_args.args[0]
+        callback()
+        log_exception.assert_called_once()

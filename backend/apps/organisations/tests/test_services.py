@@ -511,7 +511,6 @@ def test_pending_contribution_review_must_be_completed_before_offboarding(
     workspace = workspace_factory(organisation=organisation, created_by=owner)
     decision = decision_factory(
         workspace=workspace,
-        organisation=organisation,
         owner=owner,
         created_by=owner,
         status="open_for_contribution",

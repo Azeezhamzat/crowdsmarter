@@ -1,4 +1,5 @@
 import pytest
+from rest_framework.request import Request
 from rest_framework.test import APIRequestFactory, force_authenticate
 
 from apps.decisions.models import Decision
@@ -52,6 +53,7 @@ def test_decision_object_permission_matrix(
     )
     request = APIRequestFactory().patch("/", {})
     force_authenticate(request, actor)
+    request = Request(request)
 
     assert (
         CanAccessDecision().has_object_permission(request, object(), decision)

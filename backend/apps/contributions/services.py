@@ -93,7 +93,7 @@ def create_request(
     actor: User,
     decision: Decision,
     assignee_id: UUID,
-    reviewer_id: UUID | None,
+    reviewer_id: UUID | None = None,
     kind: str,
     title: str,
     instructions: str,
@@ -159,7 +159,7 @@ def update_request(
     *, actor: User, request: ContributionRequest, changes: dict
 ) -> ContributionRequest:
     """Revise an active assignment without rewriting submitted contribution history."""
-    current = ContributionRequest.objects.select_for_update().select_related(
+    current = ContributionRequest.objects.select_for_update(of=("self",)).select_related(
         "decision", "organisation", "assignee", "reviewer"
     ).get(id=request.id)
     if not can_manage_contributions(actor=actor, decision=current.decision):
@@ -366,7 +366,7 @@ def save_draft(
 def submit_request(
     *, actor: User, request: ContributionRequest, body: str | None = None, references: str = ""
 ) -> ContributionSubmission:
-    current = ContributionRequest.objects.select_for_update().select_related(
+    current = ContributionRequest.objects.select_for_update(of=("self",)).select_related(
         "decision", "organisation", "reviewer", "requested_by"
     ).get(id=request.id)
     if not can_work_on_request(actor=actor, request=current):

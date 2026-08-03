@@ -109,10 +109,10 @@ class OrganisationInvitation(UUIDTimeStampedModel):
             models.Index(fields=["expires_at"], name="invite_expires_idx"),
         ]
 
-    def clean(self) -> None:
-        """Normalise the invited identity before persistence."""
-        super().clean()
+    def full_clean(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        """Normalise the invited identity before field-level validation runs."""
         self.email = self.email.strip().lower()
+        return super().full_clean(*args, **kwargs)
 
     def __str__(self) -> str:
         return f"{self.email} invited to {self.organisation.name}"

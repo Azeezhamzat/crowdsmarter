@@ -1,5 +1,7 @@
 """REST representations for collective evaluation and constrained prioritisation."""
 
+from decimal import Decimal
+
 from rest_framework import serializers
 
 from apps.core.serializers import StrictSerializer
@@ -20,7 +22,7 @@ class EvaluationCriterionSerializer(serializers.ModelSerializer):
 class EvaluationCriterionWriteSerializer(StrictSerializer):
     title=serializers.CharField(max_length=160)
     description=serializers.CharField(required=False,allow_blank=True,max_length=8000)
-    weight=serializers.DecimalField(max_digits=5,decimal_places=2,min_value=0.01)
+    weight=serializers.DecimalField(max_digits=5,decimal_places=2,min_value=Decimal("0.01"))
     scale_min=serializers.IntegerField(required=False,default=1,min_value=0,max_value=99)
     scale_max=serializers.IntegerField(required=False,default=5,min_value=1,max_value=100)
     higher_is_better=serializers.BooleanField(required=False,default=True)
@@ -167,7 +169,7 @@ class PortfolioCriterionSerializer(serializers.ModelSerializer):
 class PortfolioCriterionWriteSerializer(StrictSerializer):
     title=serializers.CharField(max_length=160)
     description=serializers.CharField(required=False,allow_blank=True,max_length=8000)
-    weight=serializers.DecimalField(max_digits=5,decimal_places=2,min_value=0.01)
+    weight=serializers.DecimalField(max_digits=5,decimal_places=2,min_value=Decimal("0.01"))
     higher_is_better=serializers.BooleanField(required=False,default=True)
     order=serializers.IntegerField(required=False,default=0,min_value=0,max_value=999)
 

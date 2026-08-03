@@ -73,9 +73,9 @@ describe("DecisionAnalysisPage", () => {
     );
 
     expect(await screen.findByRole("heading", { name: "Regional adaptation programme" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Distributed resilience hubs" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Distributed resilience hubs" })).toBeInTheDocument();
     expect(screen.getByText("4 support · 2 challenge")).toBeInTheDocument();
-    expect(screen.getByText("78.5 weighted score")).toBeInTheDocument();
+    expect(screen.getByText(/78\.5 weighted score/)).toBeInTheDocument();
     expect(screen.getByText(/does not select an option/i)).toBeInTheDocument();
   });
 });

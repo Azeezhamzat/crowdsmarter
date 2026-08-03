@@ -109,7 +109,9 @@ def test_finalisation_requires_every_active_authority_position(
             positions_reviewed=True,
         )
 
-    assert decision_maker.email in exc_info.value.message_dict["positions"]
+    assert any(
+        decision_maker.email in message for message in exc_info.value.message_dict["positions"]
+    )
 
 
 @pytest.mark.django_db

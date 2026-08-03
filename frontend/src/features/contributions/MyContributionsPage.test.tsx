@@ -21,6 +21,6 @@ describe("MyContributionsPage", () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(<QueryClientProvider client={client}><MemoryRouter><MyContributionsPage /></MemoryRouter></QueryClientProvider>);
     expect(await screen.findByRole("heading", { name: "Your contribution work" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "No active contribution work" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "No active contribution work" })).toBeInTheDocument();
   });
 });

@@ -1,4 +1,5 @@
 import pytest
+from rest_framework.request import Request
 from rest_framework.test import APIRequestFactory, force_authenticate
 
 from apps.organisations.models import Membership
@@ -19,5 +20,6 @@ def test_workspace_object_permission_matrix(
         Membership.objects.create(organisation=workspace.organisation, user=actor, role=role)
     request = APIRequestFactory().patch("/", {})
     force_authenticate(request, actor)
+    request = Request(request)
 
     assert CanAccessWorkspace().has_object_permission(request, object(), workspace) is can_patch

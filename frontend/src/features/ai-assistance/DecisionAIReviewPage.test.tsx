@@ -53,6 +53,6 @@ describe("DecisionAIReviewPage", () => {
     );
     expect(await screen.findByRole("heading", { name: "AI review" })).toBeInTheDocument();
     expect(screen.getByText(/AI advises; humans decide/i)).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "No evidence" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "No evidence" })).toBeInTheDocument();
   });
 });

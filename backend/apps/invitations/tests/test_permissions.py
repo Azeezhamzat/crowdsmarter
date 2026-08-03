@@ -4,6 +4,7 @@ from datetime import timedelta
 
 import pytest
 from django.utils import timezone
+from rest_framework.request import Request
 from rest_framework.test import APIRequestFactory, force_authenticate
 
 from apps.invitations.models import OrganisationInvitation
@@ -39,6 +40,7 @@ def test_invitation_management_permission_by_role(
         )
     request = APIRequestFactory().post("/", {})
     force_authenticate(request, actor)
+    request = Request(request)
 
     assert CanManageInvitations().has_object_permission(
         request,
@@ -64,6 +66,7 @@ def test_invitation_permission_uses_parent_organisation(
     )
     request = APIRequestFactory().post("/", {})
     force_authenticate(request, owner)
+    request = Request(request)
 
     assert CanManageInvitations().has_object_permission(
         request,

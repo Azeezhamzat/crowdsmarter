@@ -236,6 +236,7 @@ def test_constraint_recommendation_respects_budget_and_capacity(
     mandatory = add_candidate(actor=owner, portfolio=portfolio, decision_id=third.id, budget_required=20, capacity_required=2, mandatory=True, rationale="Regulatory obligation")
     portfolio = update_portfolio(actor=owner, portfolio=portfolio, fields={"status": PrioritisationPortfolio.Status.OPEN})
     for candidate, score in [(candidate_a, 90), (candidate_b, 80), (mandatory, 45)]:
+        candidate.refresh_from_db()
         save_portfolio_assessment(actor=assessor, candidate=candidate, criterion_id=criterion.id, score=score, confidence=4, rationale="Independent assessment")
     result = portfolio_recommendation(portfolio=portfolio)
     recommended = {item["decision_id"] for item in result["candidates"] if item["recommended"]}
@@ -360,6 +361,7 @@ def test_blind_portfolio_seals_aggregates_and_requires_closure_for_selection(
         portfolio=portfolio,
         fields={"status": PrioritisationPortfolio.Status.OPEN},
     )
+    candidate.refresh_from_db()
     save_portfolio_assessment(
         actor=assessor,
         candidate=candidate,

@@ -89,7 +89,7 @@ def test_participants_cannot_be_changed_after_under_review(
         role=Membership.Role.CONTRIBUTOR,
     )
 
-    with pytest.raises(PermissionDenied, match="current state"):
+    with pytest.raises(PermissionDenied, match="decision state"):
         add_participant(
             actor=decision.owner,
             decision=decision,

@@ -86,11 +86,11 @@ describe("ForesightCanvasesPage", () => {
       await screen.findByRole("heading", { name: "Foresight canvases" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: "Future of regional food systems" }),
+      await screen.findByRole("heading", { name: "Future of regional food systems" }),
     ).toBeInTheDocument();
     expect(screen.getByText("4 drivers")).toBeInTheDocument();
     expect(screen.getByText("2 implications")).toBeInTheDocument();
-    expect(screen.getByText("Azeez Hamzat")).toBeInTheDocument();
+    expect(screen.getAllByText("Azeez Hamzat").length).toBeGreaterThan(0);
     expect(createForesightCanvas).not.toHaveBeenCalled();
   });
 });

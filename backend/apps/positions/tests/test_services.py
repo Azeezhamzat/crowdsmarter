@@ -58,7 +58,7 @@ def test_observer_cannot_submit_position(
     user_factory,
     decision_factory,
 ):  # type: ignore[no-untyped-def]
-    decision = decision_factory(status=Decision.Status.UNDER_REVIEW)
+    decision = decision_factory()
     observer = user_factory()
     Membership.objects.create(
         organisation=decision.organisation,
@@ -71,6 +71,8 @@ def test_observer_cannot_submit_position(
         user=observer,
         role=Participant.Role.OBSERVER,
     )
+    decision.status = Decision.Status.UNDER_REVIEW
+    decision.save(update_fields=["status"])
 
     with pytest.raises(PermissionDenied, match="non-observer"):
         submit_position(

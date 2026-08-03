@@ -64,6 +64,11 @@ class DecisionMethodNewVersionView(APIView):
 class DecisionMethodVersionDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
+    def get(self, request, version_id):  # type: ignore[no-untyped-def]
+        return Response(
+            MethodVersionSerializer(version_for_user(user=request.user, version_id=version_id)).data
+        )
+
     def patch(self, request, version_id):  # type: ignore[no-untyped-def]
         version = version_for_user(user=request.user, version_id=version_id)
         serializer = MethodVersionUpdateSerializer(data=request.data)

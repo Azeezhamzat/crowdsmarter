@@ -109,7 +109,7 @@ class DecisionQualityReview(UUIDTimeStampedModel):
     version = models.PositiveIntegerField()
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT)
     judgement = models.CharField(max_length=30, choices=Judgement.choices, default=Judgement.NOT_READY)
-    answers = models.JSONField(default=dict)
+    answers = models.JSONField(default=dict, blank=True)
     strengths = models.TextField(blank=True)
     blockers = models.TextField(blank=True)
     conditions = models.TextField(blank=True)

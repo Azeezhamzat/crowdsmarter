@@ -1,4 +1,5 @@
 import pytest
+from rest_framework.request import Request
 from rest_framework.test import APIRequestFactory, force_authenticate
 
 from apps.organisations.models import Membership
@@ -54,6 +55,7 @@ def test_participant_object_permission_matrix(
     )
     request = APIRequestFactory().patch("/", {})
     force_authenticate(request, actor)
+    request = Request(request)
 
     assert (
         CanAccessParticipant().has_object_permission(request, object(), participant)
