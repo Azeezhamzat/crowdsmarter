@@ -5,24 +5,6 @@ is resolved; do not delete history from this file, mark it resolved instead.
 
 ## Needs an explicit owner decision
 
-### A personal email address needs pushing out of published Git history
-
-`backend/apps/accounts/tests/test_commands.py` contained the repository
-owner's real personal email address as test input, committed at `3cc6459`
-and already pushed to `origin/main` on GitHub. The working copy is fixed
-(reverted to a placeholder `owner@example.test`).
-
-History has been rewritten locally with `git filter-repo` to strip the
-address from every commit that ever contained it (verified: zero matches
-remain anywhere in the rewritten history, and a full-tree diff against the
-original confirms only that one line changed, nothing else). The rewritten
-history has **not** been pushed yet — this sandboxed environment has no
-GitHub credentials configured, so the force-push has to be run from a
-machine that does. A full backup of the pre-rewrite repository (both this
-tree and the publishing clone) was taken first. Once pushed, note that the
-13 open Dependabot PRs on `origin` will be based on now-superseded commits
-and will need to be recreated by Dependabot's next run.
-
 ### `react-router` high-severity advisory (GHSA-qwww-vcr4-c8h2)
 
 `npm audit` flags `react-router` (pulled in by `react-router-dom@7.18.1`) for
@@ -35,25 +17,41 @@ change for routing across the whole app and needs deliberate testing, not a
 blind `npm audit fix --force`. Recommended: schedule this as its own small
 branch with full route-by-route manual verification before merging.
 
-### Docker disk usage from historical failed-phase stacks
+### Old failed-phase Docker volumes remain on disk
 
-`docker system df` reports roughly 36 GB reclaimable in images and 15 GB in
-build cache, plus several `crowdsmarter-phaseN-failed-*` containers (some
-still running Postgres) left over from past upgrade attempts. The master
-prompt's non-negotiable rule against deleting PostgreSQL/Redis volumes means
-this phase left them untouched. Recommended cleanup, once approved:
+The failed-phase containers, their custom-built images, and the build cache
+were removed (see "Fixed in Phase 19" below), reclaiming roughly 50 GB. Their
+named Docker volumes (`crowdsmarter-phaseN-failed-*_postgres_data`,
+`_media_data`, `_frontend_node_modules`, plus `crowdsmarter-v1_crowdsmarter_postgres`
+and the `phase301-backup-*` volumes) were deliberately left untouched — the
+master prompt's non-negotiable rule against deleting PostgreSQL/Redis volumes
+applies regardless of whether the stack is still active. They account for
+only ~1 GB combined, so reclaiming them isn't necessary for disk pressure;
+remove them only if the owner explicitly confirms none contain data worth
+keeping:
 
 ```bash
-docker ps -a --filter "name=crowdsmarter-phase" --filter "name=failed"
-docker container rm <ids>
-docker volume rm <ids>          # only after confirming none are needed
-docker builder prune
+docker volume ls | grep -E "phase.*-failed|phase301-backup|crowdsmarter-v1"
+docker volume rm <ids>          # only after explicit confirmation
 ```
 
-Confirm with the owner which (if any) of the failed-phase volumes contain
-data worth keeping before removing them.
-
 ## Fixed in Phase 19
+
+- A real personal email address (the repository owner's) was committed as
+  test input in `backend/apps/accounts/tests/test_commands.py` at `3cc6459`
+  and published to `origin/main` on GitHub. Rewrote history with
+  `git filter-repo` (verified zero matches remain anywhere in history on any
+  branch, and that the rewrite changed only that one line, nothing else),
+  backed up both trees first, and force-pushed the cleaned history to
+  `origin/main` and `origin/claude/phase-19-stabilisation`. The 13 open
+  Dependabot PRs are now based on superseded commits and will be recreated
+  automatically by Dependabot's next run.
+- Removed 34 stopped/idle containers and their images from ten abandoned
+  upgrade attempts (`crowdsmarter-phase6-failed-*` through
+  `crowdsmarter-phase17-failed-*`, `crowdsmarter-phase301-backup-*`,
+  `crowdsmarter-v1-*`), then cleared the build cache. Reclaimed ~24 GB of
+  build cache and ~35 GB of images; the live stack was unaffected throughout.
+  No volumes were touched — see above.
 
 - DRF `min_value should be an integer or Decimal instance` warning — two
   `DecimalField(min_value=0.01)` float literals in
