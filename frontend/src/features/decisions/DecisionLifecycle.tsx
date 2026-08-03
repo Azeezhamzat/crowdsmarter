@@ -21,7 +21,7 @@ export function DecisionLifecycle({
           <span className="status-badge status-badge--blocked">Future phase required</span>
         ) : null}
       </div>
-      <ol className="lifecycle-list">
+      <ol className="lifecycle-list" tabIndex={0} aria-label="Decision lifecycle stages, scrollable">
         {decisionLifecycle.map((item, index) => {
           const state = index < currentIndex ? "complete" : index === currentIndex ? "current" : "future";
           return (

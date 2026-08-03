@@ -25,6 +25,32 @@ docker volume ls | grep -E "phase.*-failed|phase301-backup|crowdsmarter-v1"
 docker volume rm <id>          # one at a time, after checking its contents
 ```
 
+### Test account left in the local database
+
+Phase 20.1's accessibility audit needed a real authenticated session with
+real data to scan ~33 routes properly (mocked component tests don't render
+full pages). Provisioned a local test account
+(`a11y-audit@example.test`, via `manage.py provision_local_login`) and its
+auto-created organisation ("Azeez CrowdSmarter Workspace"). The test
+decision and foresight canvas created during the audit were deleted
+afterwards, but the account and organisation themselves could not be
+cleanly removed — `AuditEvent`/`MembershipEvent` records reference them
+with `on_delete=PROTECT`, which is the append-only audit trail working
+exactly as designed, not a bug. Deleting them would mean bypassing that
+protection, which this phase deliberately did not do. If you want it gone,
+use the organisation's own deactivation/deletion flow (`/organisations/<id>/administration`)
+rather than a direct database delete.
+
+## Fixed in Phase 20
+
+- WCAG 2.2 AA audit across ~33 route templates (`axe-core`, real
+  authenticated data) found and fixed 9 violations: 5 colour-contrast
+  instances (one a genuine dark-on-dark bug from an incomplete theme
+  override), a non-keyboard-focusable scrollable region, a critical
+  ARIA-tablist structure violation, a prohibited `aria-label` on a
+  role-less `<span>`, and an unlabelled `<select>`. Full details in
+  `docs/accessibility.md`.
+
 ## Fixed in Phase 19
 
 - A real personal email address (the repository owner's) was committed as

@@ -139,12 +139,48 @@ export function DecisionContributionsPage() {
       ) : null}
 
       <div className="segmented-control contribution-tabs" role="tablist" aria-label="Contribution workspace sections">
-        <button type="button" className={tab === "requests" ? "is-active" : ""} onClick={() => setTab("requests")}>Requests</button>
-        <button type="button" className={tab === "sessions" ? "is-active" : ""} onClick={() => setTab("sessions")}>Facilitation sessions</button>
+        <button
+          id="contribution-tab-requests"
+          type="button"
+          role="tab"
+          aria-selected={tab === "requests"}
+          aria-controls="contribution-panel-requests"
+          tabIndex={tab === "requests" ? 0 : -1}
+          className={tab === "requests" ? "is-active" : ""}
+          onClick={() => setTab("requests")}
+          onKeyDown={(event) => {
+            if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
+              event.preventDefault();
+              setTab("sessions");
+              document.getElementById("contribution-tab-sessions")?.focus();
+            }
+          }}
+        >
+          Requests
+        </button>
+        <button
+          id="contribution-tab-sessions"
+          type="button"
+          role="tab"
+          aria-selected={tab === "sessions"}
+          aria-controls="contribution-panel-sessions"
+          tabIndex={tab === "sessions" ? 0 : -1}
+          className={tab === "sessions" ? "is-active" : ""}
+          onClick={() => setTab("sessions")}
+          onKeyDown={(event) => {
+            if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
+              event.preventDefault();
+              setTab("requests");
+              document.getElementById("contribution-tab-requests")?.focus();
+            }
+          }}
+        >
+          Facilitation sessions
+        </button>
       </div>
 
       {tab === "requests" ? (
-        <div className="contribution-layout">
+        <div className="contribution-layout" id="contribution-panel-requests" role="tabpanel" aria-labelledby="contribution-tab-requests" tabIndex={0}>
           <section className="contribution-list" aria-label="Contribution requests">
             {workspace.data.requests.length === 0 ? <div className="empty-state"><h2>No contribution requests</h2><p>Create a named, due-dated request rather than relying on informal follow-up.</p></div> : null}
             {workspace.data.requests.map((item) => {
@@ -233,7 +269,7 @@ export function DecisionContributionsPage() {
           ) : null}
         </div>
       ) : (
-        <div className="contribution-layout">
+        <div className="contribution-layout" id="contribution-panel-sessions" role="tabpanel" aria-labelledby="contribution-tab-sessions" tabIndex={0}>
           <section className="contribution-list" aria-label="Facilitation sessions">
             {sessions.data?.length === 0 ? <div className="empty-state"><h2>No facilitation sessions</h2><p>Schedule a bounded workshop and connect its outputs to named contribution requests.</p></div> : null}
             {sessions.data?.map((session) => <article className="facilitation-card" id={`session-${session.id}`} key={session.id}><header><div><span className="status-badge">{session.status_label}</span></div><time>{formatDateTime(session.starts_at)}</time></header><p className="eyebrow">Facilitated workshop</p><h2>{session.title}</h2><p>{session.objective}</p>{session.agenda ? <div><strong>Agenda</strong><p>{session.agenda}</p></div> : null}<p className="muted">Facilitator: {session.facilitator.email} · {session.participants.length} invited</p>{session.participants.length ? <div className="session-attendance-list">{session.participants.map((participant) => <div key={participant.id}><span>{participant.user.email}</span><select aria-label={`Attendance for ${participant.user.email}`} value={participant.attendance} disabled={!session.can_manage || attendanceMutation.isPending} onChange={(event) => attendanceMutation.mutate({ id: participant.id, attendance: event.target.value })}><option value="invited">Invited</option><option value="attended">Attended</option><option value="absent">Absent</option></select></div>)}</div> : null}{session.can_manage && session.status === "planned" ? <button className="button button--secondary" type="button" onClick={() => sessionStatusMutation.mutate({ id: session.id, status: "open" })}>Open session</button> : null}{session.can_manage && session.status === "open" ? <button className="button button--primary" type="button" onClick={() => sessionStatusMutation.mutate({ id: session.id, status: "closed" })}>Close session</button> : null}</article>)}
