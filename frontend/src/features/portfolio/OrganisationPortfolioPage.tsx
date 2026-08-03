@@ -75,6 +75,79 @@ export function OrganisationPortfolioPage() {
         <article><span className="metric-icon metric-icon--violet"><Icon name="users" /></span><div><strong>{portfolio.data?.summary.unresolved_discussion ?? 0}</strong><span>Open questions or concerns</span></div></article>
       </section>
 
+      {portfolio.data?.watchlist ? (
+        <section className="portfolio-watchlist" aria-label="Executive watchlist">
+          <h2>Watchlist</h2>
+          <p className="muted">Signals worth acting on, drawn from across every decision in this organisation.</p>
+          <div className="watchlist-grid">
+            <article className="watchlist-card">
+              <h3>Stalled decisions</h3>
+              {portfolio.data.watchlist.stalled_decisions.length ? (
+                <ul>
+                  {portfolio.data.watchlist.stalled_decisions.map((item) => (
+                    <li key={item.id}>
+                      <Link to={`/decisions/${item.id}`}>{item.title}</Link>
+                      <span className="muted"> · {item.status_label} · {item.days_stalled} days without an update</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : <p className="muted">No decisions have stalled.</p>}
+            </article>
+            <article className="watchlist-card">
+              <h3>Open high risks</h3>
+              {portfolio.data.watchlist.open_high_risks.length ? (
+                <ul>
+                  {portfolio.data.watchlist.open_high_risks.map((item) => (
+                    <li key={item.id}>
+                      <Link to={`/decisions/${item.decision_id}`}>{item.title}</Link>
+                      <span className="muted"> · {item.decision_title} · likelihood {item.likelihood}/5, impact {item.impact}/5</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : <p className="muted">No open high-severity risks.</p>}
+            </article>
+            <article className="watchlist-card">
+              <h3>Assumptions at risk</h3>
+              {portfolio.data.watchlist.assumptions_at_risk.length ? (
+                <ul>
+                  {portfolio.data.watchlist.assumptions_at_risk.map((item) => (
+                    <li key={item.id}>
+                      <Link to={`/decisions/${item.decision_id}`}>{item.statement}</Link>
+                      <span className="muted"> · {item.decision_title} · {item.verification_status_label}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : <p className="muted">No assumptions are overdue or invalidated.</p>}
+            </article>
+            <article className="watchlist-card">
+              <h3>Signposts triggered</h3>
+              {portfolio.data.watchlist.triggered_signposts.length ? (
+                <ul>
+                  {portfolio.data.watchlist.triggered_signposts.map((item) => (
+                    <li key={item.id}>
+                      <Link to={`/organisations/${organisationId}/foresight/canvases/${item.canvas_id}/scenarios/${item.scenario_set_id}?tab=signposts`}>{item.signpost_title}</Link>
+                      <span className="muted"> · {item.assessment_label} on {formatDate(item.observed_on)}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : <p className="muted">No signposts have moved sharply recently.</p>}
+            </article>
+            <article className="watchlist-card">
+              <h3>Benefits realization</h3>
+              {portfolio.data.watchlist.benefits_realization.total_reviewed ? (
+                <ul className="benefits-realization-list">
+                  <li><span>Exceeded</span><strong>{portfolio.data.watchlist.benefits_realization.exceeded}</strong></li>
+                  <li><span>Met</span><strong>{portfolio.data.watchlist.benefits_realization.met}</strong></li>
+                  <li><span>Partially met</span><strong>{portfolio.data.watchlist.benefits_realization.partially_met}</strong></li>
+                  <li><span>Not met</span><strong>{portfolio.data.watchlist.benefits_realization.not_met}</strong></li>
+                  <li><span>Inconclusive</span><strong>{portfolio.data.watchlist.benefits_realization.inconclusive}</strong></li>
+                </ul>
+              ) : <p className="muted">No outcome reviews have been completed yet.</p>}
+            </article>
+          </div>
+        </section>
+      ) : null}
+
       <section className={`portfolio-filters portfolio-filters--premium${filtersOpen ? " is-open" : ""}`} aria-labelledby="portfolio-filters-title">
         <div className="portfolio-search-row">
           <div className="search-field">

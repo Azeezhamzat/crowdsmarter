@@ -67,6 +67,21 @@ afterwards, but this account hit the identical `AuditEvent.actor`
 `PROTECT` constraint and was left in place for the same reason as
 `a11y-audit@example.test` above.
 
+## Fixed in Phase 25
+
+- Risk, assumption, signpost, and outcome-review data all existed
+  per-decision, but nothing rolled any of it up across an organisation — an
+  executive had no single place to see "what needs attention right now"
+  across all decisions. Added a `watchlist` block to
+  `organisation_portfolio()` (stalled decisions, open high risks, at-risk
+  assumptions, triggered signposts, benefits-realization rollup), rendered
+  in `OrganisationPortfolioPage.tsx` with drill-down to source decisions.
+  Pure aggregation of existing fields — no new models, no migration.
+- Unlike Phase 22–24's frontend changes, Phase 25's watchlist UI got real
+  test coverage (extended `OrganisationPortfolioPage.test.tsx` rather than
+  relying on browser verification alone), since the existing test file
+  already exercised this exact page.
+
 ## Fixed in Phase 24
 
 - `evaluation_results()` already computed a per-criterion rank-sensitivity

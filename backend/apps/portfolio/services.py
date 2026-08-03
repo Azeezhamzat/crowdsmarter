@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 from uuid import UUID
 
 from django.db import models
@@ -10,13 +10,21 @@ from django.db.models import Count, OuterRef, Q, Subquery
 from django.utils import timezone
 
 from apps.accounts.models import User
+from apps.assumptions.models import Assumption
 from apps.collaboration.models import DiscussionEntry
 from apps.decisions.models import Decision
+from apps.foresight.models import SignpostObservation
 from apps.notifications.models import Notification
 from apps.organisations.selectors import organisation_for_user
 from apps.participants.models import Participant
 from apps.positions.models import Position
 from apps.reviews.models import DecisionReview
+from apps.risks.models import Risk
+
+STALLED_THRESHOLD_DAYS = 21
+TRIGGERED_SIGNPOST_WINDOW_DAYS = 30
+HIGH_RISK_THRESHOLD = 4
+WATCHLIST_LIST_LIMIT = 10
 
 
 def _participant_role_subquery(user: User):  # type: ignore[no-untyped-def]
@@ -140,6 +148,129 @@ def _decorate(*, decisions: list[Decision], user: User) -> list[Decision]:
     return decisions
 
 
+def _stalled_decisions(*, organisation) -> list[dict]:
+    """Decisions that have not moved status/content in STALLED_THRESHOLD_DAYS, excluding terminal statuses."""
+    threshold = timezone.now() - timedelta(days=STALLED_THRESHOLD_DAYS)
+    today = timezone.localdate()
+    queryset = (
+        Decision.objects.filter(organisation=organisation, updated_at__lt=threshold)
+        .exclude(status__in=[Decision.Status.ARCHIVED, Decision.Status.LESSONS_LEARNED])
+        .order_by("updated_at")[:WATCHLIST_LIST_LIMIT]
+    )
+    return [
+        {
+            "id": decision.id,
+            "title": decision.title,
+            "status": decision.status,
+            "status_label": decision.get_status_display(),
+            "days_stalled": (today - decision.updated_at.date()).days,
+        }
+        for decision in queryset
+    ]
+
+
+def _open_high_risks(*, organisation) -> list[dict]:
+    queryset = (
+        Risk.objects.filter(
+            organisation=organisation,
+            status__in=[Risk.Status.OPEN, Risk.Status.MONITORING],
+        )
+        .filter(Q(likelihood__gte=HIGH_RISK_THRESHOLD) | Q(impact__gte=HIGH_RISK_THRESHOLD))
+        .select_related("decision")
+        .order_by("-likelihood", "-impact")[:WATCHLIST_LIST_LIMIT]
+    )
+    return [
+        {
+            "id": risk.id,
+            "title": risk.title,
+            "decision_id": risk.decision_id,
+            "decision_title": risk.decision.title,
+            "likelihood": risk.likelihood,
+            "impact": risk.impact,
+        }
+        for risk in queryset
+    ]
+
+
+def _assumptions_at_risk(*, organisation) -> list[dict]:
+    today = timezone.localdate()
+    queryset = (
+        Assumption.objects.filter(organisation=organisation, status=Assumption.Status.ACTIVE)
+        .filter(
+            Q(verification_status=Assumption.VerificationStatus.INVALIDATED)
+            | Q(review_date__lt=today)
+        )
+        .select_related("decision")
+        .order_by("review_date")[:WATCHLIST_LIST_LIMIT]
+    )
+    return [
+        {
+            "id": assumption.id,
+            "statement": assumption.statement,
+            "decision_id": assumption.decision_id,
+            "decision_title": assumption.decision.title,
+            "verification_status": assumption.verification_status,
+            "verification_status_label": assumption.get_verification_status_display(),
+        }
+        for assumption in queryset
+    ]
+
+
+def _triggered_signposts(*, organisation) -> list[dict]:
+    since = timezone.localdate() - timedelta(days=TRIGGERED_SIGNPOST_WINDOW_DAYS)
+    queryset = (
+        SignpostObservation.objects.filter(
+            signpost__scenario_set__canvas__organisation=organisation,
+            assessment__in=[
+                SignpostObservation.Assessment.STRONG,
+                SignpostObservation.Assessment.CONTRADICTORY,
+            ],
+            observed_on__gte=since,
+        )
+        .select_related("signpost__scenario_set")
+        .order_by("-observed_on")[:WATCHLIST_LIST_LIMIT]
+    )
+    return [
+        {
+            "id": observation.id,
+            "signpost_id": observation.signpost_id,
+            "signpost_title": observation.signpost.title,
+            "scenario_set_id": observation.signpost.scenario_set_id,
+            "canvas_id": observation.signpost.scenario_set.canvas_id,
+            "assessment": observation.assessment,
+            "assessment_label": observation.get_assessment_display(),
+            "observed_on": observation.observed_on,
+        }
+        for observation in queryset
+    ]
+
+
+def _benefits_realization(*, organisation) -> dict:
+    counts = {
+        choice: 0 for choice, _ in DecisionReview.OutcomeAssessment.choices
+    }
+    rows = (
+        DecisionReview.objects.filter(organisation=organisation)
+        .exclude(outcome_assessment="")
+        .values("outcome_assessment")
+        .annotate(count=Count("id"))
+    )
+    for row in rows:
+        counts[row["outcome_assessment"]] = row["count"]
+    return {**counts, "total_reviewed": sum(counts.values())}
+
+
+def _organisation_watchlist(*, organisation) -> dict:
+    """Action-oriented cross-decision signals: every entry drills down to a source decision."""
+    return {
+        "stalled_decisions": _stalled_decisions(organisation=organisation),
+        "open_high_risks": _open_high_risks(organisation=organisation),
+        "assumptions_at_risk": _assumptions_at_risk(organisation=organisation),
+        "triggered_signposts": _triggered_signposts(organisation=organisation),
+        "benefits_realization": _benefits_realization(organisation=organisation),
+    }
+
+
 def organisation_portfolio(
     *,
     user: User,
@@ -213,6 +344,7 @@ def organisation_portfolio(
             "status_counts": status_counts,
         },
         "decisions": decisions,
+        "watchlist": _organisation_watchlist(organisation=organisation),
     }
 
 

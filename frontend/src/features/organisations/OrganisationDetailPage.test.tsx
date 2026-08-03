@@ -19,6 +19,11 @@ vi.mock("../invitations/api", () => ({
 vi.mock("../portfolio/api", () => ({ getOrganisationPortfolio: vi.fn() }));
 vi.mock("../workspaces/api", () => ({ listWorkspaces: vi.fn() }));
 
+const EMPTY_WATCHLIST = {
+  stalled_decisions: [], open_high_risks: [], assumptions_at_risk: [], triggered_signposts: [],
+  benefits_realization: { exceeded: 0, met: 0, partially_met: 0, not_met: 0, inconclusive: 0, total_reviewed: 0 },
+};
+
 const organisation = {
   id: "o1", name: "AgriNova", slug: "agrinova", description: "Decision intelligence team",
   website_url: "https://example.com", brand_name: "AgriNova", primary_colour: "#315c54",
@@ -55,7 +60,7 @@ describe("OrganisationDetailPage", () => {
     vi.mocked(listMemberships).mockResolvedValue([membership]);
     vi.mocked(listInvitations).mockResolvedValue([]);
     vi.mocked(getOrganisationPortfolio).mockResolvedValue({
-      organisation, summary: { total: 0, active: 0, overdue: 0, unresolved_discussion: 0, status_counts: {} }, decisions: [],
+      organisation, summary: { total: 0, active: 0, overdue: 0, unresolved_discussion: 0, status_counts: {} }, decisions: [], watchlist: EMPTY_WATCHLIST,
     });
     vi.mocked(listWorkspaces).mockResolvedValue([workspace]);
 
@@ -73,7 +78,7 @@ describe("OrganisationDetailPage", () => {
     vi.mocked(listMemberships).mockResolvedValue([membership]);
     vi.mocked(listInvitations).mockResolvedValue([]);
     vi.mocked(getOrganisationPortfolio).mockResolvedValue({
-      organisation, summary: { total: 3, active: 2, overdue: 0, unresolved_discussion: 0, status_counts: {} }, decisions: [],
+      organisation, summary: { total: 3, active: 2, overdue: 0, unresolved_discussion: 0, status_counts: {} }, decisions: [], watchlist: EMPTY_WATCHLIST,
     });
     vi.mocked(listWorkspaces).mockResolvedValue([workspace]);
 

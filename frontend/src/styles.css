@@ -493,6 +493,16 @@ textarea:disabled, input:disabled, select:disabled { background: #f1f4f1; color:
 .portfolio-summary span { color: var(--muted); }
 .portfolio-filters { padding: 1.25rem; margin-bottom: 1.25rem; border: 1px solid var(--line); border-radius: 16px; background: #fafbfa; }
 .portfolio-filters h2 { margin-top: 0; }
+.portfolio-watchlist { margin-bottom: 1.25rem; }
+.portfolio-watchlist h2 { margin-bottom: .1rem; }
+.watchlist-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; margin-top: .75rem; }
+.watchlist-card { padding: 1rem 1.1rem; border: 1px solid var(--line); border-radius: 14px; background: #fff; }
+.watchlist-card h3 { margin: 0 0 .5rem; font-size: .95rem; }
+.watchlist-card ul { list-style: none; margin: 0; padding: 0; display: grid; gap: .5rem; }
+.watchlist-card li { font-size: .85rem; }
+.benefits-realization-list { display: grid; grid-template-columns: 1fr auto; }
+.benefits-realization-list li { display: contents; }
+.benefits-realization-list span { color: var(--muted); }
 .portfolio-filter-grid { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 1rem; }
 .portfolio-filter-grid label { display: block; }
 .portfolio-list { display: grid; gap: 1rem; }

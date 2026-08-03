@@ -62,10 +62,65 @@ class PortfolioSummarySerializer(serializers.Serializer):
     status_counts = serializers.DictField(child=serializers.IntegerField())
 
 
+class WatchlistStalledDecisionSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    title = serializers.CharField()
+    status = serializers.CharField()
+    status_label = serializers.CharField()
+    days_stalled = serializers.IntegerField()
+
+
+class WatchlistRiskSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    title = serializers.CharField()
+    decision_id = serializers.UUIDField()
+    decision_title = serializers.CharField()
+    likelihood = serializers.IntegerField()
+    impact = serializers.IntegerField()
+
+
+class WatchlistAssumptionSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    statement = serializers.CharField()
+    decision_id = serializers.UUIDField()
+    decision_title = serializers.CharField()
+    verification_status = serializers.CharField()
+    verification_status_label = serializers.CharField()
+
+
+class WatchlistSignpostObservationSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    signpost_id = serializers.UUIDField()
+    signpost_title = serializers.CharField()
+    scenario_set_id = serializers.UUIDField()
+    canvas_id = serializers.UUIDField()
+    assessment = serializers.CharField()
+    assessment_label = serializers.CharField()
+    observed_on = serializers.DateField()
+
+
+class BenefitsRealizationSerializer(serializers.Serializer):
+    exceeded = serializers.IntegerField()
+    met = serializers.IntegerField()
+    partially_met = serializers.IntegerField()
+    not_met = serializers.IntegerField()
+    inconclusive = serializers.IntegerField()
+    total_reviewed = serializers.IntegerField()
+
+
+class PortfolioWatchlistSerializer(serializers.Serializer):
+    stalled_decisions = WatchlistStalledDecisionSerializer(many=True)
+    open_high_risks = WatchlistRiskSerializer(many=True)
+    assumptions_at_risk = WatchlistAssumptionSerializer(many=True)
+    triggered_signposts = WatchlistSignpostObservationSerializer(many=True)
+    benefits_realization = BenefitsRealizationSerializer()
+
+
 class OrganisationPortfolioSerializer(serializers.Serializer):
     organisation = OrganisationSerializer()
     summary = PortfolioSummarySerializer()
     decisions = PortfolioDecisionSerializer(many=True)
+    watchlist = PortfolioWatchlistSerializer()
 
 
 class PersonalWorkSerializer(serializers.Serializer):

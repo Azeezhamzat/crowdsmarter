@@ -1,4 +1,4 @@
-# Current state (Phase 19/20/21/22/23/24 baseline)
+# Current state (Phase 19/20/21/22/23/24/25 baseline)
 
 Verified against the running system on 2026-08-03. Update this document
 whenever the baseline materially changes; do not let it drift into aspiration.
@@ -38,17 +38,18 @@ the two new migrations above were applied by hand).
 
 ## Test suites
 
-- Backend: `docker compose exec backend pytest` — **366 passed, 0 failed**
-  (was 363 passed at the end of Phase 23; +3 tests for Phase 24's
-  tornado-chart/uncertainty-narrative feature).
+- Backend: `docker compose exec backend pytest` — **368 passed, 0 failed**
+  (was 366 passed at the end of Phase 24; +2 tests for Phase 25's
+  portfolio-watchlist feature).
 - Frontend: `docker compose exec frontend npx vitest run` — **36 test files /
-  48 tests, all passing** (unchanged since Phase 22 — Phase 22/23/24's UI
-  changes were all verified live in the browser instead of with new
-  component tests; see known-issues.md if that gap should be closed later).
+  48 tests, all passing** (still 48 — Phase 25 extended the existing
+  `OrganisationPortfolioPage.test.tsx` with new watchlist assertions rather
+  than adding a new test file, unlike Phase 22–24's UI work which was
+  verified live in the browser only; see known-issues.md).
 - `docker compose exec backend python manage.py check` — clean, 0 warnings.
 - `docker compose exec backend python manage.py makemigrations --check --dry-run` — clean
-  (Phase 24 added no migration, same as Phase 23 — both only change a
-  computed API response, not stored data).
+  (Phase 25 added no migration — `apps/portfolio` has no models, it's a
+  pure read-model over other apps' data, same as Phase 23/24).
 - Frontend `npx tsc -b` and `npm run build` — clean.
 
 ## Dependencies
@@ -252,7 +253,53 @@ lightly-weighted criterion produced tornado bars matching hand-calculated
 values exactly (±9.7 and ±9.4), sorted correctly, alongside the expected
 "ranks first and stays first..." narrative sentence.
 
-Committed on `claude/phase-24-decision-analysis`, not yet pushed.
+Committed on `claude/phase-24-decision-analysis`, pushed, and fast-forward
+merged into `main`.
+
+## Phase 25 (portfolio and executive intelligence) progress
+
+Audited "cross-decision portfolio," "strategic alignment," "dependencies,"
+"review/watchlists," "assumption and signpost monitoring," and "actionable
+executive reporting" against `apps/portfolio` (no models — a pure read-model
+over `Decision`/`DecisionReview` via `organisation_portfolio()`) and the
+narrower `apps/evaluations.PrioritisationPortfolio` (a curated,
+budget-constrained candidate-selection tool, not an always-on portfolio
+view). Confirmed the org-wide decision list/status/urgency dashboard
+already exists with drill-down; a real strategic-objective/value taxonomy,
+decision-to-decision dependency modelling, and concentration-risk/decision-
+debt detection are all genuinely absent but each would need new concepts
+and models — too large for one phase. The better-bounded find: risk,
+assumption, signpost, and outcome-review data already existed per-decision
+but nothing rolled any of it up across the organisation — an executive
+had no single place to see it.
+
+Added a `watchlist` block to `organisation_portfolio()`
+(`apps/portfolio/services.py`), pure aggregation of existing fields, no new
+models or migration:
+
+- **Stalled decisions** — active-status decisions with no update in 21+
+  days.
+- **Open high risks** — `Risk.status` open/monitoring with
+  likelihood or impact ≥ 4/5.
+- **Assumptions at risk** — active assumptions that are either invalidated
+  or overdue for re-verification (`review_date` in the past).
+- **Signposts triggered** — `SignpostObservation`s with `strong`/
+  `contradictory` assessments in the last 30 days.
+- **Benefits realization** — org-wide rollup of `DecisionReview
+  .outcome_assessment` counts.
+
+`OrganisationPortfolioPage.tsx` renders all five as a new "Watchlist"
+section between the summary metrics and the filterable decision list, each
+entry linking to its source decision (or, for signposts, the scenario-set
+workspace) — satisfying the roadmap's drill-down requirement.
+
+Verified live in the browser: created one decision per watchlist category
+(stalled, high-risk, at-risk-assumption, reviewed-with-outcome) plus a
+foresight signpost with a strong observation; all five categories rendered
+correctly with accurate counts and working drill-down links, then deleted
+the throwaway data.
+
+Committed on `claude/phase-25-portfolio-executive`, not yet pushed.
 
 ## Known risks not yet resolved
 

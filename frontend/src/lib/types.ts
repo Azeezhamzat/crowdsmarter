@@ -656,6 +656,50 @@ export type PersonalWork = {
   decisions: PortfolioDecision[];
 };
 
+export type PortfolioWatchlist = {
+  stalled_decisions: Array<{
+    id: string;
+    title: string;
+    status: DecisionStatus;
+    status_label: string;
+    days_stalled: number;
+  }>;
+  open_high_risks: Array<{
+    id: string;
+    title: string;
+    decision_id: string;
+    decision_title: string;
+    likelihood: number;
+    impact: number;
+  }>;
+  assumptions_at_risk: Array<{
+    id: string;
+    statement: string;
+    decision_id: string;
+    decision_title: string;
+    verification_status: string;
+    verification_status_label: string;
+  }>;
+  triggered_signposts: Array<{
+    id: string;
+    signpost_id: string;
+    signpost_title: string;
+    scenario_set_id: string;
+    canvas_id: string;
+    assessment: string;
+    assessment_label: string;
+    observed_on: string;
+  }>;
+  benefits_realization: {
+    exceeded: number;
+    met: number;
+    partially_met: number;
+    not_met: number;
+    inconclusive: number;
+    total_reviewed: number;
+  };
+};
+
 export type OrganisationPortfolio = {
   organisation: Organisation;
   summary: {
@@ -666,6 +710,7 @@ export type OrganisationPortfolio = {
     status_counts: Partial<Record<DecisionStatus, number>>;
   };
   decisions: PortfolioDecision[];
+  watchlist: PortfolioWatchlist;
 };
 
 export type DecisionTemplate = {
