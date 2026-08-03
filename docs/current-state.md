@@ -1,4 +1,4 @@
-# Current state (Phase 19/20/21/22/23/24/25/26/27/28 baseline)
+# Current state (Phase 19/20/21/22/23/24/25/26/27/28/29 baseline)
 
 Verified against the running system on 2026-08-03. Update this document
 whenever the baseline materially changes; do not let it drift into aspiration.
@@ -21,16 +21,22 @@ source of truth. See `docs/development-workflow.md`.
 
 ## Migrations
 
-61 backend migrations applied cleanly across all apps, including
-`apps.accounts.0003_totpdevice_mfabackupcode` (Phase 28) and two from Phase 22
+63 backend migrations applied cleanly across all apps, including the new
+`apps.billing` app's `0001_initial` (creates `Plan` and
+`OrganisationSubscription`) and `0002_seed_plans_and_backfill_subscriptions`
+(a `RunPython` data migration seeding three plans — `team`/`professional`/
+`enterprise` — and backfilling every pre-existing organisation onto the
+`team` plan, Phase 29), plus `apps.accounts.0003_totpdevice_mfabackupcode`
+(Phase 28) and two from Phase 22
 (`apps.foresight.0005_signpostassumptionlink_signpostrisklink` and
 `apps.notifications.0003_remove_notification_notification_kind_valid_and_more`,
 which adds the `signpost_watch` notification kind). No migration drift
 (`makemigrations --check --dry-run` reports no changes). A pre-verification
 `pg_dump` backup was taken before Phase 21's test run
-(`backups/phase21-pre-verify-*.sql`, not committed). Phase 28's migration was
-applied to the dev DB immediately after generation, avoiding the Phase 22
-"migrate on container start only" gotcha documented below.
+(`backups/phase21-pre-verify-*.sql`, not committed). Phase 28's and Phase
+29's migrations were both applied to the dev DB immediately after
+generation, avoiding the Phase 22 "migrate on container start only" gotcha
+documented below.
 
 Note: the running `backend` container only auto-applies migrations on
 container start, not live — after generating a migration mid-session, run
@@ -41,13 +47,18 @@ the two new migrations above were applied by hand).
 
 ## Test suites
 
-- Backend: `docker compose exec backend pytest` — **384 passed, 0 failed**
-  (was 376 passed at the end of Phase 27; +8 new tests for Phase 28's MFA
-  feature: `apps/accounts/tests/test_mfa.py`).
+- Backend: `docker compose exec backend pytest` — **410 passed, 0 failed**
+  (was 384 passed at the end of Phase 28; +26 new tests for Phase 29's
+  billing/entitlement feature: `apps/billing/tests/test_models.py` (5),
+  `apps/billing/tests/test_services.py` (13), `apps/billing/tests/test_api.py`
+  (7), and one new assertion in
+  `apps/organisations/tests/test_services.py` confirming `create_organisation`
+  auto-enrolls a trialing subscription).
 - Frontend: `docker compose exec frontend npx vitest run` — **36 test files /
-  50 tests, all passing** (+2 new tests: an MFA-enrollment walkthrough in
-  `AccountSettingsPage.test.tsx` and a login-gate test in
-  `LoginPage.test.tsx`).
+  50 tests, all passing** (the existing
+  `OrganisationAdministrationPage.test.tsx` test was extended in place to
+  cover the new "Plan and billing" section rather than adding a new file, so
+  the file count is unchanged from Phase 28; +2 assertions).
 - `docker compose exec backend python manage.py check` — clean, 0 warnings.
 - `docker compose exec backend python manage.py makemigrations --check --dry-run` — clean.
 - Frontend `npx tsc -b` and `npm run build` — clean.
@@ -471,6 +482,84 @@ verification and leaving it MFA-enabled would have silently broken every
 future phase's login step.
 
 Committed on `claude/phase-28-mfa-enterprise-security`, not yet pushed.
+
+## Phase 29 (commercialization and production launch) progress
+
+Audited the full Phase 29 checklist (plan entitlements, billing, trial
+lifecycle, production infrastructure, observability, support operations,
+public trust center, launch readiness) against the codebase. Confirmed
+`apps.demo_requests` already covers lead capture and qualification status,
+and organisation onboarding/offboarding/export/deletion already exist.
+Confirmed **zero** plan/subscription/billing/entitlement concept and
+**zero** quota enforcement existed anywhere (grepped for
+`plan_key|subscription|entitlement|billing|trial_ends|max_users|quota` and
+for class names `Plan|Subscription|Billing|Entitlement|Tier` — no matches).
+Real payment processing, SSO/SCIM, and a production observability stack are
+all correctly out of scope here — no payment provider, identity provider,
+or cloud account exists in this sandbox to build or test against, the same
+constraint that ruled out Phase 26/27/28's equivalent externals.
+
+Per the master prompt's explicit instruction ("before adding billing, write
+an ADR"), wrote **ADR 0031**
+(`docs/adr/0031-billing-and-subscription-strategy.md`) before any
+billing-adjacent code, separating what is built now from what is
+deliberately deferred (provider choice, real subscriptions, invoices, tax,
+usage billing, grace periods, refunds, webhooks — each with a stated future
+plan).
+
+Built the self-contained, testable core: a new `apps.billing` app modelling
+plan entitlements without any payment processing —
+
+- `Plan` (key, name, trial days, nullable `max_active_decisions` /
+  `max_active_members` — `None` means unlimited, support level, feature
+  flags) and `OrganisationSubscription` (one active plan per organisation,
+  `trialing`/`active`/`expired` status, optional billing contact validated
+  as an active member, `is_trial_expired` property).
+- `create_subscription_for_organisation` auto-enrolls every new
+  organisation in the default plan's trial, wired into
+  `apps.organisations.services.create_organisation`.
+- `assert_can_create_decision` / `assert_can_add_member` enforce the
+  active plan's limits, wired into
+  `apps.decisions.services.create_decision` and
+  `apps.invitations.services.accept_invitation` respectively. Both are true
+  no-ops when the plan's limit field is `None` or no subscription exists,
+  and a small script parsing every existing test function body confirmed no
+  pre-existing test creates more decisions/members per organisation than
+  the seeded `team` plan's limits (25 / 15) — so the backfill migration
+  (`0002_seed_plans_and_backfill_subscriptions`, seeding `team`/
+  `professional`/`enterprise` and backfilling every pre-existing
+  organisation onto `team`) cannot retroactively break any of the 384
+  accumulated tests. A dedicated low-limit `Plan` in
+  `apps/billing/tests/test_services.py` proves the guards genuinely raise
+  when a limit is hit, not merely that they don't break anything.
+- `change_plan` / `set_billing_contact` service functions, both owner-gated
+  (`PermissionDenied` for non-owners), both audit-logged.
+- Thin DRF views (`PlanListView`, `OrganisationSubscriptionView`,
+  `ChangePlanView`, `SetBillingContactView`) under `/api/v1/plans/` and
+  `/api/v1/organisations/<id>/subscription/...`, following the established
+  "let `*ServiceError` propagate to the global exception handler" pattern —
+  no manual try/except in any view.
+- Frontend: a new "Plan and billing" section on
+  `OrganisationAdministrationPage.tsx` (visible to owner/admin, mutation
+  controls owner-only) showing current plan, trial/active status, usage
+  counts against limits, a plan-change dropdown, and a billing-contact
+  dropdown — following the page's existing dense single-file
+  `card-panel`/`ai-quality-metrics` layout conventions rather than
+  introducing a new pattern.
+
+Verified live in the browser on the shared `a11y-audit@example.test`
+account: changed the plan from Team to Professional (usage counters updated
+from `0 / 25` to unlimited-decisions display and `2 / 15` to `2 / 50`
+members), set and cleared a billing contact, then reverted the plan back to
+Team and cleared the billing contact again so the shared test account is
+left in its original state for future verification.
+
+Wrote a capstone `docs/launch-readiness.md` mapping what is genuinely
+production-ready across all 29 phases versus what remains deliberately
+deferred pending real external infrastructure (payment provider, SSO/SCIM
+identity provider, production observability, public trust center).
+
+Committed on `claude/phase-29-commercialization-launch`.
 
 ## Known risks not yet resolved
 

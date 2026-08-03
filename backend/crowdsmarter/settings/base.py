@@ -63,6 +63,7 @@ INSTALLED_APPS = [
     "apps.contributions",
     "apps.methodology",
     "apps.platform_admin",
+    "apps.billing",
 ]
 
 MIDDLEWARE = [

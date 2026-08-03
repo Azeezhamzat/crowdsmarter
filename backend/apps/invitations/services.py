@@ -396,6 +396,10 @@ def accept_invitation(
     ).exists():
         raise InvitationServiceError("This account is already a member of the organisation.")
 
+    from apps.billing.services import assert_can_add_member
+
+    assert_can_add_member(organisation=invitation.organisation)
+
     membership = Membership(
         organisation=invitation.organisation,
         user=user,

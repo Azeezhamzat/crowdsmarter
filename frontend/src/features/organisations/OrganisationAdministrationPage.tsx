@@ -6,6 +6,12 @@ import { StatusMessage } from "../../components/StatusMessage";
 import { ApiError } from "../../lib/api";
 import { getAIReviewQualityMetrics } from "../ai-assistance/api";
 import {
+  changeOrganisationPlan,
+  getOrganisationSubscription,
+  listPlans,
+  setOrganisationBillingContact,
+} from "../billing/api";
+import {
   cancelOrganisationDeletion,
   deactivateOrganisation,
   getOrganisation,
@@ -31,6 +37,9 @@ export function OrganisationAdministrationPage() {
   const history = useQuery({ queryKey: ["organisations", organisationId, "membership-history"], queryFn: () => listMembershipHistory(organisationId), enabled: Boolean(organisationId) });
   const deletions = useQuery({ queryKey: ["organisations", organisationId, "deletion-requests"], queryFn: () => listOrganisationDeletionRequests(organisationId), enabled: Boolean(organisationId) && organisation.data?.current_user_role === "owner" });
   const aiQuality = useQuery({ queryKey: ["organisations", organisationId, "ai-review-quality"], queryFn: () => getAIReviewQualityMetrics(organisationId), enabled: Boolean(organisationId) && ["owner", "admin"].includes(organisation.data?.current_user_role ?? "") });
+  const subscription = useQuery({ queryKey: ["organisations", organisationId, "subscription"], queryFn: () => getOrganisationSubscription(organisationId), enabled: Boolean(organisationId) && ["owner", "admin"].includes(organisation.data?.current_user_role ?? "") });
+  const plans = useQuery({ queryKey: ["billing", "plans"], queryFn: () => listPlans(), enabled: Boolean(organisationId) && organisation.data?.current_user_role === "owner" });
+  const [selectedPlanKey, setSelectedPlanKey] = useState("");
   const [settings, setSettings] = useState({ name: "", description: "", website_url: "", brand_name: "", primary_colour: "#315c54", invitation_policy: "owners_and_admins", default_invitation_role: "contributor", retention_days: "" });
   const [transfer, setTransfer] = useState({ target_membership_id: "", rationale: "" });
   const [deactivation, setDeactivation] = useState({ confirmation: "", reason: "" });
@@ -51,12 +60,18 @@ export function OrganisationAdministrationPage() {
     });
   }, [organisation.data]);
 
+  useEffect(() => {
+    if (!subscription.data) return;
+    setSelectedPlanKey(subscription.data.plan.key);
+  }, [subscription.data]);
+
   const refresh = async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ["organisations", organisationId] }),
       queryClient.invalidateQueries({ queryKey: ["organisations", organisationId, "memberships"] }),
       queryClient.invalidateQueries({ queryKey: ["organisations", organisationId, "membership-history"] }),
       queryClient.invalidateQueries({ queryKey: ["organisations", organisationId, "deletion-requests"] }),
+      queryClient.invalidateQueries({ queryKey: ["organisations", organisationId, "subscription"] }),
       queryClient.invalidateQueries({ queryKey: ["organisations"] }),
     ]);
   };
@@ -66,13 +81,15 @@ export function OrganisationAdministrationPage() {
   const reactivate = useMutation({ mutationFn: () => reactivateOrganisation(organisationId, reactivationRationale), onSuccess: refresh });
   const requestDeletion = useMutation({ mutationFn: () => requestOrganisationDeletion(organisationId, deletion), onSuccess: refresh });
   const cancelDeletion = useMutation({ mutationFn: ({ id, rationale }: { id: string; rationale: string }) => cancelOrganisationDeletion(id, rationale), onSuccess: refresh });
+  const changePlan = useMutation({ mutationFn: () => changeOrganisationPlan(organisationId, { plan_key: selectedPlanKey }), onSuccess: refresh });
+  const setBillingContact = useMutation({ mutationFn: (userId: string) => setOrganisationBillingContact(organisationId, { user_id: userId || null }), onSuccess: refresh });
 
   if (organisation.isPending || memberships.isPending) return <p>Loading organisation administration…</p>;
   if (organisation.isError || !organisation.data) return <StatusMessage kind="error">Organisation administration could not be loaded.</StatusMessage>;
   const isOwner = organisation.data.current_user_role === "owner";
   const canManage = ["owner", "admin"].includes(organisation.data.current_user_role);
   const ownerCandidates = memberships.data?.filter((item) => item.status === "active" && item.role !== "owner") ?? [];
-  const mutationError = save.error || transferOwner.error || deactivate.error || reactivate.error || requestDeletion.error || cancelDeletion.error;
+  const mutationError = save.error || transferOwner.error || deactivate.error || reactivate.error || requestDeletion.error || cancelDeletion.error || changePlan.error || setBillingContact.error;
 
   return (
     <div className="organisation-admin-page">
@@ -94,6 +111,39 @@ export function OrganisationAdministrationPage() {
           {canManage && organisation.data.status === "active" ? <button className="button button--primary" type="button" disabled={save.isPending} onClick={() => save.mutate()}>{save.isPending ? "Saving…" : "Save administration settings"}</button> : null}
         </section>
       </div>
+
+      {canManage ? (
+        <section className="card-panel">
+          <div className="section-heading"><div><p className="eyebrow">Plan and billing</p><h2>Packaging tier and usage</h2><p className="muted">CrowdSmarter does not process payments in this environment (see ADR 0031) — plan changes here are recorded immediately without any charge.</p></div></div>
+          {subscription.isError ? <StatusMessage kind="error">Plan and billing details require an owner or administrator role.</StatusMessage> : null}
+          {subscription.data ? (
+            <>
+              <div className="ai-quality-metrics">
+                <article><strong>{subscription.data.plan.name}</strong><span>Current plan ({subscription.data.status_label}{subscription.data.status === "trialing" && subscription.data.trial_ends_at ? `, ends ${formatDate(subscription.data.trial_ends_at)}` : ""})</span></article>
+                <article><strong>{subscription.data.active_decision_count}{subscription.data.plan.max_active_decisions != null ? ` / ${subscription.data.plan.max_active_decisions}` : ""}</strong><span>Active decisions</span></article>
+                <article><strong>{subscription.data.active_member_count}{subscription.data.plan.max_active_members != null ? ` / ${subscription.data.plan.max_active_members}` : ""}</strong><span>Active members</span></article>
+                <article><strong>{subscription.data.billing_contact ? subscription.data.billing_contact.email : "—"}</strong><span>Billing contact</span></article>
+              </div>
+              {isOwner ? (
+                <div className="form-grid form-grid--two">
+                  <label>Change plan
+                    <select value={selectedPlanKey} onChange={(event) => setSelectedPlanKey(event.target.value)}>
+                      {(plans.data ?? [subscription.data.plan]).map((item) => <option key={item.key} value={item.key}>{item.name}</option>)}
+                    </select>
+                  </label>
+                  <label>Billing contact
+                    <select value={subscription.data.billing_contact?.id ?? ""} onChange={(event) => setBillingContact.mutate(event.target.value)}>
+                      <option value="">No billing contact</option>
+                      {(memberships.data ?? []).filter((item) => item.status === "active").map((item) => <option key={item.user.id} value={item.user.id}>{item.user.email}</option>)}
+                    </select>
+                  </label>
+                </div>
+              ) : null}
+              {isOwner ? <button className="button button--primary" type="button" disabled={changePlan.isPending || selectedPlanKey === subscription.data.plan.key} onClick={() => changePlan.mutate()}>{changePlan.isPending ? "Changing plan…" : "Change plan"}</button> : null}
+            </>
+          ) : null}
+        </section>
+      ) : null}
 
       {isOwner && organisation.data.status === "active" ? <section className="card-panel governance-danger-section"><div><p className="eyebrow">Ownership</p><h2>Transfer accountable ownership</h2><p className="muted">The new owner gains owner authority. Your membership becomes administrator. The event is permanent in membership history.</p></div><div className="form-grid form-grid--two"><label>New owner<select value={transfer.target_membership_id} onChange={(event) => setTransfer({ ...transfer, target_membership_id: event.target.value })}><option value="">Choose an active member</option>{ownerCandidates.map((item) => <option key={item.id} value={item.id}>{item.user.email} · {item.role}</option>)}</select></label><label>Rationale<textarea rows={3} value={transfer.rationale} onChange={(event) => setTransfer({ ...transfer, rationale: event.target.value })} /></label></div><button className="button button--secondary" type="button" disabled={!transfer.target_membership_id || transferOwner.isPending} onClick={() => { if (window.confirm("Transfer organisation ownership and become an administrator?")) transferOwner.mutate(); }}>{transferOwner.isPending ? "Transferring…" : "Transfer ownership"}</button></section> : null}
 

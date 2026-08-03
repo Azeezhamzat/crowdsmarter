@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 
+import { getOrganisationSubscription, listPlans } from "../billing/api";
 import {
   getOrganisation,
   listMembershipHistory,
@@ -16,6 +17,11 @@ vi.mock("./api", () => ({
   listOrganisationDeletionRequests: vi.fn(), updateOrganisationAdministration: vi.fn(),
   transferOrganisationOwnership: vi.fn(), deactivateOrganisation: vi.fn(), reactivateOrganisation: vi.fn(),
   requestOrganisationDeletion: vi.fn(), cancelOrganisationDeletion: vi.fn(),
+}));
+
+vi.mock("../billing/api", () => ({
+  getOrganisationSubscription: vi.fn(), listPlans: vi.fn(),
+  changeOrganisationPlan: vi.fn(), setOrganisationBillingContact: vi.fn(),
 }));
 
 describe("OrganisationAdministrationPage", () => {
@@ -38,6 +44,22 @@ describe("OrganisationAdministrationPage", () => {
       previous_status: "", new_status: "active", note: "Founding owner", created_at: "2026-08-01T10:00:00Z",
     }]);
     vi.mocked(listOrganisationDeletionRequests).mockResolvedValue([]);
+    vi.mocked(getOrganisationSubscription).mockResolvedValue({
+      id: "s1", organisation_id: "o1",
+      plan: {
+        id: "p1", key: "team", name: "Team", description: "For a single team.", trial_days: 14,
+        max_active_decisions: 25, max_active_members: 15, includes_advanced_foresight: true,
+        includes_ai_assistance: true, support_level: "community", support_level_label: "Community",
+      },
+      status: "trialing", status_label: "Trialing", trial_ends_at: "2026-08-15T10:00:00Z",
+      is_trial_expired: false, billing_contact: null, started_at: "2026-08-01T10:00:00Z",
+      active_decision_count: 2, active_member_count: 1,
+      created_at: "2026-08-01T10:00:00Z", updated_at: "2026-08-01T10:00:00Z",
+    });
+    vi.mocked(listPlans).mockResolvedValue([
+      { id: "p1", key: "team", name: "Team", description: "", trial_days: 14, max_active_decisions: 25, max_active_members: 15, includes_advanced_foresight: true, includes_ai_assistance: true, support_level: "community", support_level_label: "Community" },
+      { id: "p2", key: "professional", name: "Professional", description: "", trial_days: 14, max_active_decisions: null, max_active_members: 50, includes_advanced_foresight: true, includes_ai_assistance: true, support_level: "standard", support_level_label: "Standard" },
+    ]);
 
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
@@ -52,5 +74,9 @@ describe("OrganisationAdministrationPage", () => {
     expect(screen.getByRole("heading", { name: /transfer accountable ownership/i })).toBeInTheDocument();
     expect(screen.getByText("Founding owner")).toBeInTheDocument();
     expect(screen.getByDisplayValue("60")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /packaging tier and usage/i })).toBeInTheDocument();
+    expect(screen.getAllByText("Team").length).toBeGreaterThan(0);
+    expect(screen.getByText(/2 \/ 25/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /change plan/i })).toBeInTheDocument();
   });
 });

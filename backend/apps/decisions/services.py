@@ -137,6 +137,10 @@ def create_decision(
     if not can_create_decision(membership=membership):
         raise PermissionDenied("Your role cannot create decisions.")
 
+    from apps.billing.services import assert_can_create_decision
+
+    assert_can_create_decision(organisation=workspace.organisation)
+
     owner = actor if owner_id is None else _active_member(
         organisation_id=workspace.organisation_id,
         user_id=owner_id,

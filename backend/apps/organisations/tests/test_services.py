@@ -35,6 +35,12 @@ def test_create_organisation_makes_actor_owner_and_audits(
         slug="decisions",
     ).exists()
 
+    from apps.billing.models import OrganisationSubscription
+
+    subscription = OrganisationSubscription.objects.get(organisation=organisation)
+    assert subscription.status == OrganisationSubscription.Status.TRIALING
+    assert subscription.plan.key == "team"
+
 
 @pytest.mark.django_db
 def test_last_owner_cannot_be_demoted(

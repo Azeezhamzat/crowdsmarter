@@ -48,6 +48,38 @@ export type Membership = {
   updated_at: string;
 };
 
+export type PlanSupportLevel = "community" | "standard" | "priority";
+
+export type Plan = {
+  id: string;
+  key: string;
+  name: string;
+  description: string;
+  trial_days: number;
+  max_active_decisions: number | null;
+  max_active_members: number | null;
+  includes_advanced_foresight: boolean;
+  includes_ai_assistance: boolean;
+  support_level: PlanSupportLevel;
+  support_level_label: string;
+};
+
+export type OrganisationSubscription = {
+  id: string;
+  organisation_id: string;
+  plan: Plan;
+  status: "trialing" | "active" | "expired";
+  status_label: string;
+  trial_ends_at: string | null;
+  is_trial_expired: boolean;
+  billing_contact: User | null;
+  started_at: string;
+  active_decision_count: number;
+  active_member_count: number;
+  created_at: string;
+  updated_at: string;
+};
+
 export type Workspace = {
   id: string;
   organisation_id: string;

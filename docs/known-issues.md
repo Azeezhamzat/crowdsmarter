@@ -67,6 +67,34 @@ afterwards, but this account hit the identical `AuditEvent.actor`
 `PROTECT` constraint and was left in place for the same reason as
 `a11y-audit@example.test` above.
 
+## Fixed in Phase 29
+
+- No plan/subscription/billing/entitlement concept existed anywhere in the
+  codebase, and no quota or usage-limit enforcement existed anywhere.
+  Added a new `apps.billing` app (`Plan`, `OrganisationSubscription`) with
+  every new organisation auto-enrolled in a trialing default plan, and
+  server-side enforcement of the active plan's `max_active_decisions` /
+  `max_active_members` limits (both are no-ops when the limit field is
+  `None` or no subscription exists). A backfill data migration seeds three
+  plans (`team`/`professional`/`enterprise`) and assigns every pre-existing
+  organisation to `team`, with limits generous enough (25 decisions / 15
+  members) that a script parsing every existing test function body
+  confirmed no pre-existing test could be retroactively broken by the
+  backfill.
+- Per the master prompt's explicit instruction, wrote ADR 0031
+  (`docs/adr/0031-billing-and-subscription-strategy.md`) before writing any
+  billing-adjacent code, scoping what's built now (entitlements, no payment
+  processing) against what's deliberately deferred (a real payment
+  provider, real subscriptions/invoices/tax, webhooks) with a stated plan
+  for each.
+- Confirmed for the record: real payment processing (Stripe or otherwise),
+  SSO/SCIM, and a production observability/deployment stack all require
+  real external infrastructure or credentials unavailable in this sandbox.
+  Not attempted; not regressed. Same reasoning as skipping real OAuth
+  integrations in Phase 26, a real LLM provider in Phase 27, and real
+  SSO/SCIM in Phase 28. Documented comprehensively in the new
+  `docs/launch-readiness.md` capstone.
+
 ## Fixed in Phase 28
 
 - No MFA/two-factor authentication capability existed anywhere in the

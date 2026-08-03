@@ -109,6 +109,10 @@ def create_organisation(*, actor: User, name: str, slug: str) -> Organisation:
     from apps.workspaces.services import create_default_workspace
 
     create_default_workspace(organisation=organisation, actor=actor)
+
+    from apps.billing.services import create_subscription_for_organisation
+
+    create_subscription_for_organisation(organisation=organisation, actor=actor)
     return organisation
 
 
