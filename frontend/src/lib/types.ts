@@ -147,6 +147,7 @@ export type ReasoningSummary = {
   active_assumptions: number;
   invalidated_assumptions: number;
   current_risks: number;
+  active_criteria: number;
   ready_for_decision: boolean;
   blockers: string[];
 };
@@ -241,6 +242,28 @@ export type Risk = {
   owner: User;
   review_date: string | null;
   status: "open" | "monitoring" | "mitigated" | "accepted" | "closed";
+  status_label: string;
+  created_by: User;
+  can_edit: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Criterion = {
+  id: string;
+  decision_id: string;
+  title: string;
+  description: string;
+  measurement_note: string;
+  direction: "maximize" | "minimize";
+  direction_label: string;
+  weight: number;
+  weight_rationale: string;
+  is_must_have: boolean;
+  threshold_note: string;
+  owner: User;
+  order: number;
+  status: "active" | "retired";
   status_label: string;
   created_by: User;
   can_edit: boolean;

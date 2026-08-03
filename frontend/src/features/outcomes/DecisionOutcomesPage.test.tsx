@@ -35,7 +35,7 @@ describe("DecisionOutcomesPage", () => {
       can_edit: false, can_transition: true, can_manage_participants: false,
       next_transition: { from_status: "decision_finalised", to_status: "commitment", enabled: true, blocked_reason: "", action: "outcome_workflow" },
       can_contribute_reasoning: false,
-      reasoning_summary: { active_options: 2, active_evidence: 1, active_assumptions: 1, invalidated_assumptions: 0, current_risks: 1, ready_for_decision: true, blockers: [] },
+      reasoning_summary: { active_options: 2, active_evidence: 1, active_assumptions: 1, invalidated_assumptions: 0, current_risks: 1, active_criteria: 0, ready_for_decision: true, blockers: [] },
       can_submit_position: false, can_finalise: false,
       position_summary: { current_positions: 1, required_authorities: 1, submitted_authorities: 1, missing_authorities: [], ready_to_finalise: false },
       created_at: "2026-07-26T10:00:00Z", updated_at: "2026-07-26T12:00:00Z",

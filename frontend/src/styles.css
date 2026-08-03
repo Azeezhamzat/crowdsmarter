@@ -614,7 +614,7 @@ textarea:disabled, input:disabled, select:disabled { background: #f1f4f1; color:
 .overview-card .record-grid span { color: var(--muted); font-size: .75rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; }
 .overview-card .record-grid p { margin: .35rem 0 0; line-height: 1.55; }
 .text-link { color: var(--accent); font-weight: 750; text-decoration: none; }
-.reasoning-count-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: .5rem; margin: .75rem 0 1rem; }
+.reasoning-count-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: .5rem; margin: .75rem 0 1rem; }
 .reasoning-count-grid div { display: grid; gap: .15rem; padding: .75rem; border-radius: 10px; background: #f5f7f5; text-align: center; }
 .reasoning-count-grid strong { font-size: 1.35rem; }
 .reasoning-count-grid span { color: var(--muted); font-size: .72rem; }

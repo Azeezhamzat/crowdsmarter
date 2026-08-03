@@ -1,6 +1,7 @@
 import { apiRequest } from "../../lib/api";
 import type {
   Assumption,
+  Criterion,
   DecisionOption,
   EvidenceItem,
   EvidenceSourceType,
@@ -145,6 +146,43 @@ export function updateRisk(
   },
 ): Promise<Risk> {
   return apiRequest<Risk>(`/risks/${riskId}/`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export type CriterionInput = {
+  title: string;
+  description: string;
+  measurement_note?: string;
+  direction: "maximize" | "minimize";
+  weight: number;
+  weight_rationale?: string;
+  is_must_have?: boolean;
+  threshold_note?: string;
+  owner_id?: string;
+  order?: number;
+};
+
+export function listCriteria(decisionId: string): Promise<Criterion[]> {
+  return apiRequest<Criterion[]>(`/decisions/${decisionId}/criteria/`);
+}
+
+export function createCriterion(
+  decisionId: string,
+  input: CriterionInput,
+): Promise<Criterion> {
+  return apiRequest<Criterion>(`/decisions/${decisionId}/criteria/`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateCriterion(
+  criterionId: string,
+  input: Partial<CriterionInput> & { status?: "active" | "retired" },
+): Promise<Criterion> {
+  return apiRequest<Criterion>(`/criteria/${criterionId}/`, {
     method: "PATCH",
     body: JSON.stringify(input),
   });

@@ -90,6 +90,7 @@ describe("DecisionGovernancePage", () => {
         active_assumptions: 1,
         invalidated_assumptions: 0,
         current_risks: 1,
+        active_criteria: 0,
         ready_for_decision: true,
         blockers: [],
       },

@@ -5,11 +5,12 @@ import { StatusMessage } from "../../components/StatusMessage";
 import { getDecision } from "../decisions/api";
 import { listMemberships } from "../organisations/api";
 import { AssumptionsSection } from "./AssumptionsSection";
+import { CriteriaSection } from "./CriteriaSection";
 import { EvidenceSection } from "./EvidenceSection";
 import { OptionsSection } from "./OptionsSection";
 import { RisksSection } from "./RisksSection";
 
-const sections = ["options", "evidence", "assumptions", "risks"] as const;
+const sections = ["options", "criteria", "evidence", "assumptions", "risks"] as const;
 type Section = (typeof sections)[number];
 
 function isSection(value: string | undefined): value is Section {
@@ -73,6 +74,9 @@ export function DecisionReasoningPage() {
             <strong>{current.reasoning_summary.active_options}</strong> options
           </span>
           <span>
+            <strong>{current.reasoning_summary.active_criteria}</strong> criteria
+          </span>
+          <span>
             <strong>{current.reasoning_summary.active_evidence}</strong> evidence
           </span>
           <span>
@@ -113,7 +117,7 @@ export function DecisionReasoningPage() {
         ))}
       </nav>
 
-      {memberships.isError && (section === "assumptions" || section === "risks") ? (
+      {memberships.isError && (section === "criteria" || section === "assumptions" || section === "risks") ? (
         <StatusMessage kind="error">
           Organisation members could not be loaded. Existing records remain
           visible, but accountable ownership cannot be reassigned right now.
@@ -124,6 +128,13 @@ export function DecisionReasoningPage() {
         <OptionsSection
           decisionId={decisionId}
           canContribute={current.can_contribute_reasoning}
+        />
+      ) : null}
+      {section === "criteria" ? (
+        <CriteriaSection
+          decisionId={decisionId}
+          canContribute={current.can_contribute_reasoning}
+          memberships={memberships.data ?? []}
         />
       ) : null}
       {section === "evidence" ? (

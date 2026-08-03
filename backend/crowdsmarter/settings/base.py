@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     "apps.evidence",
     "apps.assumptions",
     "apps.risks",
+    "apps.criteria",
     "apps.reviews",
     "apps.lessons",
     "apps.search",

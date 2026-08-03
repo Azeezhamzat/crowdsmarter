@@ -10,6 +10,7 @@ from .models import Decision
 def reasoning_summary(decision: Decision) -> dict[str, Any]:
     """Return transparent counts and blockers for structured review readiness."""
     from apps.assumptions.models import Assumption
+    from apps.criteria.models import Criterion
     from apps.decision_options.models import DecisionOption
     from apps.evidence.models import Evidence
     from apps.risks.models import Risk
@@ -31,6 +32,9 @@ def reasoning_summary(decision: Decision) -> dict[str, Any]:
     current_risks = Risk.objects.filter(decision=decision).exclude(
         status=Risk.Status.CLOSED
     ).count()
+    active_criteria = Criterion.objects.filter(
+        decision=decision, status=Criterion.Status.ACTIVE
+    ).count()
 
     blockers: list[str] = []
     if active_options < 2:
@@ -50,6 +54,7 @@ def reasoning_summary(decision: Decision) -> dict[str, Any]:
         "active_assumptions": active_assumptions,
         "invalidated_assumptions": invalidated_assumptions,
         "current_risks": current_risks,
+        "active_criteria": active_criteria,
         "ready_for_decision": not blockers,
         "blockers": blockers,
     }

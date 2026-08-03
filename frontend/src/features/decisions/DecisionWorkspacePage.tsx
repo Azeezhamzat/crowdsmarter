@@ -203,6 +203,7 @@ export function DecisionWorkspacePage() {
           <div className="section-heading"><div><p className="eyebrow">Reasoning health</p><h2 id="reasoning-title">Structured record</h2></div></div>
           <div className="reasoning-count-grid">
             <div><strong>{summary.reasoning.active_options}</strong><span>Options</span></div>
+            <div><strong>{summary.reasoning.active_criteria}</strong><span>Criteria</span></div>
             <div><strong>{summary.reasoning.active_evidence}</strong><span>Evidence</span></div>
             <div><strong>{summary.reasoning.active_assumptions}</strong><span>Assumptions</span></div>
             <div><strong>{summary.reasoning.current_risks}</strong><span>Risks</span></div>

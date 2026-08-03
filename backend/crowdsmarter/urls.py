@@ -21,6 +21,7 @@ urlpatterns = [
     path("api/v1/", include("apps.evidence.urls")),
     path("api/v1/", include("apps.assumptions.urls")),
     path("api/v1/", include("apps.risks.urls")),
+    path("api/v1/", include("apps.criteria.urls")),
     path("api/v1/", include("apps.reviews.urls")),
     path("api/v1/", include("apps.lessons.urls")),
     path("api/v1/", include("apps.search.urls")),
