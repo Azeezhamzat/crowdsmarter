@@ -59,6 +59,32 @@ protection, which this phase deliberately did not do. If you want it gone,
 use the organisation's own deactivation/deletion flow (`/organisations/<id>/administration`)
 rather than a direct database delete.
 
+Phase 23's browser verification needed a second evaluator to produce a real
+disagreement between two independent scorers, so it also created
+`second-evaluator@example.test` as a `CONTRIBUTOR` member of the same
+organisation. The throwaway decision/exercise/options were deleted
+afterwards, but this account hit the identical `AuditEvent.actor`
+`PROTECT` constraint and was left in place for the same reason as
+`a11y-audit@example.test` above.
+
+## Fixed in Phase 23
+
+- Collective evaluation results showed only a single aggregate
+  (`weighted_score`/`confidence` or `approval_rate`/`objection_rate`), with
+  no indication of how much evaluators actually disagreed — a direct miss
+  against the master prompt's explicit mandate to never show one aggregate
+  score without dispersion/dissent. `evaluation_results()` now also computes
+  `score_stdev`/`score_min`/`score_max`/`disagreement` (scorecard/Delphi) and
+  `dissent_rate` (approval/consent), surfaced as a disagreement badge and
+  inline dissent percentage in `DecisionEvaluationPage.tsx`. Pure read-side
+  change — no migration.
+- Noted for the record: neither Phase 22's foresight-watchlist UI nor Phase
+  23's dispersion-badge UI has a dedicated frontend component test yet —
+  both were verified live in the browser instead. Not urgent (typecheck +
+  the existing 48-test suite + manual verification all passed), but a
+  reasonable thing to close out in a future pass if this area sees more
+  churn.
+
 ## Fixed in Phase 22
 
 - Foresight signposts had no connection to the decision-reasoning artifacts

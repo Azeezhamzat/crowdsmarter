@@ -4,7 +4,7 @@ import { Link, useParams } from "react-router";
 
 import { StatusMessage } from "../../components/StatusMessage";
 import { ApiError } from "../../lib/api";
-import type { EvaluationExercise, EvaluationRound } from "../../lib/types";
+import type { EvaluationExercise, EvaluationOptionResult, EvaluationRound } from "../../lib/types";
 import { getDecision } from "../decisions/api";
 import { listOptions } from "../reasoning/api";
 import {
@@ -223,6 +223,29 @@ function EvaluationWorkspace({ exercise, options, onRefresh }: { exercise: Evalu
   );
 }
 
+const DISAGREEMENT_LABELS: Record<string, string> = {
+  low: "Low disagreement",
+  moderate: "Moderate disagreement",
+  high: "High disagreement",
+  insufficient_data: "Not enough data",
+};
+
+function DisagreementBadge({ result }: { result: EvaluationOptionResult }) {
+  if (result.disagreement == null) return null;
+  const range =
+    result.score_min != null && result.score_max != null
+      ? ` (range ${result.score_min.toFixed(0)}–${result.score_max.toFixed(0)})`
+      : "";
+  return (
+    <span
+      className={`disagreement-badge disagreement-badge--${result.disagreement}`}
+      title={`Evaluators' individual scores for this option, normalised to 0–100${range}`}
+    >
+      {DISAGREEMENT_LABELS[result.disagreement]}
+    </span>
+  );
+}
+
 function RoundPanel({ round, exercise, options, onRefresh }: { round: EvaluationRound; exercise: EvaluationExercise; options: Array<{ id: string; title: string }>; onRefresh: () => Promise<void> }) {
   const [scores, setScores] = useState<Record<string, string>>({});
   const [votes, setVotes] = useState<Record<string, string>>({});
@@ -278,7 +301,7 @@ function RoundPanel({ round, exercise, options, onRefresh }: { round: Evaluation
       <div className="round-results">
         <div className="result-summary"><span>{round.result_summary.submission_count} submitted</span><span>{round.result_summary.eligible_count} eligible</span><span className={round.result_summary.quorum_met ? "result-ok" : "result-warning"}>{round.result_summary.quorum_met ? "Quorum met" : `Needs ${round.result_summary.quorum_count}`}</span></div>
         {round.result_summary.hidden ? <div className="sealed-results"><strong>Results sealed</strong><p>Blindness protects independent judgement and reduces anchoring while this round remains open.</p></div> : (
-          <div className="result-ranking">{options.map((option, index) => { const result = resultByOption.get(option.id); return result ? <article key={option.id}><span className="rank-number">{index + 1}</span><div><strong>{result.title}</strong>{result.weighted_score != null ? <p>{result.weighted_score.toFixed(1)} weighted score · confidence {result.confidence ?? "—"}</p> : <p>{result.approval_rate ?? 0}% approval · {result.objection_rate ?? 0}% objections</p>}</div>{result.passes_threshold != null ? <span className={result.passes_threshold ? "role-badge" : "status-badge"}>{result.passes_threshold ? "Passes" : "Below threshold"}</span> : null}</article> : null; })}</div>
+          <div className="result-ranking">{options.map((option, index) => { const result = resultByOption.get(option.id); return result ? <article key={option.id}><span className="rank-number">{index + 1}</span><div><strong>{result.title}</strong>{result.weighted_score != null ? <p>{result.weighted_score.toFixed(1)} weighted score · confidence {result.confidence ?? "—"}</p> : <p>{result.approval_rate ?? 0}% approval · {result.objection_rate ?? 0}% objections{result.dissent_rate != null ? ` · ${result.dissent_rate}% dissent` : ""}</p>}<DisagreementBadge result={result} /></div>{result.passes_threshold != null ? <span className={result.passes_threshold ? "role-badge" : "status-badge"}>{result.passes_threshold ? "Passes" : "Below threshold"}</span> : null}</article> : null; })}</div>
         )}
       </div>
     </article>

@@ -2605,6 +2605,11 @@ kbd { display: inline-grid; place-items: center; min-width: 23px; min-height: 21
 .result-ranking article, .recommendation-list article { border: 1px solid var(--border); border-radius: var(--radius-md); padding: .75rem; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: .8rem; }
 .result-ranking p, .recommendation-list p, .recommendation-list small { margin: .2rem 0 0; color: var(--text-muted); }
 .rank-number { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 50%; background: var(--surface-muted); font-weight: 750; }
+.disagreement-badge { display: inline-flex; align-items: center; width: fit-content; padding: .2rem .55rem; border-radius: 999px; font-size: .72rem; font-weight: 700; margin-top: .35rem; }
+.disagreement-badge--low { background: var(--success-soft); color: var(--success-strong); }
+.disagreement-badge--moderate { background: var(--warning-soft); color: var(--warning-strong); }
+.disagreement-badge--high { background: #f8e2e0; color: var(--danger); }
+.disagreement-badge--insufficient_data { background: var(--surface-muted); color: var(--text-muted); }
 .minority-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: .75rem; margin: .8rem 0; }
 .minority-grid article { padding: .85rem; border: 1px solid var(--border); border-radius: var(--radius-md); }
 .minority-grid small { display: block; color: var(--text-muted); margin-top: .2rem; }

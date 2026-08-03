@@ -1358,6 +1358,10 @@ export type EvaluationOptionResult = {
   title: string;
   weighted_score?: number | null;
   confidence?: number | null;
+  score_stdev?: number | null;
+  score_min?: number | null;
+  score_max?: number | null;
+  disagreement?: "low" | "moderate" | "high" | "insufficient_data";
   criteria?: Array<{
     criterion_id: string;
     title: string;
@@ -1368,6 +1372,7 @@ export type EvaluationOptionResult = {
   vote_count?: number;
   approval_rate?: number;
   objection_rate?: number;
+  dissent_rate?: number;
   passes_threshold?: boolean;
   breakdown?: Record<string, number>;
 };

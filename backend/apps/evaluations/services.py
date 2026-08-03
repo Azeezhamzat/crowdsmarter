@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from collections import defaultdict
+from collections import Counter, defaultdict
 import builtins
 from decimal import Decimal
-from statistics import mean
+from statistics import mean, pstdev
 
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import IntegrityError, transaction
@@ -276,12 +276,14 @@ def evaluation_results(*, round, viewer):
         values = defaultdict(lambda: defaultdict(list))
         confidences = defaultdict(list)
         option_map = {}
+        per_submission_scores = defaultdict(lambda: defaultdict(dict))
         for submission in submitted:
             for response in submission.responses.all():
                 if response.criterion_id and response.score is not None:
                     values[response.option_id][response.criterion_id].append(float(response.score))
                     confidences[response.option_id].append(submission.confidence)
                     option_map[response.option_id] = response.option
+                    per_submission_scores[submission.id][response.option_id][response.criterion_id] = float(response.score)
         rows=[]
         for option_id, option in option_map.items():
             weighted=0.0
@@ -299,7 +301,19 @@ def evaluation_results(*, round, viewer):
                     weighted += normalised * float(criterion.weight/total_weight)
                     coverage += float(criterion.weight/total_weight)
                 criterion_rows.append({"criterion_id": str(criterion.id), "title": criterion.title, "mean_score": round_number(avg), "normalised_score": round_number(normalised), "response_count": len(raw)})
-            rows.append({"option_id": str(option.id), "title": option.title, "weighted_score": builtins.round(weighted/coverage,2) if coverage else None, "confidence": builtins.round(mean(confidences[option_id]),2) if confidences[option_id] else None, "criteria": criterion_rows})
+            individual_scores = _individual_weighted_scores(option_id=option_id, criteria=criteria, total_weight=total_weight, per_submission_scores=per_submission_scores)
+            dispersion = pstdev(individual_scores) if len(individual_scores) >= 2 else None
+            rows.append({
+                "option_id": str(option.id),
+                "title": option.title,
+                "weighted_score": builtins.round(weighted/coverage,2) if coverage else None,
+                "confidence": builtins.round(mean(confidences[option_id]),2) if confidences[option_id] else None,
+                "score_stdev": round_number(dispersion),
+                "score_min": round_number(min(individual_scores)) if individual_scores else None,
+                "score_max": round_number(max(individual_scores)) if individual_scores else None,
+                "disagreement": _disagreement_label(dispersion),
+                "criteria": criterion_rows,
+            })
         rows.sort(key=lambda x: (x["weighted_score"] is not None, x["weighted_score"] or -1), reverse=True)
         base["options"]=rows
         base["criterion_sensitivity"]=_sensitivity(rows=rows, criteria=criteria, values=values)
@@ -316,10 +330,50 @@ def evaluation_results(*, round, viewer):
             approval_rate=(approvals/len(non_abstain)*100) if non_abstain else 0
             objection_rate=(objections/len(non_abstain)*100) if non_abstain else 0
             passes=approval_rate >= float(exercise.approval_threshold) if exercise.method == EvaluationExercise.Method.APPROVAL else objection_rate <= float(exercise.objection_threshold)
-            rows.append({"option_id": str(option_id), "title": option_map[option_id].title, "vote_count": len(votes), "approval_rate": builtins.round(approval_rate,2), "objection_rate": builtins.round(objection_rate,2), "passes_threshold": passes, "breakdown": {choice: votes.count(choice) for choice, _ in EvaluationResponse.Vote.choices}})
+            if non_abstain:
+                majority_count = Counter(non_abstain).most_common(1)[0][1]
+                dissent_rate = builtins.round((len(non_abstain) - majority_count) / len(non_abstain) * 100, 2)
+            else:
+                dissent_rate = 0
+            rows.append({"option_id": str(option_id), "title": option_map[option_id].title, "vote_count": len(votes), "approval_rate": builtins.round(approval_rate,2), "objection_rate": builtins.round(objection_rate,2), "dissent_rate": dissent_rate, "passes_threshold": passes, "breakdown": {choice: votes.count(choice) for choice, _ in EvaluationResponse.Vote.choices}})
         rows.sort(key=lambda x: (x["passes_threshold"], x["approval_rate"], -x["objection_rate"]), reverse=True)
         base["options"]=rows
     return base
+
+
+def _individual_weighted_scores(*, option_id, criteria, total_weight, per_submission_scores):
+    """Each submitter's own weighted score for one option, so dispersion reflects evaluator disagreement."""
+    scores = []
+    for option_scores in per_submission_scores.values():
+        answered = option_scores.get(option_id)
+        if not answered:
+            continue
+        weighted = 0.0
+        coverage = 0.0
+        for criterion in criteria:
+            if criterion.id not in answered:
+                continue
+            span = criterion.scale_max - criterion.scale_min
+            normalised = (answered[criterion.id] - criterion.scale_min) / span * 100
+            if not criterion.higher_is_better:
+                normalised = 100 - normalised
+            fraction = float(criterion.weight / total_weight)
+            weighted += normalised * fraction
+            coverage += fraction
+        if coverage:
+            scores.append(weighted / coverage)
+    return scores
+
+
+def _disagreement_label(stdev):
+    """Thresholds are on the 0-100 normalised score scale, not raw criterion units."""
+    if stdev is None:
+        return "insufficient_data"
+    if stdev < 7:
+        return "low"
+    if stdev < 15:
+        return "moderate"
+    return "high"
 
 
 def round_number(value):

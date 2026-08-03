@@ -1,4 +1,4 @@
-# Current state (Phase 19/20/21/22 baseline)
+# Current state (Phase 19/20/21/22/23 baseline)
 
 Verified against the running system on 2026-08-03. Update this document
 whenever the baseline materially changes; do not let it drift into aspiration.
@@ -38,14 +38,16 @@ the two new migrations above were applied by hand).
 
 ## Test suites
 
-- Backend: `docker compose exec backend pytest` — **361 passed, 0 failed**
-  (was 354 passed at the end of Phase 21; +7 tests for the Phase 22
-  signpost-watchlist feature).
+- Backend: `docker compose exec backend pytest` — **363 passed, 0 failed**
+  (was 361 passed at the end of Phase 22; +2 tests for Phase 23's
+  evaluation-dispersion feature).
 - Frontend: `docker compose exec frontend npx vitest run` — **36 test files /
-  48 tests, all passing** (unchanged from Phase 21 — the watchlist UI has no
-  dedicated test file yet; verified live in the browser instead, see below).
+  48 tests, all passing** (unchanged — both Phase 22's and Phase 23's UI
+  changes were verified live in the browser instead of with new component
+  tests; see known-issues.md if that gap should be closed later).
 - `docker compose exec backend python manage.py check` — clean, 0 warnings.
-- `docker compose exec backend python manage.py makemigrations --check --dry-run` — clean.
+- `docker compose exec backend python manage.py makemigrations --check --dry-run` — clean
+  (Phase 23 added no migration — it only changes a computed API response).
 - Frontend `npx tsc -b` and `npm run build` — clean.
 
 ## Dependencies
@@ -171,7 +173,45 @@ confirmed exactly one `signpost_watch` notification was created and
 displayed correctly on `/notifications`. Then deleted all the throwaway
 foresight/decision test data.
 
-Committed on `claude/phase-22-foresight-adaptive-strategy`, not yet pushed.
+Committed on `claude/phase-22-foresight-adaptive-strategy`, pushed, and
+fast-forward merged into `main`.
+
+## Phase 23 (collective-intelligence aggregation transparency) progress
+
+Audited `apps/contributions` and `apps/evaluations` against the master
+prompt's collective-intelligence roadmap (contribution orchestration, bias
+reduction, aggregation, forecasting). Most of it was already built —
+`apps/evaluations.EvaluationRound` is already a genuine pooled, time-boxed,
+blind-until-close round with quorum, confidence, rationale, and minority
+reports; `apps/contributions` already handles assignment/reminder workflows.
+The one unmet, explicitly-worded mandate in that section — "never present
+one aggregate score without showing uncertainty, dispersion, and dissent" —
+was not met: `evaluation_results()` only ever returned a single
+`weighted_score`/`confidence` pair. Fixed that specific gap only:
+
+- For scorecard/Delphi exercises, `evaluation_results()` now also computes
+  each evaluator's own weighted score for an option (not just the aggregate),
+  then reports the spread across evaluators as `score_stdev`/`score_min`/
+  `score_max` and a `disagreement` label (`low`/`moderate`/`high`, thresholds
+  on the normalised 0–100 scale).
+- For approval/consent exercises, it now also reports `dissent_rate` — the
+  share of non-abstaining votes that didn't match the majority vote.
+- `DecisionEvaluationPage.tsx`'s `RoundPanel` shows a
+  low/moderate/high-disagreement badge (with a range tooltip) next to every
+  scorecard result, and the dissent percentage inline next to vote results.
+
+This is a pure read-side change — no new model, no migration; `EvaluationRound`,
+`EvaluationSubmission`, and `EvaluationResponse` are unchanged.
+
+Verified live in the browser: two evaluators scored one option identically
+(3 and 3) and one option divergently (5 and 1); the identical option
+correctly showed "Low disagreement" and the divergent one "High
+disagreement". Then deleted the throwaway decision — the second test
+account it required (`second-evaluator@example.test`) could not be removed
+due to `AuditEvent.actor` `PROTECT`, same pattern as the existing
+`a11y-audit@example.test` account; see `docs/known-issues.md`.
+
+Committed on `claude/phase-23-collective-intelligence`, not yet pushed.
 
 ## Known risks not yet resolved
 

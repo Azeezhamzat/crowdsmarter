@@ -150,6 +150,120 @@ def test_blind_scorecard_reveals_weighted_results_and_preserves_minority_report(
 
 
 @pytest.mark.django_db
+def test_scorecard_result_reports_dispersion_and_disagreement_label(
+    organisation_factory, decision_factory, user_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    first_evaluator = user_factory(email="first@example.com")
+    second_evaluator = user_factory(email="second@example.com")
+    for user in (first_evaluator, second_evaluator):
+        Membership.objects.create(
+            organisation=organisation, user=user,
+            role=Membership.Role.CONTRIBUTOR, status=Membership.Status.ACTIVE,
+        )
+    decision = decision_factory(
+        workspace=organisation.workspaces.get(is_default=True), owner=owner,
+        title="Choose a rollout approach",
+    )
+    for user in (owner, first_evaluator, second_evaluator):
+        Participant.objects.get_or_create(
+            organisation=organisation, decision=decision, user=user,
+            defaults={"role": Participant.Role.CONTRIBUTOR, "added_by": owner},
+        )
+    contested = create_option(actor=owner, decision=decision, title="Contested option", description="Divides opinion.")
+    agreed = create_option(actor=owner, decision=decision, title="Agreed option", description="Everyone agrees.")
+    exercise = create_exercise(
+        actor=owner, decision=decision, owner_id=owner.id,
+        title="Dispersion test scorecard", purpose="Check dispersion reporting.",
+        method="scorecard", anonymity="attributed", blind_results_until_close=False,
+        quorum_count=2, approval_threshold=60, objection_threshold=20,
+    )
+    value = create_criterion(
+        actor=owner, exercise=exercise, title="Value", description="Expected value.",
+        weight=1, scale_min=1, scale_max=5, higher_is_better=True, order=0,
+    )
+    round_item = create_round(actor=owner, exercise=exercise)
+    transition_round(actor=owner, round=round_item, status=EvaluationRound.Status.OPEN)
+
+    save_submission(
+        actor=owner, confidence=5, overall_rationale="Strong preference.", round=round_item,
+        responses=[
+            {"option_id": contested.id, "criterion_id": value.id, "score": 5},
+            {"option_id": agreed.id, "criterion_id": value.id, "score": 3},
+        ],
+    )
+    save_submission(
+        actor=first_evaluator, confidence=5, overall_rationale="Opposite preference.", round=round_item,
+        responses=[
+            {"option_id": contested.id, "criterion_id": value.id, "score": 1},
+            {"option_id": agreed.id, "criterion_id": value.id, "score": 3},
+        ],
+    )
+    save_submission(
+        actor=second_evaluator, confidence=5, overall_rationale="Also agrees.", round=round_item,
+        responses=[
+            {"option_id": contested.id, "criterion_id": value.id, "score": 3},
+            {"option_id": agreed.id, "criterion_id": value.id, "score": 3},
+        ],
+    )
+
+    result = evaluation_results(round=round_item, viewer=owner)
+    by_option = {row["option_id"]: row for row in result["options"]}
+
+    contested_row = by_option[str(contested.id)]
+    assert contested_row["disagreement"] == "high"
+    assert contested_row["score_stdev"] > 0
+    assert contested_row["score_min"] == 0
+    assert contested_row["score_max"] == 100
+
+    agreed_row = by_option[str(agreed.id)]
+    assert agreed_row["disagreement"] == "low"
+    assert agreed_row["score_stdev"] == 0
+
+
+@pytest.mark.django_db
+def test_vote_result_reports_dissent_rate(
+    organisation_factory, decision_factory, user_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    dissenter = user_factory(email="dissenter@example.com")
+    agreer = user_factory(email="agreer@example.com")
+    for user in (dissenter, agreer):
+        Membership.objects.create(
+            organisation=organisation, user=user,
+            role=Membership.Role.CONTRIBUTOR, status=Membership.Status.ACTIVE,
+        )
+    decision = decision_factory(
+        workspace=organisation.workspaces.get(is_default=True), owner=owner,
+        title="Consent to the mobilisation plan",
+    )
+    for user in (dissenter, agreer):
+        Participant.objects.create(
+            organisation=organisation, decision=decision, user=user,
+            role=Participant.Role.CONTRIBUTOR, added_by=owner,
+        )
+    option = create_option(actor=owner, decision=decision, title="Plan", description="The plan.")
+    exercise = create_exercise(
+        actor=owner, decision=decision, owner_id=owner.id,
+        title="Consent round", purpose="Test dissent.", method="consent",
+        anonymity="attributed", blind_results_until_close=False,
+        quorum_count=3, approval_threshold=60, objection_threshold=20,
+    )
+    round_item = create_round(actor=owner, exercise=exercise)
+    transition_round(actor=owner, round=round_item, status=EvaluationRound.Status.OPEN)
+
+    save_submission(actor=owner, confidence=4, overall_rationale="", round=round_item, responses=[{"option_id": option.id, "vote": "consent"}])
+    save_submission(actor=agreer, confidence=4, overall_rationale="", round=round_item, responses=[{"option_id": option.id, "vote": "consent"}])
+    save_submission(actor=dissenter, confidence=4, overall_rationale="A reasoned objection.", round=round_item, responses=[{"option_id": option.id, "vote": "object"}])
+
+    result = evaluation_results(round=round_item, viewer=owner)
+    row = result["options"][0]
+    assert row["dissent_rate"] == pytest.approx(33.33, abs=0.01)
+
+
+@pytest.mark.django_db
 def test_observer_cannot_submit_evaluation(
     organisation_factory, decision_factory, user_factory
 ):  # type: ignore[no-untyped-def]
