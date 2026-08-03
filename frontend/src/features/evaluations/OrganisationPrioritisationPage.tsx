@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
 
+import { PageHelp } from "../../components/PageHelp";
 import { StatusMessage } from "../../components/StatusMessage";
 import { ApiError } from "../../lib/api";
 import type { PrioritisationPortfolio } from "../../lib/types";
@@ -89,6 +90,21 @@ export function OrganisationPrioritisationPage() {
         <div><p className="eyebrow">Portfolio prioritisation</p><h1>{organisation.data.name}</h1><p>Compare strategic value collectively, expose uncertainty, and test a transparent recommendation against budget and capacity.</p></div>
         <div className="phase14-principle"><strong>Constraint-aware</strong><span>The recommendation is explainable support, never an automatic portfolio decision.</span></div>
       </header>
+
+      <PageHelp title="How a prioritisation portfolio works">
+        <p>
+          A <strong>portfolio</strong> is a bounded set of candidate decisions competing for the
+          same limited budget or capacity. Add criteria with weights, then invite assessors to
+          score each candidate against them — <strong>anonymous</strong> assessment hides who gave
+          which score to reduce anchoring and status effects, and <strong>sealing results</strong>{" "}
+          keeps every score hidden from other assessors until the round closes.
+        </p>
+        <p>
+          Once closed, the system produces a transparent, explainable recommendation given the
+          budget and capacity limits — but selecting candidates is always a separate, human,
+          accountable-owner action, never automatic.
+        </p>
+      </PageHelp>
 
       {create.error ? <StatusMessage kind="error">{message(create.error)}</StatusMessage> : null}
 

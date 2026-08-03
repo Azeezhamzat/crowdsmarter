@@ -3170,6 +3170,43 @@ kbd { display: inline-grid; place-items: center; min-width: 23px; min-height: 21
   margin-top: 0.75rem;
 }
 
+.page-help {
+  margin: 0 0 1.5rem;
+  padding: 0.9rem 1.1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.85rem;
+  background: var(--surface);
+}
+
+.page-help summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.page-help[open] summary {
+  margin-bottom: 0.75rem;
+}
+
+.page-help__body {
+  max-width: 68ch;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.page-help__body p {
+  margin: 0 0 0.6rem;
+}
+
+.page-help__body ul {
+  margin: 0 0 0.6rem;
+  padding-left: 1.2rem;
+}
+
+.page-help__body li {
+  margin-bottom: 0.3rem;
+}
+
 /* Phase 17 — organisation methodology and administration */
 .methodology-page,
 .organisation-admin-page {

@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 
 import { Icon } from "../../components/Icon";
+import { PageHelp } from "../../components/PageHelp";
 import { StatusMessage } from "../../components/StatusMessage";
 import { ApiError } from "../../lib/api";
 import type { ForesightSignal } from "../../lib/types";
@@ -250,6 +251,22 @@ export function OrganisationForesightPage() {
         </div>
         <div className="heading-actions"><Link className="button button--secondary" to={`/organisations/${organisationId}/foresight/canvases`}><Icon name="layers" /> Systems canvases</Link>{canContribute ? <button className="button button--primary" type="button" onClick={() => setTab("signals")}><Icon name="plus" /> Capture signal</button> : null}</div>
       </div>
+
+      <PageHelp title="How signals, sources, and watchlists fit together">
+        <p>
+          A <strong>source</strong> is an attributable place a signal came from — a report, a
+          conversation, an attachment. A <strong>signal</strong> is one observed piece of change,
+          classified by STEEP category (social, technological, economic, environmental, political
+          — plus legal and ethical) and scored for impact and uncertainty. The radar plots signals
+          on those two axes so the ones worth attention stand out.
+        </p>
+        <p>
+          A <strong>watchlist</strong> groups related signals under a strategic concern you want to
+          keep monitoring over time. <strong>Systems canvases</strong> go a level deeper — mapping
+          drivers, stakeholders, and causal relationships — and are where signals connect through to
+          scenarios and, ultimately, to specific decisions.
+        </p>
+      </PageHelp>
 
       {error ? <StatusMessage kind="error">{error instanceof ApiError ? error.message : "The foresight action could not be completed."}</StatusMessage> : null}
       {overview.isError || signals.isError || sources.isError ? <StatusMessage kind="error">Foresight records could not be loaded.</StatusMessage> : null}

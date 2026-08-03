@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
 
+import { PageHelp } from "../../components/PageHelp";
 import { StatusMessage } from "../../components/StatusMessage";
 import type { DecisionAnalysisIssue, DecisionQualityReview, ExecutiveDecisionSummary } from "../../lib/types";
 import { getDecision } from "../decisions/api";
@@ -203,6 +204,18 @@ export function DecisionAnalysisPage() {
       </div>
 
       <StatusMessage kind="info">{workspace.principle}</StatusMessage>
+
+      <PageHelp title="What each section of this analysis shows">
+        <p>
+          <strong>Option comparison</strong> lays each option's evidence, assumptions, risks, and
+          collective evaluation scores side by side. <strong>Gaps and contradictions</strong>{" "}
+          surfaces where evidence conflicts or coverage is thin, so it can be resolved before the
+          decision is finalised. <strong>Decision quality</strong> is a structured, versioned
+          reviewer judgement on whether the reasoning behind the decision is sound — not a score
+          on the options themselves. <strong>Executive summary</strong> is a human-approved,
+          versioned synthesis for people who need the outcome and rationale without the full trace.
+        </p>
+      </PageHelp>
 
       <section className="analysis-summary-strip" aria-label="Analysis summary">
         <div><strong>{workspace.options.length}</strong><span>active options</span></div>
