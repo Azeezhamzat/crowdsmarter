@@ -57,7 +57,7 @@ export function RequestDemoPage() {
       <header className="demo-request-header">
         <Link className="public-brand" to="/" aria-label="CrowdSmarter home">
           <LogoMark size={38} />
-          <span><strong>CrowdSmarter</strong><small>Foresight-to-decision intelligence</small></span>
+          <span><strong>CrowdSmarter</strong><small>Foresight. Collective intelligence. Decisions.</small></span>
         </Link>
         <Link className="demo-request-header__signin" to="/login">Already have access? Sign in</Link>
       </header>

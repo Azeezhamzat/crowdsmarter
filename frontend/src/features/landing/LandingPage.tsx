@@ -72,7 +72,7 @@ export function LandingPage() {
       <header className="public-header public-header--executive">
         <Link className="public-brand" to="/" aria-label="CrowdSmarter home">
           <LogoMark size={38} />
-          <span><strong>CrowdSmarter</strong><small>Foresight-to-decision intelligence</small></span>
+          <span><strong>CrowdSmarter</strong><small>Foresight. Collective intelligence. Decisions.</small></span>
         </Link>
         <nav className="public-nav public-nav--executive" aria-label="Primary navigation">
           <a href="#platform">Platform</a>
@@ -302,7 +302,7 @@ export function LandingPage() {
       </main>
 
       <footer className="public-footer public-footer--executive">
-        <div className="public-brand"><LogoMark size={38} /><span><strong>CrowdSmarter</strong><small>Foresight-driven organisational decision intelligence</small></span></div>
+        <div className="public-brand"><LogoMark size={38} /><span><strong>CrowdSmarter</strong><small>Foresight. Collective intelligence. Decisions.</small></span></div>
         <div className="public-footer__contact">
           <span>General enquiries and partnerships</span>
           <a href={buildMailto(contactChannels.general, "CrowdSmarter enquiry")}>{contactChannels.general}</a>

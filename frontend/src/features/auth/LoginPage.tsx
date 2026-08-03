@@ -102,7 +102,7 @@ export function LoginPage() {
       <section className="auth-introduction auth-introduction--executive" aria-labelledby="product-title">
         <Link className="auth-brand" to="/">
           <LogoMark size={38} variant="inverse" />
-          <span><strong>CrowdSmarter</strong><small>Foresight-to-decision intelligence</small></span>
+          <span><strong>CrowdSmarter</strong><small>Foresight. Collective intelligence. Decisions.</small></span>
         </Link>
         <div className="auth-introduction__content auth-introduction__content--executive">
           <div className="auth-context-pill"><Icon name="shield" size={16} />Secure organisational workspace</div>

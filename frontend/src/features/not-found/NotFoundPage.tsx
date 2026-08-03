@@ -9,7 +9,7 @@ export function NotFoundPage() {
       <header className="public-header public-header--executive">
         <Link className="public-brand" to="/" aria-label="CrowdSmarter home">
           <LogoMark size={38} />
-          <span><strong>CrowdSmarter</strong><small>Foresight-to-decision intelligence</small></span>
+          <span><strong>CrowdSmarter</strong><small>Foresight. Collective intelligence. Decisions.</small></span>
         </Link>
         <div className="public-header__actions">
           <Link className="public-nav__signin" to="/login">Sign in</Link>

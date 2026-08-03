@@ -261,7 +261,7 @@ export function AppShell() {
         <div className="app-sidebar__brand-row">
           <Link to="/app" className="brand brand--sidebar" aria-label="CrowdSmarter application home">
             <LogoMark variant="inverse" size={34} />
-            <span className="brand-copy"><strong>CrowdSmarter</strong><small>Decision intelligence</small></span>
+            <span className="brand-copy"><strong>CrowdSmarter</strong><small>Foresight. Collective intelligence. Decisions.</small></span>
           </Link>
           <button ref={sidebarCloseButtonRef} className="icon-button app-sidebar__close" type="button" onClick={() => closeSidebar()} aria-label="Close navigation">
             <Icon name="close" />
