@@ -1,4 +1,4 @@
-# Current state (Phase 19/20/21/22/23 baseline)
+# Current state (Phase 19/20/21/22/23/24 baseline)
 
 Verified against the running system on 2026-08-03. Update this document
 whenever the baseline materially changes; do not let it drift into aspiration.
@@ -38,16 +38,17 @@ the two new migrations above were applied by hand).
 
 ## Test suites
 
-- Backend: `docker compose exec backend pytest` — **363 passed, 0 failed**
-  (was 361 passed at the end of Phase 22; +2 tests for Phase 23's
-  evaluation-dispersion feature).
+- Backend: `docker compose exec backend pytest` — **366 passed, 0 failed**
+  (was 363 passed at the end of Phase 23; +3 tests for Phase 24's
+  tornado-chart/uncertainty-narrative feature).
 - Frontend: `docker compose exec frontend npx vitest run` — **36 test files /
-  48 tests, all passing** (unchanged — both Phase 22's and Phase 23's UI
-  changes were verified live in the browser instead of with new component
-  tests; see known-issues.md if that gap should be closed later).
+  48 tests, all passing** (unchanged since Phase 22 — Phase 22/23/24's UI
+  changes were all verified live in the browser instead of with new
+  component tests; see known-issues.md if that gap should be closed later).
 - `docker compose exec backend python manage.py check` — clean, 0 warnings.
 - `docker compose exec backend python manage.py makemigrations --check --dry-run` — clean
-  (Phase 23 added no migration — it only changes a computed API response).
+  (Phase 24 added no migration, same as Phase 23 — both only change a
+  computed API response, not stored data).
 - Frontend `npx tsc -b` and `npm run build` — clean.
 
 ## Dependencies
@@ -211,7 +212,47 @@ account it required (`second-evaluator@example.test`) could not be removed
 due to `AuditEvent.actor` `PROTECT`, same pattern as the existing
 `a11y-audit@example.test` account; see `docs/known-issues.md`.
 
-Committed on `claude/phase-23-collective-intelligence`, not yet pushed.
+Committed on `claude/phase-23-collective-intelligence`, pushed, and
+fast-forward merged into `main`.
+
+## Phase 24 (advanced decision analysis — sensitivity transparency) progress
+
+Audited "analysis methods" and "uncertainty and sensitivity" from the
+decision-intelligence roadmap. Most methods already exist and are mature:
+weighted-sum MCDA and constrained portfolio optimization in
+`apps/evaluations`, scenario wind-tunnelling in `apps/foresight`. Genuinely
+absent methods (outranking, AHP-style pairwise comparison, cost-
+effectiveness, expected value, utility, regret) are each a much bigger,
+riskier build than fits one phase, so none were started. Instead, the audit
+found something more valuable and much better bounded: `_sensitivity()` in
+`apps/evaluations/services.py` already computed a rank-sensitivity table
+under ±25% weight perturbation, but the frontend never rendered it — the
+computation existed and was silently thrown away. Fixed that, and extended
+it:
+
+- Refactored `_sensitivity()` to share a `_simulate_scores()`/
+  `_perturbed_weights()` helper with a new `_tornado()` function, which
+  reports, for the current top-ranked option, how much a ±25% weight change
+  on each criterion moves *that option's own score* — classic tornado-chart
+  data, sorted by impact descending.
+- Added a rule-based `uncertainty_narrative` string to `evaluation_results()`
+  (for both scorecard/Delphi and approval/consent methods), stating plainly
+  whether the current leader's rank is stable under weight perturbation and
+  flagging moderate/high evaluator disagreement — directly answering the
+  roadmap's "do not imply mathematical certainty where inputs are
+  subjective" instruction.
+- `DecisionEvaluationPage.tsx`'s `RoundPanel` now renders the narrative
+  sentence, a tornado bar chart, and a "Rank stability under ±25% weight
+  changes" details table (the previously invisible sensitivity data).
+
+Pure read-side change — no new model, no migration.
+
+Verified live in the browser: an exercise with a heavily-weighted and a
+lightly-weighted criterion produced tornado bars matching hand-calculated
+values exactly (±9.7 and ±9.4), sorted correctly, alongside the expected
+"ranks first and stays first..." narrative sentence.
+
+Committed on `claude/phase-24-decision-analysis`, not yet pushed.
 
 ## Known risks not yet resolved
 

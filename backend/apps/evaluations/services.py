@@ -267,7 +267,7 @@ def evaluation_results(*, round, viewer):
     submitted = list(round.submissions.filter(status=EvaluationSubmission.Status.SUBMITTED).prefetch_related("responses__option", "responses__criterion", "submitted_by"))
     eligible = exercise.decision.participants.filter(status="active").exclude(role="observer").values("user_id").distinct().count()
     hidden = exercise.blind_results_until_close and round.status != EvaluationRound.Status.CLOSED
-    base = {"hidden": hidden, "round_id": str(round.id), "submission_count": len(submitted), "eligible_count": eligible, "quorum_count": exercise.quorum_count, "quorum_met": len(submitted) >= exercise.quorum_count, "method": exercise.method, "options": [], "criterion_sensitivity": []}
+    base = {"hidden": hidden, "round_id": str(round.id), "submission_count": len(submitted), "eligible_count": eligible, "quorum_count": exercise.quorum_count, "quorum_met": len(submitted) >= exercise.quorum_count, "method": exercise.method, "options": [], "criterion_sensitivity": [], "tornado": None, "uncertainty_narrative": ""}
     if hidden:
         return base
     if exercise.method in {EvaluationExercise.Method.SCORECARD, EvaluationExercise.Method.DELPHI}:
@@ -317,6 +317,8 @@ def evaluation_results(*, round, viewer):
         rows.sort(key=lambda x: (x["weighted_score"] is not None, x["weighted_score"] or -1), reverse=True)
         base["options"]=rows
         base["criterion_sensitivity"]=_sensitivity(rows=rows, criteria=criteria, values=values)
+        base["tornado"]=_tornado(rows=rows, criteria=criteria, values=values)
+        base["uncertainty_narrative"]=_uncertainty_narrative(rows=rows, criterion_sensitivity=base["criterion_sensitivity"])
     else:
         grouped=defaultdict(list); option_map={}
         for submission in submitted:
@@ -338,6 +340,12 @@ def evaluation_results(*, round, viewer):
             rows.append({"option_id": str(option_id), "title": option_map[option_id].title, "vote_count": len(votes), "approval_rate": builtins.round(approval_rate,2), "objection_rate": builtins.round(objection_rate,2), "dissent_rate": dissent_rate, "passes_threshold": passes, "breakdown": {choice: votes.count(choice) for choice, _ in EvaluationResponse.Vote.choices}})
         rows.sort(key=lambda x: (x["passes_threshold"], x["approval_rate"], -x["objection_rate"]), reverse=True)
         base["options"]=rows
+        if rows:
+            leader = rows[0]
+            if leader["dissent_rate"] > 0:
+                base["uncertainty_narrative"] = f"“{leader['title']}” currently leads, but {leader['dissent_rate']}% of non-abstaining votes dissented from the majority position."
+            else:
+                base["uncertainty_narrative"] = f"“{leader['title']}” currently leads with no recorded dissent among non-abstaining votes."
     return base
 
 
@@ -380,6 +388,33 @@ def round_number(value):
     return round(value, 2) if value is not None else None
 
 
+def _simulate_scores(*, criteria, values, weights, total):
+    """Recompute every option's weighted score under a hypothetical set of criterion weights."""
+    scores = {}
+    for option_id in values:
+        score = 0.0
+        coverage = 0.0
+        for criterion in criteria:
+            raw = values[option_id].get(criterion.id, [])
+            if not raw:
+                continue
+            avg = mean(raw)
+            normalised = (avg - criterion.scale_min) / (criterion.scale_max - criterion.scale_min) * 100
+            if not criterion.higher_is_better:
+                normalised = 100 - normalised
+            fraction = float(weights[criterion.id] / total)
+            score += normalised * fraction
+            coverage += fraction
+        scores[option_id] = score / coverage if coverage else None
+    return scores
+
+
+def _perturbed_weights(*, criteria, changed, factor):
+    weights = {c.id: c.weight * (factor if c.id == changed.id else Decimal("1")) for c in criteria}
+    total = sum(weights.values(), Decimal("0")) or Decimal("1")
+    return weights, total
+
+
 def _sensitivity(*, rows, criteria, values):
     if not rows or not criteria:
         return []
@@ -387,23 +422,68 @@ def _sensitivity(*, rows, criteria, values):
     rank_ranges={key:[rank] for key,rank in base_rank.items()}
     for changed in criteria:
         for factor in (Decimal("0.75"), Decimal("1.25")):
-            weights={c.id: c.weight*(factor if c.id==changed.id else Decimal("1")) for c in criteria}
-            total=sum(weights.values(), Decimal("0")) or Decimal("1")
-            simulated=[]
-            for row in rows:
-                option_id=next((oid for oid in values if str(oid)==row["option_id"]), None)
-                score=0.0; coverage=0.0
-                if option_id:
-                    for criterion in criteria:
-                        raw=values[option_id].get(criterion.id, [])
-                        if raw:
-                            avg=mean(raw); normalised=(avg-criterion.scale_min)/(criterion.scale_max-criterion.scale_min)*100
-                            if not criterion.higher_is_better: normalised=100-normalised
-                            fraction=float(weights[criterion.id]/total); score+=normalised*fraction; coverage+=fraction
-                simulated.append((row["option_id"], score/coverage if coverage else -1))
-            simulated.sort(key=lambda pair: pair[1], reverse=True)
-            for index,(option_id,_) in enumerate(simulated): rank_ranges[option_id].append(index+1)
+            weights, total = _perturbed_weights(criteria=criteria, changed=changed, factor=factor)
+            scores = _simulate_scores(criteria=criteria, values=values, weights=weights, total=total)
+            simulated = sorted(
+                ((str(option_id), score if score is not None else -1.0) for option_id, score in scores.items()),
+                key=lambda pair: pair[1],
+                reverse=True,
+            )
+            for index, (option_id, _) in enumerate(simulated):
+                rank_ranges[option_id].append(index + 1)
     return [{"option_id": oid, "base_rank": base_rank[oid], "best_rank": min(ranks), "worst_rank": max(ranks), "stable": min(ranks)==max(ranks)} for oid,ranks in rank_ranges.items()]
+
+
+def _tornado(*, rows, criteria, values):
+    """Per-criterion impact on the current leader's own score under a +/-25% weight change."""
+    if not rows or not criteria:
+        return None
+    leader_id = next((option_id for option_id in values if str(option_id) == rows[0]["option_id"]), None)
+    if leader_id is None:
+        return None
+    bars = []
+    for changed in criteria:
+        low_weights, low_total = _perturbed_weights(criteria=criteria, changed=changed, factor=Decimal("0.75"))
+        high_weights, high_total = _perturbed_weights(criteria=criteria, changed=changed, factor=Decimal("1.25"))
+        low_score = _simulate_scores(criteria=criteria, values=values, weights=low_weights, total=low_total).get(leader_id)
+        high_score = _simulate_scores(criteria=criteria, values=values, weights=high_weights, total=high_total).get(leader_id)
+        if low_score is None or high_score is None:
+            continue
+        bars.append({
+            "criterion_id": str(changed.id),
+            "title": changed.title,
+            "score_low": round_number(min(low_score, high_score)),
+            "score_high": round_number(max(low_score, high_score)),
+            "impact": round_number(abs(high_score - low_score)),
+        })
+    bars.sort(key=lambda item: item["impact"], reverse=True)
+    return {"option_id": rows[0]["option_id"], "option_title": rows[0]["title"], "base_score": rows[0]["weighted_score"], "criteria": bars}
+
+
+def _uncertainty_narrative(*, rows, criterion_sensitivity):
+    if not rows:
+        return ""
+    leader = rows[0]
+    sensitivity_by_option = {item["option_id"]: item for item in criterion_sensitivity}
+    leader_sensitivity = sensitivity_by_option.get(leader["option_id"])
+    sentences = []
+    if leader_sensitivity and not leader_sensitivity["stable"]:
+        sentences.append(
+            f"“{leader['title']}” currently ranks first, but a ±25% change to at least one "
+            "criterion weight changes which option leads — treat this ranking as directional, "
+            "not final."
+        )
+    else:
+        sentences.append(
+            f"“{leader['title']}” ranks first and stays first across ±25% changes to any "
+            "single criterion weight."
+        )
+    if leader.get("disagreement") in {"moderate", "high"}:
+        sentences.append(
+            f"Evaluators showed {leader['disagreement']} disagreement on this option's score "
+            "— review individual rationale before treating the ranking as consensus."
+        )
+    return " ".join(sentences)
 
 
 @transaction.atomic

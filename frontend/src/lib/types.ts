@@ -1393,6 +1393,19 @@ export type EvaluationResults = {
     worst_rank: number;
     stable: boolean;
   }>;
+  tornado: {
+    option_id: string;
+    option_title: string;
+    base_score: number | null;
+    criteria: Array<{
+      criterion_id: string;
+      title: string;
+      score_low: number | null;
+      score_high: number | null;
+      impact: number | null;
+    }>;
+  } | null;
+  uncertainty_narrative: string;
 };
 
 export type EvaluationRound = {

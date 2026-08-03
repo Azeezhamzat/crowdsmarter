@@ -2610,6 +2610,19 @@ kbd { display: inline-grid; place-items: center; min-width: 23px; min-height: 21
 .disagreement-badge--moderate { background: var(--warning-soft); color: var(--warning-strong); }
 .disagreement-badge--high { background: #f8e2e0; color: var(--danger); }
 .disagreement-badge--insufficient_data { background: var(--surface-muted); color: var(--text-muted); }
+.uncertainty-narrative { margin: .8rem 0 0; padding: .7rem .9rem; border-radius: var(--radius-md); background: var(--surface-muted); color: var(--text-muted); font-size: .85rem; }
+.tornado-chart { margin-top: 1rem; }
+.tornado-chart h4 { margin: 0 0 .2rem; }
+.tornado-chart > p { margin: 0 0 .6rem; }
+.tornado-bars { display: grid; gap: .5rem; }
+.tornado-bar-row { display: grid; grid-template-columns: minmax(120px, 1fr) 2fr auto; align-items: center; gap: .6rem; font-size: .82rem; }
+.tornado-bar-track { background: var(--surface-muted); border-radius: 999px; height: .55rem; overflow: hidden; }
+.tornado-bar-fill { background: var(--primary); height: 100%; border-radius: 999px; }
+.tornado-bar-value { font-variant-numeric: tabular-nums; color: var(--text-muted); }
+.sensitivity-details { margin-top: 1rem; }
+.sensitivity-details summary { cursor: pointer; font-weight: 700; }
+.sensitivity-details table { width: 100%; margin-top: .5rem; border-collapse: collapse; font-size: .85rem; }
+.sensitivity-details th, .sensitivity-details td { text-align: left; padding: .4rem .6rem; border-bottom: 1px solid var(--border); }
 .minority-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: .75rem; margin: .8rem 0; }
 .minority-grid article { padding: .85rem; border: 1px solid var(--border); border-radius: var(--radius-md); }
 .minority-grid small { display: block; color: var(--text-muted); margin-top: .2rem; }

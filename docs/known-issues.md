@@ -67,6 +67,19 @@ afterwards, but this account hit the identical `AuditEvent.actor`
 `PROTECT` constraint and was left in place for the same reason as
 `a11y-audit@example.test` above.
 
+## Fixed in Phase 24
+
+- `evaluation_results()` already computed a per-criterion rank-sensitivity
+  table (`criterion_sensitivity`, ±25% weight perturbation) but nothing on
+  the frontend ever read it — a completed calculation was silently unused.
+  Added a companion `_tornado()` computation (per-criterion impact on the
+  leader's own score) and a rule-based `uncertainty_narrative`, and rendered
+  all three (narrative, tornado bars, rank-stability table) in
+  `DecisionEvaluationPage.tsx`. Pure read-side change, no migration.
+- The dedicated-frontend-test gap noted in "Fixed in Phase 23" now also
+  applies to Phase 24's tornado/narrative UI — same reasoning (verified live
+  in the browser, typecheck + full suite + manual verification all passed).
+
 ## Fixed in Phase 23
 
 - Collective evaluation results showed only a single aggregate

@@ -301,7 +301,52 @@ function RoundPanel({ round, exercise, options, onRefresh }: { round: Evaluation
       <div className="round-results">
         <div className="result-summary"><span>{round.result_summary.submission_count} submitted</span><span>{round.result_summary.eligible_count} eligible</span><span className={round.result_summary.quorum_met ? "result-ok" : "result-warning"}>{round.result_summary.quorum_met ? "Quorum met" : `Needs ${round.result_summary.quorum_count}`}</span></div>
         {round.result_summary.hidden ? <div className="sealed-results"><strong>Results sealed</strong><p>Blindness protects independent judgement and reduces anchoring while this round remains open.</p></div> : (
-          <div className="result-ranking">{options.map((option, index) => { const result = resultByOption.get(option.id); return result ? <article key={option.id}><span className="rank-number">{index + 1}</span><div><strong>{result.title}</strong>{result.weighted_score != null ? <p>{result.weighted_score.toFixed(1)} weighted score · confidence {result.confidence ?? "—"}</p> : <p>{result.approval_rate ?? 0}% approval · {result.objection_rate ?? 0}% objections{result.dissent_rate != null ? ` · ${result.dissent_rate}% dissent` : ""}</p>}<DisagreementBadge result={result} /></div>{result.passes_threshold != null ? <span className={result.passes_threshold ? "role-badge" : "status-badge"}>{result.passes_threshold ? "Passes" : "Below threshold"}</span> : null}</article> : null; })}</div>
+          <>
+            <div className="result-ranking">{options.map((option, index) => { const result = resultByOption.get(option.id); return result ? <article key={option.id}><span className="rank-number">{index + 1}</span><div><strong>{result.title}</strong>{result.weighted_score != null ? <p>{result.weighted_score.toFixed(1)} weighted score · confidence {result.confidence ?? "—"}</p> : <p>{result.approval_rate ?? 0}% approval · {result.objection_rate ?? 0}% objections{result.dissent_rate != null ? ` · ${result.dissent_rate}% dissent` : ""}</p>}<DisagreementBadge result={result} /></div>{result.passes_threshold != null ? <span className={result.passes_threshold ? "role-badge" : "status-badge"}>{result.passes_threshold ? "Passes" : "Below threshold"}</span> : null}</article> : null; })}</div>
+            {round.result_summary.uncertainty_narrative ? <p className="uncertainty-narrative">{round.result_summary.uncertainty_narrative}</p> : null}
+            {(() => {
+              const tornado = round.result_summary.tornado;
+              if (!tornado || !tornado.criteria.length) return null;
+              const maxImpact = tornado.criteria[0]?.impact ?? 0;
+              return (
+                <div className="tornado-chart">
+                  <h4>Weight sensitivity for “{tornado.option_title}”</h4>
+                  <p className="muted">Each bar shows how much a ±25% change to that criterion's weight could move the leading option's own score, largest impact first.</p>
+                  <div className="tornado-bars">
+                    {tornado.criteria.map((bar) => {
+                      const width = maxImpact ? ((bar.impact ?? 0) / maxImpact) * 100 : 0;
+                      return (
+                        <div className="tornado-bar-row" key={bar.criterion_id}>
+                          <span className="tornado-bar-label">{bar.title}</span>
+                          <div className="tornado-bar-track"><div className="tornado-bar-fill" style={{ width: `${width}%` }} /></div>
+                          <span className="tornado-bar-value">±{(bar.impact ?? 0).toFixed(1)}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+            {round.result_summary.criterion_sensitivity.length ? (
+              <details className="sensitivity-details">
+                <summary>Rank stability under ±25% weight changes</summary>
+                <table>
+                  <thead><tr><th>Option</th><th>Base rank</th><th>Best rank</th><th>Worst rank</th><th>Stable?</th></tr></thead>
+                  <tbody>
+                    {round.result_summary.criterion_sensitivity.map((item) => (
+                      <tr key={item.option_id}>
+                        <td>{resultByOption.get(item.option_id)?.title ?? item.option_id}</td>
+                        <td>{item.base_rank}</td>
+                        <td>{item.best_rank}</td>
+                        <td>{item.worst_rank}</td>
+                        <td>{item.stable ? "Stable" : "Sensitive"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </details>
+            ) : null}
+          </>
         )}
       </div>
     </article>

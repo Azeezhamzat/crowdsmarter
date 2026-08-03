@@ -223,6 +223,155 @@ def test_scorecard_result_reports_dispersion_and_disagreement_label(
 
 
 @pytest.mark.django_db
+def test_tornado_orders_criteria_by_impact_on_the_leader(
+    organisation_factory, decision_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    decision = decision_factory(
+        workspace=organisation.workspaces.get(is_default=True), owner=owner,
+        title="Choose a delivery model",
+    )
+    leader = create_option(actor=owner, decision=decision, title="Leading option", description="Currently ahead.")
+    other = create_option(actor=owner, decision=decision, title="Other option", description="Currently behind.")
+    exercise = create_exercise(
+        actor=owner, decision=decision, owner_id=owner.id,
+        title="Tornado test scorecard", purpose="Check tornado ordering.",
+        method="scorecard", anonymity="attributed", blind_results_until_close=False,
+        quorum_count=1, approval_threshold=60, objection_threshold=20,
+    )
+    heavy = create_criterion(
+        actor=owner, exercise=exercise, title="Heavily weighted",
+        description="A criterion with a large weight.", weight=3,
+        scale_min=1, scale_max=5, higher_is_better=True, order=0,
+    )
+    light = create_criterion(
+        actor=owner, exercise=exercise, title="Lightly weighted",
+        description="A criterion with a small weight.", weight=1,
+        scale_min=1, scale_max=5, higher_is_better=True, order=1,
+    )
+    round_item = create_round(actor=owner, exercise=exercise)
+    transition_round(actor=owner, round=round_item, status=EvaluationRound.Status.OPEN)
+    save_submission(
+        actor=owner, confidence=4, overall_rationale="", round=round_item,
+        responses=[
+            {"option_id": leader.id, "criterion_id": heavy.id, "score": 5},
+            {"option_id": leader.id, "criterion_id": light.id, "score": 1},
+            {"option_id": other.id, "criterion_id": heavy.id, "score": 1},
+            {"option_id": other.id, "criterion_id": light.id, "score": 5},
+        ],
+    )
+
+    result = evaluation_results(round=round_item, viewer=owner)
+    assert result["options"][0]["option_id"] == str(leader.id)
+    tornado = result["tornado"]
+    assert tornado["option_id"] == str(leader.id)
+    assert tornado["option_title"] == "Leading option"
+    assert len(tornado["criteria"]) == 2
+    assert tornado["criteria"][0]["criterion_id"] == str(heavy.id)
+    assert tornado["criteria"][0]["impact"] >= tornado["criteria"][1]["impact"]
+
+
+@pytest.mark.django_db
+def test_uncertainty_narrative_flags_an_unstable_ranking(
+    organisation_factory, decision_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    decision = decision_factory(
+        workspace=organisation.workspaces.get(is_default=True), owner=owner,
+        title="Choose between near-tied options",
+    )
+    first = create_option(actor=owner, decision=decision, title="First option", description="One profile.")
+    second = create_option(actor=owner, decision=decision, title="Second option", description="A different profile.")
+    exercise = create_exercise(
+        actor=owner, decision=decision, owner_id=owner.id,
+        title="Near-tie scorecard", purpose="Check narrative instability wording.",
+        method="scorecard", anonymity="attributed", blind_results_until_close=False,
+        quorum_count=1, approval_threshold=60, objection_threshold=20,
+    )
+    balanced = create_criterion(
+        actor=owner, exercise=exercise, title="Balanced criterion",
+        description="Both options score the same here.", weight=1,
+        scale_min=1, scale_max=5, higher_is_better=True, order=0,
+    )
+    tilted = create_criterion(
+        actor=owner, exercise=exercise, title="Tilted criterion",
+        description="The options diverge here.", weight=1,
+        scale_min=1, scale_max=5, higher_is_better=True, order=1,
+    )
+    round_item = create_round(actor=owner, exercise=exercise)
+    transition_round(actor=owner, round=round_item, status=EvaluationRound.Status.OPEN)
+    save_submission(
+        actor=owner, confidence=4, overall_rationale="", round=round_item,
+        responses=[
+            {"option_id": first.id, "criterion_id": balanced.id, "score": 3},
+            {"option_id": first.id, "criterion_id": tilted.id, "score": 3},
+            {"option_id": second.id, "criterion_id": balanced.id, "score": 4},
+            {"option_id": second.id, "criterion_id": tilted.id, "score": 2},
+        ],
+    )
+
+    result = evaluation_results(round=round_item, viewer=owner)
+    assert "directional" in result["uncertainty_narrative"]
+
+
+@pytest.mark.django_db
+def test_uncertainty_narrative_notes_stability_and_disagreement(
+    organisation_factory, decision_factory, user_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    second_evaluator = user_factory(email="tornado-second@example.com")
+    Membership.objects.create(
+        organisation=organisation, user=second_evaluator,
+        role=Membership.Role.CONTRIBUTOR, status=Membership.Status.ACTIVE,
+    )
+    decision = decision_factory(
+        workspace=organisation.workspaces.get(is_default=True), owner=owner,
+        title="Choose a clear but contested leader",
+    )
+    Participant.objects.create(
+        organisation=organisation, decision=decision, user=second_evaluator,
+        role=Participant.Role.CONTRIBUTOR, added_by=owner,
+    )
+    leader = create_option(actor=owner, decision=decision, title="Clear leader", description="Wins comfortably.")
+    trailing = create_option(actor=owner, decision=decision, title="Clear trailer", description="Loses comfortably.")
+    exercise = create_exercise(
+        actor=owner, decision=decision, owner_id=owner.id,
+        title="Stable but contested scorecard", purpose="Check narrative stability + disagreement wording.",
+        method="scorecard", anonymity="attributed", blind_results_until_close=False,
+        quorum_count=2, approval_threshold=60, objection_threshold=20,
+    )
+    value = create_criterion(
+        actor=owner, exercise=exercise, title="Value", description="Expected value.",
+        weight=1, scale_min=1, scale_max=5, higher_is_better=True, order=0,
+    )
+    round_item = create_round(actor=owner, exercise=exercise)
+    transition_round(actor=owner, round=round_item, status=EvaluationRound.Status.OPEN)
+    save_submission(
+        actor=owner, confidence=5, overall_rationale="", round=round_item,
+        responses=[
+            {"option_id": leader.id, "criterion_id": value.id, "score": 5},
+            {"option_id": trailing.id, "criterion_id": value.id, "score": 1},
+        ],
+    )
+    save_submission(
+        actor=second_evaluator, confidence=5, overall_rationale="", round=round_item,
+        responses=[
+            {"option_id": leader.id, "criterion_id": value.id, "score": 1},
+            {"option_id": trailing.id, "criterion_id": value.id, "score": 1},
+        ],
+    )
+
+    result = evaluation_results(round=round_item, viewer=owner)
+    assert result["options"][0]["option_id"] == str(leader.id)
+    assert result["options"][0]["disagreement"] == "high"
+    assert "stays first" in result["uncertainty_narrative"]
+    assert "disagreement" in result["uncertainty_narrative"]
+
+
+@pytest.mark.django_db
 def test_vote_result_reports_dissent_rate(
     organisation_factory, decision_factory, user_factory
 ):  # type: ignore[no-untyped-def]
