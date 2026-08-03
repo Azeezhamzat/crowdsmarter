@@ -264,13 +264,13 @@ export function ForesightDecisionTrace() {
       <div className="capability-trace-graphic__flow" aria-hidden="true">
         {stages.map((stage, index) => (
           <div className="capability-trace-graphic__item" key={stage.title}>
-            <article className={index === stages.length - 1 ? "is-decision" : ""}>
+            <article>
               <span className="capability-trace-graphic__number">{stage.number}</span>
               <strong>{stage.title}</strong>
               <small>{stage.detail}</small>
             </article>
             {index < stages.length - 1 ? (
-              <span className="capability-trace-graphic__arrow">→</span>
+              <span className="capability-trace-graphic__arrow">↓</span>
             ) : null}
           </div>
         ))}

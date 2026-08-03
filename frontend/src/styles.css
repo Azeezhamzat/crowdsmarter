@@ -3863,65 +3863,50 @@ kbd { display: inline-grid; place-items: center; min-width: 23px; min-height: 21
 }
 
 .capability-trace {
-  min-height: 300px;
   margin-top: 1.4rem;
   padding: clamp(1rem, 2vw, 1.4rem);
   background: rgba(255, 255, 255, .075);
+  border-radius: 14px;
 }
 
 .capability-trace-graphic {
   width: 100%;
   display: grid;
-  gap: 1.25rem;
+  gap: 1.1rem;
   margin: 0;
 }
 
 .capability-trace-graphic__flow {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
   gap: .65rem;
-  align-items: stretch;
 }
 
 .capability-trace-graphic__item {
   min-width: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: .45rem;
-  align-items: center;
-}
-
-.capability-trace-graphic__item:last-child {
-  grid-template-columns: minmax(0, 1fr);
+  gap: .4rem;
+  justify-items: center;
 }
 
 .capability-trace-graphic__item article {
+  width: 100%;
+  box-sizing: border-box;
   min-width: 0;
-  min-height: 250px;
   display: grid;
-  align-content: center;
-  gap: .42rem;
-  padding: .9rem;
-  border: 1px solid rgba(255, 255, 255, .3);
+  gap: .3rem;
+  padding: .9rem 1.1rem;
+  border: 1px solid #dbeae7;
   border-radius: 14px;
-  background: rgba(255, 255, 255, .13);
-}
-
-.capability-trace-graphic__item article.is-decision {
-  border-color: #dbeae7;
   background: #eef7f5;
   color: #123d43;
+  text-align: left;
 }
 
 .capability-trace-graphic__number {
-  color: #a3ded4;
+  color: #1b7a72;
   font-size: .7rem;
   font-weight: 850;
   letter-spacing: .08em;
-}
-
-.capability-trace-graphic__item article.is-decision .capability-trace-graphic__number {
-  color: #1b7a72;
 }
 
 .capability-trace-graphic strong {
@@ -3930,17 +3915,13 @@ kbd { display: inline-grid; place-items: center; min-width: 23px; min-height: 21
 }
 
 .capability-trace-graphic small {
-  color: #c7ddd9;
+  color: #4e6c69;
   font-size: .75rem;
   line-height: 1.4;
 }
 
-.capability-trace-graphic__item article.is-decision small {
-  color: #4e6c69;
-}
-
 .capability-trace-graphic__arrow {
-  color: #b3dcd4;
+  color: #bfe3dc;
   font-size: 1.1rem;
   font-weight: 850;
 }
@@ -3971,13 +3952,6 @@ kbd { display: inline-grid; place-items: center; min-width: 23px; min-height: 21
     grid-template-columns: minmax(0, 1fr) minmax(390px, .9fr);
   }
 
-  .capability-trace-graphic__flow {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .capability-trace-graphic__item:nth-child(2) .capability-trace-graphic__arrow {
-    display: none;
-  }
 }
 
 @media (max-width: 980px) {
@@ -4041,30 +4015,6 @@ kbd { display: inline-grid; place-items: center; min-width: 23px; min-height: 21
     font-size: 9.5px;
   }
 
-  .capability-trace {
-    min-height: 0;
-  }
-
-  .capability-trace-graphic__flow {
-    grid-template-columns: 1fr;
-  }
-
-  .capability-trace-graphic__item {
-    grid-template-columns: 1fr;
-  }
-
-  .capability-trace-graphic__arrow {
-    justify-self: center;
-    transform: rotate(90deg);
-  }
-
-  .capability-trace-graphic__item:nth-child(2) .capability-trace-graphic__arrow {
-    display: block;
-  }
-
-  .capability-trace-graphic__item article {
-    min-height: 104px;
-  }
 }
 
 /* Phase 18A — accessibility remediation foundation */
