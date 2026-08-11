@@ -4,7 +4,7 @@ import { Link, useParams } from "react-router";
 
 import { Icon } from "../../components/Icon";
 import { StatusMessage } from "../../components/StatusMessage";
-import type { DecisionUrgency, DecisionStatus } from "../../lib/types";
+import type { DecisionUrgency, DecisionStatus, OrganisationPortfolio } from "../../lib/types";
 import { decisionLifecycle } from "../decisions/lifecycle";
 import { getOrganisationPortfolio } from "./api";
 
@@ -16,6 +16,83 @@ function formatDate(value: string | null): string {
 function stagePercent(status: DecisionStatus): number {
   const index = decisionLifecycle.findIndex((item) => item.status === status);
   return index < 0 ? 0 : Math.round(((index + 1) / decisionLifecycle.length) * 100);
+}
+
+function StatusDistributionChart({ statusCounts, total }: { statusCounts: Partial<Record<DecisionStatus, number>>; total: number }) {
+  const rows = decisionLifecycle
+    .map((item) => ({ ...item, count: statusCounts[item.status] ?? 0 }))
+    .filter((item) => item.count > 0);
+  if (!rows.length) return <p className="muted">No decisions to distribute yet.</p>;
+  return (
+    <div className="analytics-bars" role="img" aria-label={`Decisions by lifecycle stage. ${rows.map((r) => `${r.label}: ${r.count}`).join("; ")}`}>
+      {rows.map((item) => (
+        <div key={item.status}>
+          <span>{item.label}</span>
+          <div><i style={{ width: `${Math.max(5, (item.count / Math.max(total, 1)) * 100)}%` }} /></div>
+          <strong>{item.count}</strong>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function riskSeverityTier(likelihood: number, impact: number): "low" | "medium" | "high" {
+  const severity = likelihood * impact;
+  if (severity >= 15) return "high";
+  if (severity >= 8) return "medium";
+  return "low";
+}
+
+function RiskHeatmap({ heatmap }: { heatmap: OrganisationPortfolio["watchlist"]["risk_heatmap"] }) {
+  const cellByCoordinate = new Map(heatmap.cells.map((cell) => [`${cell.likelihood}-${cell.impact}`, cell]));
+  const maxCount = Math.max(1, ...heatmap.cells.map((cell) => cell.count));
+  const likelihoods = [5, 4, 3, 2, 1];
+  const impacts = [1, 2, 3, 4, 5];
+  if (!heatmap.total_open_risks) return <p className="muted">No open or monitored risks recorded yet.</p>;
+  return (
+    <div className="risk-heatmap">
+      <div className="risk-heatmap__grid" role="img" aria-label={`Risk heatmap by likelihood and impact. ${heatmap.total_open_risks} open risk(s) plotted.`}>
+        <span className="risk-heatmap__axis-label risk-heatmap__axis-label--y">Likelihood</span>
+        <div className="risk-heatmap__rows">
+          {likelihoods.map((likelihood) => (
+            <div className="risk-heatmap__row" key={likelihood}>
+              <span className="risk-heatmap__row-label">{likelihood}</span>
+              {impacts.map((impact) => {
+                const cell = cellByCoordinate.get(`${likelihood}-${impact}`);
+                const count = cell?.count ?? 0;
+                const tier = riskSeverityTier(likelihood, impact);
+                const opacity = count ? 0.25 + 0.75 * (count / maxCount) : 0;
+                const title = count
+                  ? `Likelihood ${likelihood} × impact ${impact}: ${count} risk(s)\n${(cell?.risks ?? []).map((r) => `• ${r.title} (${r.decision_title})`).join("\n")}`
+                  : `Likelihood ${likelihood} × impact ${impact}: no open risks`;
+                return (
+                  <div
+                    key={impact}
+                    className={`risk-heatmap__cell risk-heatmap__cell--${tier}${count ? " has-risks" : ""}`}
+                    style={{ ["--cell-opacity" as string]: opacity }}
+                    title={title}
+                  >
+                    {count > 0 ? count : ""}
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+          <div className="risk-heatmap__x-axis">
+            <span />
+            {impacts.map((impact) => <span key={impact}>{impact}</span>)}
+          </div>
+        </div>
+      </div>
+      <span className="risk-heatmap__axis-label risk-heatmap__axis-label--x">Impact</span>
+      <ul className="risk-heatmap__legend">
+        <li><span className="risk-heatmap__cell risk-heatmap__cell--low has-risks" />Low</li>
+        <li><span className="risk-heatmap__cell risk-heatmap__cell--medium has-risks" />Medium</li>
+        <li><span className="risk-heatmap__cell risk-heatmap__cell--high has-risks" />High</li>
+        <li className="muted">{heatmap.total_open_risks} open or monitored risk{heatmap.total_open_risks === 1 ? "" : "s"} plotted</li>
+      </ul>
+    </div>
+  );
 }
 
 export function OrganisationPortfolioPage() {
@@ -74,6 +151,22 @@ export function OrganisationPortfolioPage() {
         <article><span className="metric-icon metric-icon--amber"><Icon name="warning" /></span><div><strong>{portfolio.data?.summary.overdue ?? 0}</strong><span>Overdue</span></div></article>
         <article><span className="metric-icon metric-icon--violet"><Icon name="users" /></span><div><strong>{portfolio.data?.summary.unresolved_discussion ?? 0}</strong><span>Open questions or concerns</span></div></article>
       </section>
+
+      {portfolio.data ? (
+        <section className="portfolio-visuals" aria-label="Portfolio visuals">
+          <article className="card-panel">
+            <p className="eyebrow">Flow</p>
+            <h2>Decisions by lifecycle stage</h2>
+            <StatusDistributionChart statusCounts={portfolio.data.summary.status_counts} total={portfolio.data.summary.total} />
+          </article>
+          <article className="card-panel">
+            <p className="eyebrow">Exposure</p>
+            <h2>Risk heatmap</h2>
+            <p className="muted">Every open or monitored risk across the portfolio, plotted by likelihood and impact.</p>
+            <RiskHeatmap heatmap={portfolio.data.watchlist.risk_heatmap} />
+          </article>
+        </section>
+      ) : null}
 
       {portfolio.data?.watchlist ? (
         <section className="portfolio-watchlist" aria-label="Executive watchlist">

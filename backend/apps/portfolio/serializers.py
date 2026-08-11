@@ -108,12 +108,32 @@ class BenefitsRealizationSerializer(serializers.Serializer):
     total_reviewed = serializers.IntegerField()
 
 
+class RiskHeatmapRiskSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    title = serializers.CharField()
+    decision_id = serializers.UUIDField()
+    decision_title = serializers.CharField()
+
+
+class RiskHeatmapCellSerializer(serializers.Serializer):
+    likelihood = serializers.IntegerField()
+    impact = serializers.IntegerField()
+    count = serializers.IntegerField()
+    risks = RiskHeatmapRiskSerializer(many=True)
+
+
+class RiskHeatmapSerializer(serializers.Serializer):
+    cells = RiskHeatmapCellSerializer(many=True)
+    total_open_risks = serializers.IntegerField()
+
+
 class PortfolioWatchlistSerializer(serializers.Serializer):
     stalled_decisions = WatchlistStalledDecisionSerializer(many=True)
     open_high_risks = WatchlistRiskSerializer(many=True)
     assumptions_at_risk = WatchlistAssumptionSerializer(many=True)
     triggered_signposts = WatchlistSignpostObservationSerializer(many=True)
     benefits_realization = BenefitsRealizationSerializer()
+    risk_heatmap = RiskHeatmapSerializer()
 
 
 class OrganisationPortfolioSerializer(serializers.Serializer):

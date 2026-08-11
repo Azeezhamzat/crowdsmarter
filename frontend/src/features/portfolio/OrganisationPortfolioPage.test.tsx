@@ -43,6 +43,13 @@ describe("OrganisationPortfolioPage", () => {
           { id: "so1", signpost_id: "sp1", signpost_title: "Adoption signpost", scenario_set_id: "ss1", canvas_id: "c1", assessment: "strong", assessment_label: "Strong movement", observed_on: "2026-07-25" },
         ],
         benefits_realization: { exceeded: 0, met: 2, partially_met: 1, not_met: 0, inconclusive: 0, total_reviewed: 3 },
+        risk_heatmap: {
+          cells: [
+            { likelihood: 5, impact: 5, count: 1, risks: [{ id: "r1", title: "Severe supplier risk", decision_id: "d1", decision_title: "Run a pilot" }] },
+            { likelihood: 1, impact: 1, count: 0, risks: [] },
+          ],
+          total_open_risks: 1,
+        },
       },
     });
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -74,5 +81,11 @@ describe("OrganisationPortfolioPage", () => {
       "/organisations/o1/foresight/canvases/c1/scenarios/ss1?tab=signposts",
     );
     expect(screen.getByText("Partially met")).toBeInTheDocument();
+
+    expect(screen.getByText("Decisions by lifecycle stage")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: /decisions by lifecycle stage/i })).toBeInTheDocument();
+    expect(screen.getByText("Risk heatmap")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: /risk heatmap by likelihood and impact/i })).toBeInTheDocument();
+    expect(screen.getByText("1 open or monitored risk plotted")).toBeInTheDocument();
   });
 });

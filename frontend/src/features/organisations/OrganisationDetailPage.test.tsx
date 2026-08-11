@@ -22,6 +22,7 @@ vi.mock("../workspaces/api", () => ({ listWorkspaces: vi.fn() }));
 const EMPTY_WATCHLIST = {
   stalled_decisions: [], open_high_risks: [], assumptions_at_risk: [], triggered_signposts: [],
   benefits_realization: { exceeded: 0, met: 0, partially_met: 0, not_met: 0, inconclusive: 0, total_reviewed: 0 },
+  risk_heatmap: { cells: [], total_open_risks: 0 },
 };
 
 const organisation = {

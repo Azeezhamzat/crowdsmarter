@@ -245,6 +245,47 @@ def _triggered_signposts(*, organisation) -> list[dict]:
     ]
 
 
+def _risk_heatmap(*, organisation) -> dict:
+    """A full likelihood x impact grid over every open/monitoring risk, for a portfolio-wide heatmap.
+
+    Unlike open_high_risks (which lists only the top severity outliers), this covers the
+    complete 1-5 x 1-5 space so low-severity risk concentration is visible too, not just spikes.
+    """
+    risks = (
+        Risk.objects.filter(
+            organisation=organisation,
+            status__in=[Risk.Status.OPEN, Risk.Status.MONITORING],
+        )
+        .select_related("decision")
+        .only("id", "title", "likelihood", "impact", "decision_id", "decision__title")
+    )
+    cells: dict[tuple[int, int], list[dict]] = {}
+    total = 0
+    for risk in risks:
+        cells.setdefault((risk.likelihood, risk.impact), []).append(
+            {
+                "id": risk.id,
+                "title": risk.title,
+                "decision_id": risk.decision_id,
+                "decision_title": risk.decision.title,
+            }
+        )
+        total += 1
+    return {
+        "cells": [
+            {
+                "likelihood": likelihood,
+                "impact": impact,
+                "count": len(cells.get((likelihood, impact), [])),
+                "risks": cells.get((likelihood, impact), [])[:5],
+            }
+            for likelihood in range(1, 6)
+            for impact in range(1, 6)
+        ],
+        "total_open_risks": total,
+    }
+
+
 def _benefits_realization(*, organisation) -> dict:
     counts = {
         choice: 0 for choice, _ in DecisionReview.OutcomeAssessment.choices
@@ -268,6 +309,7 @@ def _organisation_watchlist(*, organisation) -> dict:
         "assumptions_at_risk": _assumptions_at_risk(organisation=organisation),
         "triggered_signposts": _triggered_signposts(organisation=organisation),
         "benefits_realization": _benefits_realization(organisation=organisation),
+        "risk_heatmap": _risk_heatmap(organisation=organisation),
     }
 
 

@@ -476,6 +476,25 @@ textarea:disabled, input:disabled, select:disabled { background: #f1f4f1; color:
 .portfolio-summary span { color: var(--muted); }
 .portfolio-filters { padding: 1.25rem; margin-bottom: 1.25rem; border: 1px solid var(--line); border-radius: 16px; background: #fafbfa; }
 .portfolio-filters h2 { margin-top: 0; }
+.portfolio-visuals { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1rem; margin-bottom: 1.25rem; }
+.risk-heatmap { display: flex; flex-direction: column; align-items: center; gap: .3rem; margin-top: 1rem; }
+.risk-heatmap__grid { display: flex; align-items: center; gap: .5rem; }
+.risk-heatmap__axis-label { font-size: .78rem; color: var(--muted); font-weight: 650; }
+.risk-heatmap__axis-label--y { writing-mode: vertical-rl; transform: rotate(180deg); }
+.risk-heatmap__rows { display: flex; flex-direction: column; gap: 3px; }
+.risk-heatmap__row { display: flex; align-items: center; gap: 3px; }
+.risk-heatmap__row-label { width: 1.1rem; text-align: right; font-size: .78rem; color: var(--muted); margin-right: .2rem; }
+.risk-heatmap__cell { width: 2.6rem; height: 2.2rem; display: flex; align-items: center; justify-content: center; border-radius: 6px; font-size: .82rem; font-weight: 700; color: var(--ink); background: #eef1ef; }
+.risk-heatmap__cell.has-risks { color: #fff; cursor: default; }
+.risk-heatmap__cell--low.has-risks { background: color-mix(in srgb, var(--public-green, #1b7a72) var(--cell-opacity, 60%), #eef1ef); }
+.risk-heatmap__cell--medium.has-risks { background: color-mix(in srgb, var(--warning) var(--cell-opacity, 60%), #eef1ef); }
+.risk-heatmap__cell--high.has-risks { background: color-mix(in srgb, var(--danger) var(--cell-opacity, 60%), #eef1ef); }
+.risk-heatmap__x-axis { display: flex; gap: 3px; margin-top: 2px; }
+.risk-heatmap__x-axis span { width: 2.6rem; text-align: center; font-size: .78rem; color: var(--muted); }
+.risk-heatmap__x-axis span:first-child { width: 1.1rem; margin-right: .2rem; }
+.risk-heatmap__legend { display: flex; align-items: center; flex-wrap: wrap; gap: .9rem; list-style: none; margin: .6rem 0 0; padding: 0; font-size: .78rem; color: var(--muted); }
+.risk-heatmap__legend li { display: flex; align-items: center; gap: .35rem; }
+.risk-heatmap__legend .risk-heatmap__cell { width: 12px; height: 12px; border-radius: 3px; --cell-opacity: 85%; }
 .portfolio-watchlist { margin-bottom: 1.25rem; }
 .portfolio-watchlist h2 { margin-bottom: .1rem; }
 .watchlist-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; margin-top: .75rem; }

@@ -160,6 +160,15 @@ def test_organisation_portfolio_reports_a_watchlist(
     assert [item["id"] for item in watchlist["stalled_decisions"]] == [str(stalled.id)]
     assert watchlist["stalled_decisions"][0]["days_stalled"] >= 30
 
+    heatmap = watchlist["risk_heatmap"]
+    assert heatmap["total_open_risks"] == 1
+    top_cell = next(cell for cell in heatmap["cells"] if cell["likelihood"] == 5 and cell["impact"] == 5)
+    assert top_cell["count"] == 1
+    assert top_cell["risks"][0]["decision_id"] == str(risky_decision.id)
+    empty_cell = next(cell for cell in heatmap["cells"] if cell["likelihood"] == 1 and cell["impact"] == 1)
+    assert empty_cell["count"] == 0
+    assert len(heatmap["cells"]) == 25
+
     assert [item["decision_id"] for item in watchlist["open_high_risks"]] == [str(risky_decision.id)]
 
     assert [item["decision_id"] for item in watchlist["assumptions_at_risk"]] == [str(assumption_decision.id)]

@@ -776,6 +776,20 @@ export type PortfolioWatchlist = {
     inconclusive: number;
     total_reviewed: number;
   };
+  risk_heatmap: {
+    cells: Array<{
+      likelihood: number;
+      impact: number;
+      count: number;
+      risks: Array<{
+        id: string;
+        title: string;
+        decision_id: string;
+        decision_title: string;
+      }>;
+    }>;
+    total_open_risks: number;
+  };
 };
 
 export type OrganisationPortfolio = {
