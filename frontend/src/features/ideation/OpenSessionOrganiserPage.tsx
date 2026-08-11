@@ -1,0 +1,154 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { Link, useParams } from "react-router";
+
+import { StatusMessage } from "../../components/StatusMessage";
+import { ApiError } from "../../lib/api";
+import type { Idea } from "../../lib/types";
+import { getOrganisationPortfolio } from "../portfolio/api";
+import { getOrganiserSession, promoteIdea, setSessionState, shortlistIdea } from "./api";
+
+function submitterLabel(idea: Idea): string {
+  if (idea.submitted_by_participant) return idea.submitted_by_participant.name;
+  if (idea.submitted_by_user) {
+    const name = `${idea.submitted_by_user.first_name} ${idea.submitted_by_user.last_name}`.trim();
+    return name || idea.submitted_by_user.email;
+  }
+  return "Someone";
+}
+
+function IdeaRow({ sessionId, idea, decisions }: { sessionId: string; idea: Idea; decisions: Array<{ id: string; title: string }> }) {
+  const queryClient = useQueryClient();
+  const [decisionId, setDecisionId] = useState("");
+  const queryKey = ["sessions", sessionId, "organiser"];
+
+  const shortlist = useMutation({
+    mutationFn: (shortlisted: boolean) => shortlistIdea(sessionId, idea.id, shortlisted),
+    onSuccess: (data) => queryClient.setQueryData(queryKey, data),
+  });
+  const promote = useMutation({
+    mutationFn: () => promoteIdea(sessionId, idea.id, decisionId),
+    onSuccess: (data) => queryClient.setQueryData(queryKey, data),
+  });
+
+  return (
+    <article className="idea-card">
+      <div className="idea-card__body">
+        <h3>{idea.title}</h3>
+        {idea.description ? <p>{idea.description}</p> : null}
+        <small className="muted">{submitterLabel(idea)} · {idea.status_label} · {idea.vote_count} vote{idea.vote_count === 1 ? "" : "s"}</small>
+        {promote.isError ? (
+          <StatusMessage kind="error">{promote.error instanceof ApiError ? promote.error.message : "Could not promote this idea."}</StatusMessage>
+        ) : null}
+        {idea.status === "promoted" ? null : (
+          <div className="button-row">
+            <button
+              className="button button--secondary button--compact"
+              type="button"
+              disabled={shortlist.isPending}
+              onClick={() => shortlist.mutate(idea.status !== "shortlisted")}
+            >
+              {idea.status === "shortlisted" ? "Remove from shortlist" : "Shortlist"}
+            </button>
+            <select value={decisionId} onChange={(event) => setDecisionId(event.target.value)}>
+              <option value="">Promote into…</option>
+              {decisions.map((decision) => <option key={decision.id} value={decision.id}>{decision.title}</option>)}
+            </select>
+            <button
+              className="button button--primary button--compact"
+              type="button"
+              disabled={!decisionId || promote.isPending}
+              onClick={() => promote.mutate()}
+            >
+              {promote.isPending ? "Promoting…" : "Promote to option"}
+            </button>
+          </div>
+        )}
+      </div>
+    </article>
+  );
+}
+
+export function OpenSessionOrganiserPage() {
+  const { organisationId: routeOrganisationId, sessionId: routeSessionId } = useParams<{ organisationId: string; sessionId: string }>();
+  const organisationId = routeOrganisationId ?? "";
+  const sessionId = routeSessionId ?? "";
+  const queryClient = useQueryClient();
+  const queryKey = ["sessions", sessionId, "organiser"];
+
+  const session = useQuery({ queryKey, queryFn: () => getOrganiserSession(sessionId), enabled: Boolean(sessionId) });
+  const portfolio = useQuery({
+    queryKey: ["organisations", organisationId, "portfolio-decisions"],
+    queryFn: () => getOrganisationPortfolio(organisationId, {}),
+    enabled: Boolean(organisationId),
+  });
+
+  const state = useMutation({
+    mutationFn: (action: "open" | "close") => setSessionState(sessionId, action),
+    onSuccess: (data) => queryClient.setQueryData(queryKey, data),
+  });
+
+  const publicUrl = session.data ? `${window.location.origin}/s/${session.data.public_slug}` : "";
+  const [copied, setCopied] = useState(false);
+
+  return (
+    <div>
+      <Link className="back-link" to={`/organisations/${organisationId}/sessions`}>← Open sessions</Link>
+      {session.isPending ? <p>Loading session…</p> : null}
+      {session.isError ? <StatusMessage kind="error">This session could not be loaded.</StatusMessage> : null}
+      {session.data ? (
+        <>
+          <div className="page-heading">
+            <div>
+              <p className="eyebrow">Open session</p>
+              <h1>{session.data.title}</h1>
+              <p className="muted">{session.data.prompt}</p>
+              <span className={`status-badge status-badge--${session.data.status}`}>{session.data.status_label}</span>
+            </div>
+            <div className="button-row">
+              {session.data.status === "open" ? (
+                <button className="button button--secondary" type="button" disabled={state.isPending} onClick={() => state.mutate("close")}>Close session</button>
+              ) : (
+                <button className="button button--primary" type="button" disabled={state.isPending} onClick={() => state.mutate("open")}>
+                  {session.data.status === "draft" ? "Open session" : "Reopen session"}
+                </button>
+              )}
+            </div>
+          </div>
+
+          <section className="card-panel">
+            <p className="eyebrow">Shareable link</p>
+            <div className="button-row">
+              <code>{publicUrl}</code>
+              <button
+                className="button button--secondary button--compact"
+                type="button"
+                onClick={async () => {
+                  await navigator.clipboard.writeText(publicUrl);
+                  setCopied(true);
+                  window.setTimeout(() => setCopied(false), 2000);
+                }}
+              >
+                {copied ? "Copied" : "Copy link"}
+              </button>
+            </div>
+            <p className="muted">Anyone with this link can join and submit ideas once the session is open.</p>
+          </section>
+
+          <section aria-label="Ideas">
+            <h2>Ideas ({session.data.ideas.length})</h2>
+            {session.data.ideas.length === 0 ? (
+              <p className="muted">No ideas submitted yet.</p>
+            ) : (
+              <div className="idea-list">
+                {session.data.ideas.map((idea) => (
+                  <IdeaRow key={idea.id} sessionId={sessionId} idea={idea} decisions={portfolio.data?.decisions ?? []} />
+                ))}
+              </div>
+            )}
+          </section>
+        </>
+      ) : null}
+    </div>
+  );
+}

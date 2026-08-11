@@ -64,6 +64,7 @@ INSTALLED_APPS = [
     "apps.methodology",
     "apps.platform_admin",
     "apps.billing",
+    "apps.ideation",
 ]
 
 MIDDLEWARE = [
@@ -161,6 +162,9 @@ REST_FRAMEWORK = {
         "analytics_insights": os.getenv("API_ANALYTICS_INSIGHTS_THROTTLE_RATE", "30/hour"),
         "foresight_feed_sync": os.getenv("API_FORESIGHT_FEED_SYNC_THROTTLE_RATE", "20/hour"),
         "demo_request": os.getenv("API_DEMO_REQUEST_THROTTLE_RATE", "5/hour"),
+        "session_join": os.getenv("API_SESSION_JOIN_THROTTLE_RATE", "20/hour"),
+        "idea_submit": os.getenv("API_IDEA_SUBMIT_THROTTLE_RATE", "30/hour"),
+        "idea_vote": os.getenv("API_IDEA_VOTE_THROTTLE_RATE", "120/hour"),
     },
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 50,

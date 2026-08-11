@@ -17,6 +17,9 @@ import { DecisionContributionsPage } from "./features/contributions/DecisionCont
 import { MyContributionsPage } from "./features/contributions/MyContributionsPage";
 import { GuidedDecisionCreatePage } from "./features/decisions/GuidedDecisionCreatePage";
 import { OrganisationExportPage } from "./features/exports/OrganisationExportPage";
+import { OpenSessionOrganiserPage } from "./features/ideation/OpenSessionOrganiserPage";
+import { OpenSessionPublicPage } from "./features/ideation/OpenSessionPublicPage";
+import { OrganisationSessionsPage } from "./features/ideation/OrganisationSessionsPage";
 import { DecisionEvaluationPage } from "./features/evaluations/DecisionEvaluationPage";
 import { DecisionAnalysisPage } from "./features/decision-analysis/DecisionAnalysisPage";
 import { OrganisationPrioritisationPage } from "./features/evaluations/OrganisationPrioritisationPage";
@@ -52,6 +55,7 @@ export const router = createBrowserRouter([
   { path: "/forgot-password", element: <ForgotPasswordPage /> },
   { path: "/reset-password", element: <ResetPasswordPage /> },
   { path: "/accept-invitation", element: <AcceptInvitationPage /> },
+  { path: "/s/:publicSlug", element: <OpenSessionPublicPage /> },
   {
     element: <ProtectedRoute />,
     children: [
@@ -68,6 +72,8 @@ export const router = createBrowserRouter([
       { path: "/organisations/:organisationId/search", element: <OrganisationSearchPage /> },
       { path: "/organisations/:organisationId/analytics", element: <OrganisationAnalyticsPage /> },
       { path: "/organisations/:organisationId/portfolio", element: <OrganisationPortfolioPage /> },
+      { path: "/organisations/:organisationId/sessions", element: <OrganisationSessionsPage /> },
+      { path: "/organisations/:organisationId/sessions/:sessionId", element: <OpenSessionOrganiserPage /> },
       { path: "/organisations/:organisationId/prioritisation", element: <OrganisationPrioritisationPage /> },
       { path: "/organisations/:organisationId/export", element: <OrganisationExportPage /> },
       { path: "/organisations/:organisationId/foresight", element: <OrganisationForesightPage /> },

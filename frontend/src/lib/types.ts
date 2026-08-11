@@ -1936,3 +1936,52 @@ export type ContributionPreference = {
   created_at: string;
   updated_at: string;
 };
+
+export type IdeaStatus = "submitted" | "shortlisted" | "promoted" | "archived";
+export type OpenSessionStatus = "draft" | "open" | "closed" | "archived";
+
+export type Idea = {
+  id: string;
+  title: string;
+  description: string;
+  status: IdeaStatus;
+  status_label: string;
+  submitted_by_participant: { name: string } | null;
+  submitted_by_user: User | null;
+  vote_count: number;
+  voted_by_me: boolean;
+  created_at: string;
+};
+
+export type OpenSessionPublic = {
+  id: string;
+  organisation_name: string;
+  title: string;
+  prompt: string;
+  description: string;
+  status: OpenSessionStatus;
+  status_label: string;
+  voting_enabled: boolean;
+  submission_deadline: string | null;
+  ideas: Idea[];
+};
+
+export type OpenSessionSummary = {
+  id: string;
+  title: string;
+  prompt: string;
+  status: OpenSessionStatus;
+  status_label: string;
+  public_slug: string;
+  decision_id: string | null;
+  decision_title: string | null;
+  voting_enabled: boolean;
+  idea_count: number;
+  created_by: User;
+  created_at: string;
+};
+
+export type OpenSessionOrganiser = OpenSessionSummary & {
+  description: string;
+  ideas: Idea[];
+};

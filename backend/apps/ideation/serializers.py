@@ -1,0 +1,128 @@
+"""Read/write representations for open sessions, ideas, and votes."""
+
+from __future__ import annotations
+
+from rest_framework import serializers
+
+from apps.core.serializers import StrictSerializer
+from apps.decisions.serializers import DecisionUserSerializer
+
+from .models import Idea, OpenSession
+
+
+class SessionParticipantSerializer(serializers.Serializer):
+    name = serializers.CharField()
+
+
+class IdeaSerializer(serializers.ModelSerializer):
+    submitted_by_participant = SessionParticipantSerializer(read_only=True)
+    submitted_by_user = DecisionUserSerializer(read_only=True)
+    status_label = serializers.CharField(source="get_status_display", read_only=True)
+    vote_count = serializers.IntegerField(read_only=True)
+    voted_by_me = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Idea
+        fields = [
+            "id",
+            "title",
+            "description",
+            "status",
+            "status_label",
+            "submitted_by_participant",
+            "submitted_by_user",
+            "vote_count",
+            "voted_by_me",
+            "created_at",
+        ]
+        read_only_fields = fields
+
+    def get_voted_by_me(self, obj: Idea) -> bool:
+        voter_ids = self.context.get("voted_idea_ids")
+        return bool(voter_ids) and obj.id in voter_ids
+
+
+class IdeaCreateSerializer(StrictSerializer):
+    title = serializers.CharField(max_length=240)
+    description = serializers.CharField(required=False, allow_blank=True, default="")
+
+
+class SessionJoinSerializer(StrictSerializer):
+    name = serializers.CharField(max_length=200)
+    email = serializers.EmailField()
+
+
+class _IdeasFromContextMixin:
+    """Render ideas from an explicitly-annotated queryset passed via context.
+
+    The reverse `session.ideas` accessor can't carry the vote_count annotation
+    or the requester-specific voted_by_me flag, so the view always supplies
+    the already-annotated, already-filtered queryset as context["ideas"].
+    """
+
+    def get_ideas(self, obj):  # type: ignore[no-untyped-def]
+        ideas = self.context.get("ideas", [])
+        return IdeaSerializer(ideas, many=True, context=self.context).data
+
+
+class OpenSessionPublicSerializer(_IdeasFromContextMixin, serializers.ModelSerializer):
+    organisation_name = serializers.CharField(source="organisation.name", read_only=True)
+    status_label = serializers.CharField(source="get_status_display", read_only=True)
+    ideas = serializers.SerializerMethodField()
+
+    class Meta:
+        model = OpenSession
+        fields = [
+            "id",
+            "organisation_name",
+            "title",
+            "prompt",
+            "description",
+            "status",
+            "status_label",
+            "voting_enabled",
+            "submission_deadline",
+            "ideas",
+        ]
+        read_only_fields = fields
+
+
+class OpenSessionSummarySerializer(serializers.ModelSerializer):
+    status_label = serializers.CharField(source="get_status_display", read_only=True)
+    decision_title = serializers.CharField(source="decision.title", read_only=True, allow_null=True)
+    idea_count = serializers.IntegerField(read_only=True)
+    created_by = DecisionUserSerializer(read_only=True)
+
+    class Meta:
+        model = OpenSession
+        fields = [
+            "id",
+            "title",
+            "prompt",
+            "status",
+            "status_label",
+            "public_slug",
+            "decision_id",
+            "decision_title",
+            "voting_enabled",
+            "idea_count",
+            "created_by",
+            "created_at",
+        ]
+        read_only_fields = fields
+
+
+class OpenSessionOrganiserSerializer(_IdeasFromContextMixin, OpenSessionSummarySerializer):
+    ideas = serializers.SerializerMethodField()
+
+    class Meta(OpenSessionSummarySerializer.Meta):
+        fields = OpenSessionSummarySerializer.Meta.fields + ["description", "ideas"]
+
+
+class OpenSessionCreateSerializer(StrictSerializer):
+    title = serializers.CharField(max_length=240)
+    prompt = serializers.CharField()
+    description = serializers.CharField(required=False, allow_blank=True, default="")
+    decision_id = serializers.UUIDField(required=False, allow_null=True)
+    voting_enabled = serializers.BooleanField(required=False, default=True)
+    submission_deadline = serializers.DateTimeField(required=False, allow_null=True)
