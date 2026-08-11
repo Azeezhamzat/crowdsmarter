@@ -25,6 +25,7 @@ import {
   updateSignal,
   uploadSourceAttachment,
 } from "./api";
+import { steepDotColour } from "./steepColours";
 
 type Tab = "radar" | "signals" | "sources" | "watchlists";
 
@@ -47,16 +48,6 @@ function formatBytes(value: number): string {
   if (value < 1024 * 1024) return `${Math.round(value / 1024)} KB`;
   return `${(value / (1024 * 1024)).toFixed(1)} MB`;
 }
-
-const steepDotColour: Record<ForesightSignal["steep_category"], string> = {
-  social: "#7f5fd9",
-  technological: "#1f8fc4",
-  economic: "#c9962a",
-  environmental: "#2f8a5b",
-  political: "#c1553f",
-  legal: "#5b6478",
-  ethical: "#b1489a",
-};
 
 function SignalScatterChart({
   signals,

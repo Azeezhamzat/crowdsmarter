@@ -4,7 +4,7 @@ import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 
 import { fetchCurrentUser } from "../auth/api";
-import { getPlatformConfiguration, getPlatformOverview } from "./api";
+import { getPlatformConfiguration, getPlatformOverview, testAIProviderConnection } from "./api";
 import { PlatformAdminPage } from "./PlatformAdminPage";
 
 vi.mock("../auth/api", () => ({ fetchCurrentUser: vi.fn() }));
@@ -22,6 +22,7 @@ vi.mock("./api", () => ({
   setAIProvider: vi.fn(),
   setAIProviderAPIKey: vi.fn(),
   clearAIProviderAPIKey: vi.fn(),
+  testAIProviderConnection: vi.fn(),
 }));
 
 describe("PlatformAdminPage", () => {
@@ -117,5 +118,14 @@ describe("PlatformAdminPage", () => {
     fireEvent.change(providerSelect, { target: { value: "gemini" } });
     expect(screen.getByPlaceholderText("gemini-2.0-flash")).toBeInTheDocument();
     expect(screen.getByText(/set a google gemini api key below/i)).toBeInTheDocument();
+
+    vi.mocked(testAIProviderConnection).mockResolvedValue({
+      ok: true,
+      detail: "Runs locally with no external API call, so there is nothing to connect to.",
+      provider_key: "rules",
+      provider_label: "Transparent rules review",
+    });
+    fireEvent.click(screen.getByRole("button", { name: /test connection/i }));
+    expect(await screen.findByText(/runs locally with no external api call/i)).toBeInTheDocument();
   });
 });

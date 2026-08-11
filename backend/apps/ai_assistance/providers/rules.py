@@ -7,7 +7,14 @@ from collections import defaultdict
 from datetime import date, datetime
 from typing import Any
 
-from .base import AIReviewOutput, AnalyticsNarrative, AnalyticsObservation, ReviewFinding, SimilarDecision
+from .base import (
+    AIReviewOutput,
+    AnalyticsNarrative,
+    AnalyticsObservation,
+    ProviderConnectionResult,
+    ReviewFinding,
+    SimilarDecision,
+)
 
 
 _TOKEN_PATTERN = re.compile(r"[a-z0-9]{3,}")
@@ -482,3 +489,9 @@ class RuleBasedAIProvider:
             )
 
         return AnalyticsNarrative(headline=headline, observations=observations, generated_by=self.label)
+
+    def test_connection(self) -> ProviderConnectionResult:
+        return ProviderConnectionResult(
+            ok=True,
+            detail="Runs locally with no external API call, so there is nothing to connect to.",
+        )

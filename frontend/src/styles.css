@@ -417,9 +417,16 @@ textarea:disabled, input:disabled, select:disabled { background: #f1f4f1; color:
 .analytics-definitions dl { display: grid; gap: .8rem; margin-bottom: 0; }
 .analytics-definitions dt { font-weight: 760; text-transform: capitalize; }
 .analytics-definitions dd { margin: .2rem 0 0; color: var(--muted); }
+.analytics-trend { display: flex; flex-direction: column; align-items: center; gap: .5rem; margin-bottom: .5rem; }
+.analytics-trend__legend { display: flex; gap: 1rem; list-style: none; margin: 0; padding: 0; font-size: .78rem; color: var(--muted); }
+.analytics-trend__legend li { display: flex; align-items: center; gap: .35rem; }
+.analytics-trend__legend span { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
 .analytics-insight { margin-top: 1rem; }
 .analytics-insight__result { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--line); }
 .analytics-insight__headline { font-size: 1.05rem; font-weight: 760; margin-bottom: .3rem; }
+.analytics-insight__history { margin-top: 1rem; }
+.analytics-insight__history > summary { cursor: pointer; font-weight: 650; color: var(--muted); }
+.analytics-insight__history .analytics-insight__result:first-of-type { margin-top: .75rem; }
 
 @media (max-width: 920px) {
   .ai-review-grid, .ai-human-actions, .analytics-layout { grid-template-columns: 1fr; }
@@ -1911,6 +1918,7 @@ kbd { display: inline-grid; place-items: center; min-width: 23px; min-height: 21
 .systems-map-layout { display: grid; grid-template-columns: minmax(0, 1fr) 350px; gap: 1rem; align-items: start; }
 .systems-map-forms { display: grid; gap: 1rem; position: sticky; top: 5.2rem; }
 .systems-map-forms details > summary { cursor: pointer; margin-bottom: .75rem; }
+.causal-network { display: flex; justify-content: center; padding: .5rem 0 1.2rem; }
 .causal-map { display: grid; gap: .75rem; }
 .causal-link { display: grid; grid-template-columns: minmax(120px, 1fr) 95px minmax(120px, 1fr); gap: .6rem; align-items: center; padding: .85rem; border: 1px solid var(--border); border-radius: .85rem; background: var(--surface); }
 .causal-link > p { grid-column: 1 / -1; margin: 0; color: var(--muted); font-size: .85rem; }

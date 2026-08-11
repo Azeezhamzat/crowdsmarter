@@ -60,6 +60,7 @@ from .services import (
     set_ai_provider_api_key,
     set_user_active,
     suspend_platform_administrator,
+    test_ai_provider_connection,
     update_demo_request_status,
     update_platform_configuration,
 )
@@ -354,6 +355,14 @@ class AIProviderAPIKeyView(PlatformAdminBaseView):
             rationale=serializer.validated_data["rationale"],
         )
         return Response(PlatformConfigurationSerializer(item).data)
+
+
+class AIProviderTestConnectionView(PlatformAdminBaseView):
+    """Make a small live call against the currently configured AI provider."""
+
+    def post(self, request):  # type: ignore[no-untyped-def]
+        result = test_ai_provider_connection(actor=request.user)
+        return Response(result)
 
 
 class PlatformDemoRequestListView(PlatformAdminBaseView):

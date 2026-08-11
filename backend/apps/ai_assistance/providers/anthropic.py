@@ -19,7 +19,7 @@ from apps.platform_admin.models import PlatformConfiguration
 
 from . import _analytics_shared as analytics_shared
 from . import _review_shared as shared
-from .base import AIReviewOutput, AnalyticsNarrative
+from .base import AIReviewOutput, AnalyticsNarrative, ProviderConnectionResult
 
 
 class AnthropicAIProvider:
@@ -85,3 +85,15 @@ class AnthropicAIProvider:
             raise ValueError("The AI provider did not return a structured narrative.")
         payload: dict[str, Any] = tool_use.input
         return analytics_shared.build_narrative(payload=payload, provider_label=self.label)
+
+    def test_connection(self) -> ProviderConnectionResult:
+        try:
+            client = anthropic.Anthropic(api_key=self._api_key)
+            client.messages.create(
+                model=self.model_identifier,
+                max_tokens=8,
+                messages=[{"role": "user", "content": "Reply with the single word OK."}],
+            )
+        except Exception as error:  # noqa: BLE001 - surface any failure as a diagnosable result
+            return ProviderConnectionResult(ok=False, detail=str(error))
+        return ProviderConnectionResult(ok=True, detail=f"Reached the Anthropic API with model {self.model_identifier}.")

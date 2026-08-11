@@ -33,7 +33,7 @@ def get_provider() -> AIProvider:
             raise TypeError(
                 f"Configured AI provider requires a non-empty '{attribute}' string."
             )
-    callable_attributes = ["review_decision", "summarise_analytics"]
+    callable_attributes = ["review_decision", "summarise_analytics", "test_connection"]
     for attribute in callable_attributes:
         if not callable(getattr(provider, attribute, None)):
             raise TypeError(

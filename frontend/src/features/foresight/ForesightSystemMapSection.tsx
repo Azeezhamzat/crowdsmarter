@@ -1,8 +1,91 @@
 import type { CSSProperties, Dispatch, SetStateAction } from "react";
 
 import { Icon } from "../../components/Icon";
-import type { ForesightCanvasWorkspace } from "../../lib/types";
+import type { ForesightCanvasWorkspace, ForesightRelationship } from "../../lib/types";
 import type { FeedbackLoopForm, RelationshipForm, StakeholderForm } from "./canvasTypes";
+import { steepDotColour } from "./steepColours";
+
+const polarityStroke: Record<ForesightRelationship["polarity"], string> = {
+  reinforcing: "#2f8a5b",
+  balancing: "#c9962a",
+  uncertain: "#8a92a6",
+};
+
+function CausalNetworkDiagram({ canvas }: { canvas: ForesightCanvasWorkspace }) {
+  const size = 300;
+  const center = size / 2;
+  const radius = 108;
+
+  const driverById = new Map(canvas.drivers.map((driver) => [driver.id, driver]));
+  const nodeIds = Array.from(
+    new Set(
+      canvas.relationships.flatMap((item) => [item.source_driver_id, item.target_driver_id]),
+    ),
+  );
+  if (!nodeIds.length) return null;
+
+  const position = new Map<string, { x: number; y: number }>();
+  nodeIds.forEach((id, index) => {
+    const angle = (index / nodeIds.length) * 2 * Math.PI - Math.PI / 2;
+    position.set(id, { x: center + Math.cos(angle) * radius, y: center + Math.sin(angle) * radius });
+  });
+
+  return (
+    <svg viewBox={`0 0 ${size} ${size}`} width="100%" style={{ maxWidth: 360 }} role="img" aria-label="Driver causal network">
+      <defs>
+        <marker id="causal-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="context-stroke" />
+        </marker>
+      </defs>
+      {canvas.relationships.map((item) => {
+        const from = position.get(item.source_driver_id);
+        const to = position.get(item.target_driver_id);
+        if (!from || !to || item.source_driver_id === item.target_driver_id) return null;
+        const dx = to.x - from.x;
+        const dy = to.y - from.y;
+        const length = Math.hypot(dx, dy) || 1;
+        const nodeRadius = 20;
+        const startX = from.x + (dx / length) * nodeRadius;
+        const startY = from.y + (dy / length) * nodeRadius;
+        const endX = to.x - (dx / length) * (nodeRadius + 6);
+        const endY = to.y - (dy / length) * (nodeRadius + 6);
+        return (
+          <line
+            key={item.id}
+            x1={startX}
+            y1={startY}
+            x2={endX}
+            y2={endY}
+            stroke={polarityStroke[item.polarity]}
+            strokeWidth={1 + item.strength / 2}
+            strokeDasharray={item.polarity === "uncertain" ? "4 3" : undefined}
+            markerEnd="url(#causal-arrow)"
+            opacity={0.85}
+          >
+            <title>{`${item.source_title} → ${item.target_title} (${item.polarity_label}, strength ${item.strength}/5): ${item.rationale}`}</title>
+          </line>
+        );
+      })}
+      {nodeIds.map((id) => {
+        const driver = driverById.get(id);
+        const point = position.get(id)!;
+        const colour = driver ? steepDotColour[driver.steep_category] : "#5b6478";
+        const label = driver?.title ?? "Driver";
+        const short = label.length > 16 ? `${label.slice(0, 15)}…` : label;
+        return (
+          <g key={id}>
+            <circle cx={point.x} cy={point.y} r={20} fill={colour} opacity={0.92} stroke="#fff" strokeWidth={2}>
+              <title>{label}</title>
+            </circle>
+            <text x={point.x} y={point.y + 34} fontSize="9.5" textAnchor="middle" fill="var(--muted, #5a6f6a)">
+              {short}
+            </text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
 
 export function ForesightSystemMapSection({
   canvas,
@@ -37,6 +120,11 @@ export function ForesightSystemMapSection({
           </div>
           <span className="role-badge">Structured, not predictive</span>
         </div>
+        {canvas.relationships.length ? (
+          <div className="causal-network">
+            <CausalNetworkDiagram canvas={canvas} />
+          </div>
+        ) : null}
         <div className="causal-map" aria-label="Causal relationships">
           {canvas.relationships.map((item, index) => (
             <article

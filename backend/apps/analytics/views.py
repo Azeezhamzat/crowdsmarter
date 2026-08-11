@@ -9,7 +9,12 @@ from rest_framework.views import APIView
 from apps.organisations.models import Membership
 from apps.organisations.selectors import organisation_for_user
 
-from .services import organisation_analytics, organisation_analytics_insight
+from .serializers import AnalyticsInsightSerializer
+from .services import (
+    generate_analytics_insight,
+    list_analytics_insights,
+    organisation_analytics,
+)
 
 
 class OrganisationAnalyticsView(APIView):
@@ -46,4 +51,19 @@ class OrganisationAnalyticsInsightView(APIView):
             raise PermissionDenied(
                 "Only organisation owners and administrators can generate AI analytics insights."
             )
-        return Response(organisation_analytics_insight(organisation=organisation))
+        insight = generate_analytics_insight(organisation=organisation, actor=request.user)
+        return Response(AnalyticsInsightSerializer(insight).data)
+
+
+class OrganisationAnalyticsInsightHistoryView(APIView):
+    """Read-only history of previously generated AI analytics insights."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, organisation_id):  # type: ignore[no-untyped-def]
+        organisation = organisation_for_user(
+            user=request.user,
+            organisation_id=organisation_id,
+        )
+        insights = list_analytics_insights(organisation=organisation)
+        return Response(AnalyticsInsightSerializer(insights, many=True).data)

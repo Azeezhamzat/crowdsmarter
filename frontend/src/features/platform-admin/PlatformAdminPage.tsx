@@ -17,6 +17,7 @@ import {
   listPlatformUsers,
   setAIProvider,
   setAIProviderAPIKey,
+  testAIProviderConnection,
   updatePlatformConfiguration,
   updatePlatformDemoRequestStatus,
 } from "./api";
@@ -136,6 +137,7 @@ function AIProviderPanel() {
   const providerMutation = useMutation({ mutationFn: () => setAIProvider({ provider_key: providerKey, model, rationale: providerRationale }), onSuccess: async () => { setProviderRationale(""); await refresh(); } });
   const keyMutation = useMutation({ mutationFn: () => setAIProviderAPIKey({ api_key: apiKey, rationale: keyRationale }), onSuccess: async () => { setApiKey(""); setKeyRationale(""); await refresh(); } });
   const clearMutation = useMutation({ mutationFn: () => clearAIProviderAPIKey({ rationale: clearRationale }), onSuccess: async () => { setClearRationale(""); await refresh(); } });
+  const testMutation = useMutation({ mutationFn: testAIProviderConnection });
   if (configuration.isPending) return <p>Loading AI provider settings…</p>;
   if (configuration.isError || !configuration.data) return <StatusMessage kind="error">AI provider settings could not be loaded.</StatusMessage>;
   const data = configuration.data;
@@ -152,6 +154,13 @@ function AIProviderPanel() {
       <article><strong>{data.ai_provider_api_key_is_set ? "Configured" : "Not set"}</strong><span>API key</span></article>
       <article><strong>{data.ai_provider_model}</strong><span>Model</span></article>
     </div>
+    <button className="button button--secondary" type="button" disabled={testMutation.isPending} onClick={() => testMutation.mutate()}>{testMutation.isPending ? "Testing…" : "Test connection"}</button>
+    {testMutation.isError ? <StatusMessage kind="error">The connection test could not be run.</StatusMessage> : null}
+    {testMutation.data ? (
+      <StatusMessage kind={testMutation.data.ok ? "success" : "error"}>
+        {testMutation.data.provider_label ? `${testMutation.data.provider_label}: ` : ""}{testMutation.data.detail}
+      </StatusMessage>
+    ) : null}
     <div className="form-grid form-grid--two">
       <label>Provider<select value={providerKey} onChange={(event) => { const next = event.target.value as AIProviderKey; setProviderKey(next); const option = AI_PROVIDER_OPTIONS.find((item) => item.value === next); if (option?.defaultModel) setModel(option.defaultModel); }}>{AI_PROVIDER_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
       <label>Model identifier<input value={model} onChange={(event) => setModel(event.target.value)} placeholder={selected.defaultModel || "model identifier"} /><small>{selected.modelHint || "Not used by the rule-based reviewer."}</small></label>

@@ -59,6 +59,15 @@ class AnalyticsNarrative:
         return asdict(self)
 
 
+@dataclass(frozen=True)
+class ProviderConnectionResult:
+    ok: bool
+    detail: str
+
+    def as_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
 class AIProvider(Protocol):
     """Replaceable provider contract. Providers may use rules, local models, or APIs."""
 
@@ -71,3 +80,6 @@ class AIProvider(Protocol):
 
     def summarise_analytics(self, *, metrics: dict[str, Any]) -> AnalyticsNarrative:
         """Return a short narrative over organisation-wide decision metrics."""
+
+    def test_connection(self) -> ProviderConnectionResult:
+        """Make the smallest possible live call to confirm the provider is reachable."""

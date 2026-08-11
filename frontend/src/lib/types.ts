@@ -619,6 +619,13 @@ export type AnalyticsStatusCount = {
   count: number;
 };
 
+export type AnalyticsMonthlyTrendPoint = {
+  month: string;
+  label: string;
+  created: number;
+  finalised: number;
+};
+
 export type OrganisationAnalytics = {
   generated_at: string;
   totals: {
@@ -632,6 +639,7 @@ export type OrganisationAnalytics = {
     status_counts: AnalyticsStatusCount[];
     created_last_90_days: number;
     finalised_last_90_days: number;
+    monthly_trend: AnalyticsMonthlyTrendPoint[];
     median_days_to_finalise: number | null;
     overdue_target_decisions: number;
     contribution_coverage_percent: number | null;
@@ -657,9 +665,14 @@ export type AnalyticsObservation = {
 };
 
 export type AnalyticsInsight = {
+  id: string;
+  provider_key: string;
+  provider_label: string;
+  model_identifier: string;
   headline: string;
   observations: AnalyticsObservation[];
-  generated_by: string;
+  requested_by: User;
+  created_at: string;
 };
 
 export type DiscussionKind = "note" | "question" | "concern" | "update";

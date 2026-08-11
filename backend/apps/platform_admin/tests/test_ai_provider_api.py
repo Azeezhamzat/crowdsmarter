@@ -45,6 +45,42 @@ def test_non_administrator_cannot_read_or_change_ai_provider(api_client, user_fa
         {"api_key": "sk-ant-test", "rationale": "irrelevant, should be rejected first"},
         format="json",
     ).status_code == 403
+    assert api_client.post(
+        reverse("platform_admin:platform-admin-ai-provider-test-connection"),
+    ).status_code == 403
+
+
+@pytest.mark.django_db
+def test_test_connection_succeeds_locally_for_the_default_rules_provider(api_client, user_factory):
+    administrator = user_factory()
+    grant_platform_capability(administrator)
+    api_client.force_authenticate(administrator)
+
+    response = api_client.post(reverse("platform_admin:platform-admin-ai-provider-test-connection"))
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["provider_key"] == "rules"
+    assert body["provider_label"] == "Transparent rules review"
+    assert body["detail"]
+
+
+@pytest.mark.django_db
+def test_test_connection_reports_failure_when_a_keyed_provider_has_no_key(api_client, user_factory):
+    administrator = user_factory()
+    grant_platform_capability(administrator)
+    api_client.force_authenticate(administrator)
+    config = PlatformConfiguration.load()
+    config.ai_provider_key = PlatformConfiguration.AIProviderKey.ANTHROPIC
+    config.save(update_fields=["ai_provider_key"])
+
+    response = api_client.post(reverse("platform_admin:platform-admin-ai-provider-test-connection"))
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is False
+    assert "API key" in body["detail"]
 
 
 @pytest.mark.django_db

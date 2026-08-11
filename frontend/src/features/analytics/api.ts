@@ -11,3 +11,9 @@ export function generateOrganisationAnalyticsInsight(organisationId: string): Pr
     body: JSON.stringify({}),
   });
 }
+
+export function getOrganisationAnalyticsInsightHistory(
+  organisationId: string,
+): Promise<AnalyticsInsight[]> {
+  return apiRequest<AnalyticsInsight[]>(`/organisations/${organisationId}/analytics/insight/history/`);
+}

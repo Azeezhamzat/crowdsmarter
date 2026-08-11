@@ -1,5 +1,6 @@
 import { apiRequest } from "../../lib/api";
 import type {
+  AIProviderConnectionResult,
   AIProviderKey,
   PlatformAdministrator,
   PlatformAuditEvent,
@@ -151,6 +152,13 @@ export function clearAIProviderAPIKey(input: { rationale: string }): Promise<Pla
   return apiRequest<PlatformConfiguration>("/platform-admin/configuration/ai-provider/api-key/", {
     method: "DELETE",
     body: JSON.stringify(input),
+  });
+}
+
+export function testAIProviderConnection(): Promise<AIProviderConnectionResult> {
+  return apiRequest<AIProviderConnectionResult>("/platform-admin/configuration/ai-provider/test-connection/", {
+    method: "POST",
+    body: JSON.stringify({}),
   });
 }
 

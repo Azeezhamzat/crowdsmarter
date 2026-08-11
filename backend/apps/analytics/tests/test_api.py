@@ -40,6 +40,13 @@ def test_analytics_explains_flow_metrics(
     assert response.json()["flow"]["overdue_target_decisions"] == 1
     assert "median_days_to_finalise" in response.json()["definitions"]
 
+    monthly_trend = response.json()["flow"]["monthly_trend"]
+    assert len(monthly_trend) == 6
+    current_month = monthly_trend[-1]
+    assert current_month["created"] == 2
+    assert current_month["finalised"] == 1
+    assert monthly_trend[0]["month"] < monthly_trend[-1]["month"]
+
 
 @pytest.mark.django_db
 def test_analytics_is_tenant_isolated(
@@ -68,7 +75,19 @@ def test_analytics_insight_generates_a_narrative_for_owner(
     assert response.status_code == 200
     payload = response.json()
     assert payload["headline"]
-    assert payload["generated_by"] == "Transparent rules review"
+    assert payload["provider_label"] == "Transparent rules review"
+    assert payload["id"]
+    assert payload["requested_by"]["id"] == str(decision.owner_id)
+
+    history_url = reverse(
+        "analytics:organisation-insight-history",
+        kwargs={"organisation_id": decision.organisation_id},
+    )
+    history_response = api_client.get(history_url)
+    assert history_response.status_code == 200
+    history_payload = history_response.json()
+    assert len(history_payload) == 1
+    assert history_payload[0]["id"] == payload["id"]
 
 
 @pytest.mark.django_db

@@ -1,11 +1,15 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router";
 
 import { StatusMessage } from "../../components/StatusMessage";
 import { ApiError } from "../../lib/api";
-import type { AnalyticsObservation } from "../../lib/types";
+import type { AnalyticsInsight, AnalyticsMonthlyTrendPoint, AnalyticsObservation } from "../../lib/types";
 import { getOrganisation } from "../organisations/api";
-import { generateOrganisationAnalyticsInsight, getOrganisationAnalytics } from "./api";
+import {
+  generateOrganisationAnalyticsInsight,
+  getOrganisationAnalytics,
+  getOrganisationAnalyticsInsightHistory,
+} from "./api";
 
 function valueOrDash(value: number | null, suffix = ""): string {
   return value === null ? "—" : `${value}${suffix}`;
@@ -26,49 +30,84 @@ function ObservationList({ observations }: { observations: AnalyticsObservation[
   );
 }
 
-function FlowTrendChart({ created, finalised }: { created: number; finalised: number }) {
-  const max = Math.max(created, finalised, 1);
-  const width = 260;
-  const barHeight = 28;
-  const gap = 14;
-  const labelWidth = 132;
-  const trackWidth = width - labelWidth;
-  const height = barHeight * 2 + gap;
-  const bars = [
-    { label: "Created (90 days)", value: created, colour: "var(--public-green, #1b7a72)" },
-    { label: "Finalised (90 days)", value: finalised, colour: "#8fb9b0" },
-  ];
+function FlowTrendChart({ points }: { points: AnalyticsMonthlyTrendPoint[] }) {
+  const max = Math.max(1, ...points.flatMap((point) => [point.created, point.finalised]));
+  const width = 360;
+  const height = 180;
+  const axisHeight = 22;
+  const plotHeight = height - axisHeight;
+  const groupWidth = width / Math.max(points.length, 1);
+  const barWidth = Math.min(16, groupWidth / 3);
+  const summary = points.map((point) => `${point.label}: ${point.created} created, ${point.finalised} finalised`).join("; ");
+
   return (
-    <svg
-      viewBox={`0 0 ${width} ${height}`}
-      width="100%"
-      style={{ maxWidth: 340 }}
-      role="img"
-      aria-label={`Created ${created} decisions and finalised ${finalised} decisions in the last 90 days`}
-    >
-      {bars.map((bar, index) => {
-        const barWidth = Math.max(2, (bar.value / max) * trackWidth);
-        const y = index * (barHeight + gap);
-        return (
-          <g key={bar.label}>
-            <text x={0} y={y + barHeight / 2 + 4} fontSize="11" fill="var(--muted, #5a6f6a)">
-              {bar.label}
-            </text>
-            <rect x={labelWidth} y={y} width={trackWidth} height={barHeight} rx={5} fill="#eef2f0" />
-            <rect x={labelWidth} y={y} width={barWidth} height={barHeight} rx={5} fill={bar.colour} />
-            <text x={labelWidth + barWidth + 6} y={y + barHeight / 2 + 4} fontSize="12" fontWeight="700" fill="var(--ink, #123d43)">
-              {bar.value}
-            </text>
-          </g>
-        );
-      })}
-    </svg>
+    <div className="analytics-trend">
+      <svg viewBox={`0 0 ${width} ${height}`} width="100%" style={{ maxWidth: 420 }} role="img" aria-label={`Monthly decision flow. ${summary}`}>
+        <line x1={0} y1={plotHeight} x2={width} y2={plotHeight} stroke="var(--line, #d9e1dc)" />
+        {points.map((point, index) => {
+          const groupX = index * groupWidth + groupWidth / 2;
+          const createdHeight = (point.created / max) * (plotHeight - 8);
+          const finalisedHeight = (point.finalised / max) * (plotHeight - 8);
+          return (
+            <g key={point.month}>
+              <rect
+                x={groupX - barWidth - 2}
+                y={plotHeight - createdHeight}
+                width={barWidth}
+                height={createdHeight}
+                rx={2}
+                fill="var(--public-green, #1b7a72)"
+              >
+                <title>{`${point.label}: ${point.created} created`}</title>
+              </rect>
+              <rect
+                x={groupX + 2}
+                y={plotHeight - finalisedHeight}
+                width={barWidth}
+                height={finalisedHeight}
+                rx={2}
+                fill="#8fb9b0"
+              >
+                <title>{`${point.label}: ${point.finalised} finalised`}</title>
+              </rect>
+              <text x={groupX} y={height - 4} fontSize="9" textAnchor="middle" fill="var(--muted, #5a6f6a)">
+                {point.label.split(" ")[0]}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+      <ul className="analytics-trend__legend">
+        <li><span style={{ background: "var(--public-green, #1b7a72)" }} />Created</li>
+        <li><span style={{ background: "#8fb9b0" }} />Finalised</li>
+      </ul>
+    </div>
+  );
+}
+
+function InsightCard({ insight }: { insight: AnalyticsInsight }) {
+  const requester = [insight.requested_by.first_name, insight.requested_by.last_name].filter(Boolean).join(" ") || insight.requested_by.email;
+  return (
+    <div className="analytics-insight__result">
+      <p className="analytics-insight__headline">{insight.headline}</p>
+      <small className="muted">
+        Generated by {insight.provider_label} for {requester} on {new Date(insight.created_at).toLocaleString()}
+      </small>
+      <ObservationList observations={insight.observations} />
+    </div>
   );
 }
 
 function AnalyticsInsightPanel({ organisationId }: { organisationId: string }) {
-  const insight = useMutation({ mutationFn: () => generateOrganisationAnalyticsInsight(organisationId) });
+  const queryClient = useQueryClient();
+  const historyKey = ["organisations", organisationId, "analytics", "insights"];
+  const history = useQuery({ queryKey: historyKey, queryFn: () => getOrganisationAnalyticsInsightHistory(organisationId) });
+  const insight = useMutation({
+    mutationFn: () => generateOrganisationAnalyticsInsight(organisationId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: historyKey }),
+  });
   const forbidden = insight.error instanceof ApiError && insight.error.status === 403;
+  const previousInsights = (history.data ?? []).filter((item) => item.id !== insight.data?.id);
   return (
     <section className="page-primary analytics-insight" aria-label="AI-generated analytics insight">
       <p className="eyebrow">AI-powered</p>
@@ -76,19 +115,19 @@ function AnalyticsInsightPanel({ organisationId }: { organisationId: string }) {
       <p className="muted">
         Generated on demand from the metrics above by the platform&rsquo;s configured AI provider (transparent rules
         by default; Claude, ChatGPT, or Gemini if an operator has selected and keyed one). Advisory only — it does
-        not alter any record.
+        not alter any record. Every generated insight is kept as an attributable record.
       </p>
       <button className="button button--secondary" type="button" disabled={insight.isPending} onClick={() => insight.mutate()}>
-        {insight.isPending ? "Generating…" : insight.data ? "Regenerate insight" : "Generate insight"}
+        {insight.isPending ? "Generating…" : "Generate insight"}
       </button>
       {forbidden ? <StatusMessage kind="error">Only organisation owners and administrators can generate AI analytics insights.</StatusMessage> : null}
       {insight.isError && !forbidden ? <StatusMessage kind="error">The insight could not be generated.</StatusMessage> : null}
-      {insight.data ? (
-        <div className="analytics-insight__result">
-          <p className="analytics-insight__headline">{insight.data.headline}</p>
-          <small className="muted">Generated by {insight.data.generated_by}</small>
-          <ObservationList observations={insight.data.observations} />
-        </div>
+      {insight.data ? <InsightCard insight={insight.data} /> : null}
+      {previousInsights.length ? (
+        <details className="analytics-insight__history">
+          <summary>Previous insights ({previousInsights.length})</summary>
+          {previousInsights.map((item) => <InsightCard key={item.id} insight={item} />)}
+        </details>
       ) : null}
     </section>
   );
@@ -119,7 +158,7 @@ export function OrganisationAnalyticsPage() {
           <div className="analytics-layout">
             <section className="page-primary">
               <p className="eyebrow">Flow</p><h2>Decision movement</h2>
-              <FlowTrendChart created={analytics.data.flow.created_last_90_days} finalised={analytics.data.flow.finalised_last_90_days} />
+              <FlowTrendChart points={analytics.data.flow.monthly_trend} />
               <dl className="record-grid">
                 <div><dt>Created in 90 days</dt><dd>{analytics.data.flow.created_last_90_days}</dd></div>
                 <div><dt>Finalised in 90 days</dt><dd>{analytics.data.flow.finalised_last_90_days}</dd></div>

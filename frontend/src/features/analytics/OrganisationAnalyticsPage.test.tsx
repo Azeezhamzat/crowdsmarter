@@ -4,11 +4,21 @@ import { MemoryRouter, Route, Routes } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 
 import { getOrganisation } from "../organisations/api";
-import { generateOrganisationAnalyticsInsight, getOrganisationAnalytics } from "./api";
+import {
+  generateOrganisationAnalyticsInsight,
+  getOrganisationAnalytics,
+  getOrganisationAnalyticsInsightHistory,
+} from "./api";
 import { OrganisationAnalyticsPage } from "./OrganisationAnalyticsPage";
 
 vi.mock("../organisations/api", () => ({ getOrganisation: vi.fn() }));
-vi.mock("./api", () => ({ getOrganisationAnalytics: vi.fn(), generateOrganisationAnalyticsInsight: vi.fn() }));
+vi.mock("./api", () => ({
+  getOrganisationAnalytics: vi.fn(),
+  generateOrganisationAnalyticsInsight: vi.fn(),
+  getOrganisationAnalyticsInsightHistory: vi.fn(),
+}));
+
+const requester = { id: "00000000-0000-0000-0000-000000000002", email: "owner@agrinova.test", first_name: "Ade", last_name: "Owner" };
 
 const organisationId = "00000000-0000-0000-0000-000000000001";
 
@@ -29,14 +39,35 @@ describe("OrganisationAnalyticsPage", () => {
     vi.mocked(getOrganisationAnalytics).mockResolvedValue({
       generated_at: "2026-07-26T12:00:00Z",
       totals: { decisions: 4, open_decisions: 2, finalised_decisions: 2, archived_decisions: 1, active_lessons: 3 },
-      flow: { status_counts: [{ status: "under_review", label: "Under Review", count: 2 }], created_last_90_days: 4, finalised_last_90_days: 2, median_days_to_finalise: 12, overdue_target_decisions: 1, contribution_coverage_percent: 50 },
+      flow: {
+        status_counts: [{ status: "under_review", label: "Under Review", count: 2 }],
+        created_last_90_days: 4,
+        finalised_last_90_days: 2,
+        monthly_trend: [
+          { month: "2026-02-01", label: "Feb 2026", created: 0, finalised: 0 },
+          { month: "2026-03-01", label: "Mar 2026", created: 1, finalised: 0 },
+          { month: "2026-04-01", label: "Apr 2026", created: 0, finalised: 0 },
+          { month: "2026-05-01", label: "May 2026", created: 1, finalised: 1 },
+          { month: "2026-06-01", label: "Jun 2026", created: 0, finalised: 0 },
+          { month: "2026-07-01", label: "Jul 2026", created: 2, finalised: 1 },
+        ],
+        median_days_to_finalise: 12,
+        overdue_target_decisions: 1,
+        contribution_coverage_percent: 50,
+      },
       learning: { outcome_reviews_completed: 1, outcome_success_percent: 100, outcome_assessment_counts: [{ assessment: "met", label: "Met expectations", count: 1 }], reviews_due_or_overdue: 0, active_lessons: 3 },
       definitions: { median_days_to_finalise: "Median calendar days." },
     });
+    vi.mocked(getOrganisationAnalyticsInsightHistory).mockResolvedValue([]);
     vi.mocked(generateOrganisationAnalyticsInsight).mockResolvedValue({
+      id: "00000000-0000-0000-0000-000000000010",
+      provider_key: "rules",
+      provider_label: "Transparent rules review",
+      model_identifier: "",
       headline: "4 decisions tracked; one is overdue.",
       observations: [{ severity: "high", title: "1 decision overdue", detail: "Past its target date." }],
-      generated_by: "Transparent rules review",
+      requested_by: requester,
+      created_at: "2026-07-26T12:00:00Z",
     });
 
     renderPage();
@@ -44,7 +75,7 @@ describe("OrganisationAnalyticsPage", () => {
     expect(await screen.findByRole("heading", { name: /agrinova analytics/i })).toBeInTheDocument();
     expect(screen.getByText("Decision movement")).toBeInTheDocument();
     expect(screen.getByText("Median calendar days.")).toBeInTheDocument();
-    expect(screen.getByRole("img", { name: /created 4 decisions and finalised 2 decisions/i })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: /monthly decision flow/i })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /generate insight/i }));
     expect(await screen.findByText("4 decisions tracked; one is overdue.")).toBeInTheDocument();

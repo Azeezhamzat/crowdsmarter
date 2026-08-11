@@ -164,6 +164,13 @@ export type PlatformConfiguration = PlatformContactSettings & {
   updated_at: string;
 };
 
+export type AIProviderConnectionResult = {
+  ok: boolean;
+  detail: string;
+  provider_key: string;
+  provider_label: string;
+};
+
 export type PlatformAdministrator = {
   id: string;
   user: User;

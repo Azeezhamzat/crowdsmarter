@@ -602,6 +602,38 @@ def clear_ai_provider_api_key(*, actor: Any, rationale: str) -> PlatformConfigur
     return item
 
 
+def test_ai_provider_connection(*, actor: Any) -> dict[str, Any]:
+    """Make the smallest possible live call to confirm the configured provider is reachable.
+
+    Never raises for a provider-side failure (missing key, bad credentials, network
+    error) — those are all reported back as an ok=False result an administrator can
+    read, not a 500. Only a permission failure raises.
+    """
+    _require_platform_administrator(actor)
+    from apps.ai_assistance.providers.registry import get_provider
+
+    try:
+        provider = get_provider()
+    except Exception as error:  # noqa: BLE001 - surface any failure as a diagnosable result
+        result = {"ok": False, "detail": str(error), "provider_key": "", "provider_label": ""}
+    else:
+        outcome = provider.test_connection()
+        result = {
+            "ok": outcome.ok,
+            "detail": outcome.detail,
+            "provider_key": provider.key,
+            "provider_label": provider.label,
+        }
+    record_event(
+        action="platform_configuration.ai_provider_connection_tested",
+        object_type="platform_configuration",
+        object_id=str(PlatformConfiguration.load().id),
+        actor=actor,
+        metadata={"ok": result["ok"], "provider_key": result["provider_key"]},
+    )
+    return result
+
+
 @transaction.atomic
 def update_demo_request_status(
     *, actor: Any, demo_request: DemoRequest, status: str, rationale: str
