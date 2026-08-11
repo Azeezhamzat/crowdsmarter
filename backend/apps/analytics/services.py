@@ -9,6 +9,7 @@ from typing import Any
 
 from django.utils import timezone
 
+from apps.ai_assistance.providers.registry import get_provider
 from apps.decisions.models import Decision, DecisionTransition
 from apps.lessons.models import Lesson
 from apps.organisations.models import Organisation
@@ -170,3 +171,17 @@ def organisation_analytics(*, organisation: Organisation) -> dict[str, Any]:
             ),
         },
     }
+
+
+def organisation_analytics_insight(*, organisation: Organisation) -> dict[str, Any]:
+    """Generate an on-demand narrative over the same metrics organisation_analytics() exposes.
+
+    Uses whichever AI provider is currently configured platform-wide (transparent
+    rules by default, or a real model once an operator selects and keys one).
+    Ephemeral: nothing about this call is persisted, so it can be regenerated
+    freely as the underlying data changes.
+    """
+    metrics = organisation_analytics(organisation=organisation)
+    provider = get_provider()
+    narrative = provider.summarise_analytics(metrics=metrics)
+    return narrative.as_dict()

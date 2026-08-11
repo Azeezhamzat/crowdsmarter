@@ -582,12 +582,12 @@ def set_ai_provider_api_key(
 
 @transaction.atomic
 def clear_ai_provider_api_key(*, actor: Any, rationale: str) -> PlatformConfiguration:
-    """Remove the stored API key, reverting to the rules provider if Anthropic was active."""
+    """Remove the stored API key, reverting to the rules provider if a keyed provider was active."""
     _require_platform_administrator(actor)
     rationale = _meaningful(rationale)
     item = PlatformConfiguration.objects.select_for_update().get(singleton_key=1)
     item.ai_provider_api_key_encrypted = ""
-    if item.ai_provider_key == PlatformConfiguration.AIProviderKey.ANTHROPIC:
+    if item.ai_provider_key != PlatformConfiguration.AIProviderKey.RULES:
         item.ai_provider_key = PlatformConfiguration.AIProviderKey.RULES
     item.save(
         update_fields=["ai_provider_api_key_encrypted", "ai_provider_key", "updated_at"]

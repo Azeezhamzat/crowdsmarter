@@ -48,6 +48,92 @@ function formatBytes(value: number): string {
   return `${(value / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+const steepDotColour: Record<ForesightSignal["steep_category"], string> = {
+  social: "#7f5fd9",
+  technological: "#1f8fc4",
+  economic: "#c9962a",
+  environmental: "#2f8a5b",
+  political: "#c1553f",
+  legal: "#5b6478",
+  ethical: "#b1489a",
+};
+
+function SignalScatterChart({
+  signals,
+  categories,
+  onSelect,
+}: {
+  signals: ForesightSignal[];
+  categories: Array<{ value: ForesightSignal["steep_category"]; label: string }>;
+  onSelect: (title: string) => void;
+}) {
+  const size = 320;
+  const margin = 34;
+  const plot = size - margin * 2;
+  const toX = (uncertainty: number) => margin + ((uncertainty - 1) / 4) * plot;
+  const toY = (impact: number) => size - margin - ((impact - 1) / 4) * plot;
+
+  // Signals sharing the same integer (impact, uncertainty) point are spread in a small ring
+  // around it so they stay individually visible instead of stacking exactly on top of each other.
+  const buckets = new Map<string, ForesightSignal[]>();
+  for (const signal of signals) {
+    const key = `${signal.impact}-${signal.uncertainty}`;
+    const bucket = buckets.get(key) ?? [];
+    bucket.push(signal);
+    buckets.set(key, bucket);
+  }
+  const positioned: Array<{ signal: ForesightSignal; x: number; y: number }> = [];
+  for (const bucket of buckets.values()) {
+    const cx = toX(bucket[0]!.uncertainty);
+    const cy = toY(bucket[0]!.impact);
+    bucket.forEach((signal, index) => {
+      if (bucket.length === 1) {
+        positioned.push({ signal, x: cx, y: cy });
+        return;
+      }
+      const angle = (index / bucket.length) * 2 * Math.PI;
+      const spread = 9;
+      positioned.push({ signal, x: cx + Math.cos(angle) * spread, y: cy + Math.sin(angle) * spread });
+    });
+  }
+
+  return (
+    <div className="signal-scatter">
+      <svg viewBox={`0 0 ${size} ${size}`} width="100%" role="img" aria-label="Signals plotted by impact and uncertainty">
+        <line x1={margin} y1={size - margin} x2={size - margin} y2={size - margin} stroke="var(--line, #d9e1dc)" />
+        <line x1={margin} y1={margin} x2={margin} y2={size - margin} stroke="var(--line, #d9e1dc)" />
+        <line x1={toX(3)} y1={margin} x2={toX(3)} y2={size - margin} stroke="var(--line, #d9e1dc)" strokeDasharray="3 3" />
+        <line x1={margin} y1={toY(3)} x2={size - margin} y2={toY(3)} stroke="var(--line, #d9e1dc)" strokeDasharray="3 3" />
+        <text x={size - margin} y={size - margin + 16} fontSize="10" textAnchor="end" fill="var(--muted, #5a6f6a)">Uncertainty →</text>
+        <text x={margin - 8} y={margin} fontSize="10" textAnchor="end" fill="var(--muted, #5a6f6a)">Impact ↑</text>
+        {positioned.map(({ signal, x, y }) => (
+          <circle
+            key={signal.id}
+            cx={x}
+            cy={y}
+            r={4 + signal.priority_score / 6}
+            fill={steepDotColour[signal.steep_category]}
+            opacity={0.85}
+            role="button"
+            tabIndex={0}
+            aria-label={`${signal.title}: impact ${signal.impact}, uncertainty ${signal.uncertainty}, ${signal.steep_label}`}
+            style={{ cursor: "pointer" }}
+            onClick={() => onSelect(signal.title)}
+            onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSelect(signal.title); } }}
+          >
+            <title>{`${signal.title} — impact ${signal.impact}/5, uncertainty ${signal.uncertainty}/5`}</title>
+          </circle>
+        ))}
+      </svg>
+      <ul className="signal-scatter__legend">
+        {categories.map((category) => (
+          <li key={category.value}><span style={{ background: steepDotColour[category.value] }} />{category.label}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export function OrganisationForesightPage() {
   const { organisationId = "" } = useParams<{ organisationId: string }>();
   const queryClient = useQueryClient();
@@ -288,7 +374,13 @@ export function OrganisationForesightPage() {
       {tab === "radar" ? (
         <div className="foresight-radar-layout">
           <section className="page-primary foresight-radar-card">
-            <div className="section-heading"><div><p className="eyebrow">Portfolio view</p><h2>STEEP signal radar</h2></div><span className="role-badge">Impact × uncertainty</span></div>
+            <div className="section-heading"><div><p className="eyebrow">Portfolio view</p><h2>Signal radar</h2></div><span className="role-badge">Impact × uncertainty</span></div>
+            <SignalScatterChart
+              signals={(signals.data ?? []).filter((signal) => signal.status !== "retired")}
+              categories={steepCategories}
+              onSelect={(title) => { setSignalQuery(title); setTab("signals"); }}
+            />
+            <p className="eyebrow" style={{ marginTop: "1.4rem" }}>By STEEP category</p>
             <div className="steep-radar">
               {steepCategories.map((category) => {
                 const categorySignals = (signals.data ?? []).filter((signal) => signal.steep_category === category.value && signal.status !== "retired");

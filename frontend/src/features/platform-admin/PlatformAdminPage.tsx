@@ -115,6 +115,13 @@ function ConfigurationPanel() {
   return <section className="card-panel"><div className="section-heading"><div><p className="eyebrow">Official channels</p><h2>Contact and support policy</h2><p className="muted">These values are centrally governed and exposed through the public configuration endpoint. All aliases may initially route to hello@crowdsmarter.com.</p></div></div>{mutation.isSuccess ? <StatusMessage kind="success">Platform settings saved.</StatusMessage> : null}{mutation.isError ? <StatusMessage kind="error">Platform settings could not be saved.</StatusMessage> : null}<div className="form-grid form-grid--two">{emailFields.map(([field, label]) => <label key={field}>{label}<input type="email" value={String(form[field])} onChange={(event) => setForm({ ...form, [field]: event.target.value })} /></label>)}<label>Maximum support-access duration<input type="number" min={1} max={72} value={form.support_access_max_hours} onChange={(event) => setForm({ ...form, support_access_max_hours: Number(event.target.value) })} /><small>Hours; each access still requires a recorded reason.</small></label><label>Change rationale<textarea rows={3} value={form.rationale} onChange={(event) => setForm({ ...form, rationale: event.target.value })} /></label></div><button className="button button--primary" type="button" disabled={form.rationale.trim().length < 12 || mutation.isPending} onClick={() => mutation.mutate()}>{mutation.isPending ? "Saving…" : "Save platform settings"}</button></section>;
 }
 
+const AI_PROVIDER_OPTIONS: Array<{ value: AIProviderKey; label: string; defaultModel: string; keyPlaceholder: string; modelHint: string }> = [
+  { value: "rules", label: "Transparent rules (no external service)", defaultModel: "", keyPlaceholder: "", modelHint: "" },
+  { value: "anthropic", label: "Anthropic Claude", defaultModel: "claude-sonnet-5", keyPlaceholder: "sk-ant-…", modelHint: "e.g. claude-sonnet-5, claude-haiku-4-5-20251001" },
+  { value: "openai", label: "OpenAI ChatGPT", defaultModel: "gpt-4o", keyPlaceholder: "sk-…", modelHint: "e.g. gpt-4o, gpt-4.1" },
+  { value: "gemini", label: "Google Gemini", defaultModel: "gemini-2.0-flash", keyPlaceholder: "AIza…", modelHint: "e.g. gemini-2.0-flash, gemini-2.5-pro" },
+];
+
 function AIProviderPanel() {
   const queryClient = useQueryClient();
   const configuration = useQuery({ queryKey: ["platform-admin", "configuration"], queryFn: getPlatformConfiguration });
@@ -132,8 +139,10 @@ function AIProviderPanel() {
   if (configuration.isPending) return <p>Loading AI provider settings…</p>;
   if (configuration.isError || !configuration.data) return <StatusMessage kind="error">AI provider settings could not be loaded.</StatusMessage>;
   const data = configuration.data;
+  const selected = AI_PROVIDER_OPTIONS.find((option) => option.value === providerKey) ?? AI_PROVIDER_OPTIONS[0]!;
+  const needsKey = providerKey !== "rules";
   return <section className="card-panel">
-    <div className="section-heading"><div><p className="eyebrow">Decision reviews</p><h2>AI provider</h2><p className="muted">The rule-based reviewer needs no external service or key. Switching to a real model sends decision content to that provider and requires an API key.</p></div></div>
+    <div className="section-heading"><div><p className="eyebrow">Decision reviews and analytics</p><h2>AI provider</h2><p className="muted">The rule-based reviewer needs no external service or key. Choose Claude, ChatGPT, or Gemini to power decision reviews and analytics insights with a real model instead — this sends decision content to that provider and requires an API key.</p></div></div>
     {providerMutation.isError ? <StatusMessage kind="error">The provider choice could not be saved.</StatusMessage> : null}
     {keyMutation.isError ? <StatusMessage kind="error">The API key could not be saved.</StatusMessage> : null}
     {clearMutation.isError ? <StatusMessage kind="error">The API key could not be removed.</StatusMessage> : null}
@@ -144,16 +153,16 @@ function AIProviderPanel() {
       <article><strong>{data.ai_provider_model}</strong><span>Model</span></article>
     </div>
     <div className="form-grid form-grid--two">
-      <label>Provider<select value={providerKey} onChange={(event) => setProviderKey(event.target.value as AIProviderKey)}><option value="rules">Transparent rules (no external service)</option><option value="anthropic">Anthropic Claude</option></select></label>
-      <label>Model identifier<input value={model} onChange={(event) => setModel(event.target.value)} placeholder="claude-sonnet-5" /><small>e.g. claude-sonnet-5, claude-haiku-4-5-20251001</small></label>
+      <label>Provider<select value={providerKey} onChange={(event) => { const next = event.target.value as AIProviderKey; setProviderKey(next); const option = AI_PROVIDER_OPTIONS.find((item) => item.value === next); if (option?.defaultModel) setModel(option.defaultModel); }}>{AI_PROVIDER_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+      <label>Model identifier<input value={model} onChange={(event) => setModel(event.target.value)} placeholder={selected.defaultModel || "model identifier"} /><small>{selected.modelHint || "Not used by the rule-based reviewer."}</small></label>
       <label>Change rationale<textarea rows={2} value={providerRationale} onChange={(event) => setProviderRationale(event.target.value)} /></label>
     </div>
-    {providerKey === "anthropic" && !data.ai_provider_api_key_is_set ? <p className="field-hint">Set an API key below before selecting Anthropic.</p> : null}
+    {needsKey && !data.ai_provider_api_key_is_set ? <p className="field-hint">Set a {selected.label} API key below before selecting this provider.</p> : null}
     <button className="button button--primary" type="button" disabled={providerRationale.trim().length < 12 || providerMutation.isPending} onClick={() => providerMutation.mutate()}>{providerMutation.isPending ? "Saving…" : "Save provider choice"}</button>
 
-    <div className="section-heading"><div><p className="eyebrow">Credential</p><h2>Anthropic API key</h2><p className="muted">Stored encrypted. It is never shown again once saved, including to other platform administrators.</p></div></div>
+    <div className="section-heading"><div><p className="eyebrow">Credential</p><h2>{needsKey ? `${selected.label} API key` : "API key"}</h2><p className="muted">Stored encrypted. It is never shown again once saved, including to other platform administrators.</p></div></div>
     <div className="form-grid form-grid--two">
-      <label>API key<input type="password" autoComplete="off" value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder={data.ai_provider_api_key_is_set ? "Already configured — enter a new key to replace it" : "sk-ant-…"} /></label>
+      <label>API key<input type="password" autoComplete="off" value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder={data.ai_provider_api_key_is_set ? "Already configured — enter a new key to replace it" : (selected.keyPlaceholder || "API key")} /></label>
       <label>Change rationale<textarea rows={2} value={keyRationale} onChange={(event) => setKeyRationale(event.target.value)} /></label>
     </div>
     <button className="button button--secondary" type="button" disabled={!apiKey.trim() || keyRationale.trim().length < 12 || keyMutation.isPending} onClick={() => keyMutation.mutate()}>{keyMutation.isPending ? "Saving…" : "Set API key"}</button>
@@ -162,7 +171,7 @@ function AIProviderPanel() {
       <div className="form-grid form-grid--two">
         <label>Reason for removing the key<textarea rows={2} value={clearRationale} onChange={(event) => setClearRationale(event.target.value)} /></label>
       </div>
-      <button className="button button--danger" type="button" disabled={clearRationale.trim().length < 12 || clearMutation.isPending} onClick={() => { if (window.confirm("Remove the configured API key? This reverts to the rules-based reviewer if Anthropic is active.")) clearMutation.mutate(); }}>{clearMutation.isPending ? "Removing…" : "Remove API key"}</button>
+      <button className="button button--danger" type="button" disabled={clearRationale.trim().length < 12 || clearMutation.isPending} onClick={() => { if (window.confirm("Remove the configured API key? This reverts to the rules-based reviewer if a keyed provider is active.")) clearMutation.mutate(); }}>{clearMutation.isPending ? "Removing…" : "Remove API key"}</button>
     </> : null}
   </section>;
 }

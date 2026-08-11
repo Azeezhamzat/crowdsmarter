@@ -7,7 +7,7 @@ from collections import defaultdict
 from datetime import date, datetime
 from typing import Any
 
-from .base import AIReviewOutput, ReviewFinding, SimilarDecision
+from .base import AIReviewOutput, AnalyticsNarrative, AnalyticsObservation, ReviewFinding, SimilarDecision
 
 
 _TOKEN_PATTERN = re.compile(r"[a-z0-9]{3,}")
@@ -387,3 +387,98 @@ class RuleBasedAIProvider:
                 ),
             ],
         )
+
+    def summarise_analytics(self, *, metrics: dict[str, Any]) -> AnalyticsNarrative:
+        totals = metrics["totals"]
+        flow = metrics["flow"]
+        learning = metrics["learning"]
+
+        if totals["decisions"] == 0:
+            return AnalyticsNarrative(
+                headline="No decisions have been recorded yet.",
+                observations=[
+                    AnalyticsObservation(
+                        severity="low",
+                        title="This organisation has no decision history yet",
+                        detail="Metrics will become meaningful once decisions are framed and tracked.",
+                    )
+                ],
+                generated_by=self.label,
+            )
+
+        headline = (
+            f"{totals['decisions']} decision(s) tracked: {totals['open_decisions']} open, "
+            f"{totals['finalised_decisions']} finalised, {totals['active_lessons']} active lesson(s)."
+        )
+
+        observations: list[AnalyticsObservation] = []
+
+        overdue = flow["overdue_target_decisions"]
+        if overdue > 0:
+            observations.append(
+                AnalyticsObservation(
+                    severity="high",
+                    title=f"{overdue} open decision(s) are past their target date",
+                    detail="These decisions have a target_decision_date in the past and remain open.",
+                )
+            )
+
+        coverage = flow["contribution_coverage_percent"]
+        if coverage is not None:
+            if coverage < 50:
+                observations.append(
+                    AnalyticsObservation(
+                        severity="medium",
+                        title=f"Contribution coverage is low ({coverage}%)",
+                        detail="Fewer than half of open decisions have at least two active participants.",
+                    )
+                )
+            elif coverage == 100:
+                observations.append(
+                    AnalyticsObservation(
+                        severity="low",
+                        title="Every open decision has at least two active participants",
+                        detail="Contribution coverage is at 100% across open decisions.",
+                    )
+                )
+
+        due_reviews = learning["reviews_due_or_overdue"]
+        if due_reviews > 0:
+            observations.append(
+                AnalyticsObservation(
+                    severity="medium",
+                    title=f"{due_reviews} outcome review(s) are due or overdue",
+                    detail="These decisions have passed their review_due_date without a recorded outcome review.",
+                )
+            )
+
+        median_days = flow["median_days_to_finalise"]
+        if median_days is not None and median_days > 60:
+            observations.append(
+                AnalyticsObservation(
+                    severity="medium",
+                    title=f"Median time to finalise is {median_days} days",
+                    detail="Recent finalised decisions took a relatively long time from creation to finalisation.",
+                )
+            )
+
+        success_rate = learning["outcome_success_percent"]
+        if success_rate is not None:
+            observations.append(
+                AnalyticsObservation(
+                    severity="low" if success_rate >= 60 else "medium",
+                    title=f"{success_rate}% of completed outcome reviews met or exceeded expectations",
+                    detail=f"Based on {learning['outcome_reviews_completed']} completed outcome review(s).",
+                )
+            )
+
+        if not observations:
+            observations.append(
+                AnalyticsObservation(
+                    severity="low",
+                    title="No notable risk signals in the current metrics",
+                    detail="Open decisions are on track, and there is not yet enough outcome history to assess further.",
+                )
+            )
+
+        return AnalyticsNarrative(headline=headline, observations=observations, generated_by=self.label)

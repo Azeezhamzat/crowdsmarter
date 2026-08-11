@@ -82,6 +82,8 @@ class PlatformConfiguration(UUIDTimeStampedModel):
     class AIProviderKey(models.TextChoices):
         RULES = "rules", "Transparent rules (no external service)"
         ANTHROPIC = "anthropic", "Anthropic Claude"
+        OPENAI = "openai", "OpenAI ChatGPT"
+        GEMINI = "gemini", "Google Gemini"
 
     singleton_key = models.PositiveSmallIntegerField(default=1, unique=True, editable=False)
     public_contact_email = models.EmailField(default="hello@crowdsmarter.com")
@@ -111,7 +113,7 @@ class PlatformConfiguration(UUIDTimeStampedModel):
                 name="platform_support_access_hours_range",
             ),
             models.CheckConstraint(
-                condition=models.Q(ai_provider_key__in=["rules", "anthropic"]),
+                condition=models.Q(ai_provider_key__in=["rules", "anthropic", "openai", "gemini"]),
                 name="platform_ai_provider_key_valid",
             ),
         ]
@@ -137,13 +139,14 @@ class PlatformConfiguration(UUIDTimeStampedModel):
         ):
             setattr(self, field, getattr(self, field).strip().lower())
         if (
-            self.ai_provider_key == self.AIProviderKey.ANTHROPIC
+            self.ai_provider_key != self.AIProviderKey.RULES
             and not self.ai_provider_api_key_encrypted
         ):
             raise ValidationError(
                 {
                     "ai_provider_key": (
-                        "Set an Anthropic API key before selecting this provider."
+                        f"Set a {self.get_ai_provider_key_display()} API key before "
+                        "selecting this provider."
                     )
                 }
             )

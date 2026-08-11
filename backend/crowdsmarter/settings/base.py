@@ -158,6 +158,7 @@ REST_FRAMEWORK = {
         "invitation_management": os.getenv("API_INVITATION_MANAGEMENT_THROTTLE_RATE", "120/hour"),
         "invitation_acceptance": os.getenv("API_INVITATION_ACCEPTANCE_THROTTLE_RATE", "60/hour"),
         "ai_review": os.getenv("API_AI_REVIEW_THROTTLE_RATE", "20/hour"),
+        "analytics_insights": os.getenv("API_ANALYTICS_INSIGHTS_THROTTLE_RATE", "30/hour"),
         "foresight_feed_sync": os.getenv("API_FORESIGHT_FEED_SYNC_THROTTLE_RATE", "20/hour"),
         "demo_request": os.getenv("API_DEMO_REQUEST_THROTTLE_RATE", "5/hour"),
     },

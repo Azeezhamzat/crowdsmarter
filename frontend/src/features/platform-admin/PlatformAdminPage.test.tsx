@@ -104,5 +104,18 @@ describe("PlatformAdminPage", () => {
     expect(screen.getByText("Not set")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /set api key/i })).toBeDisabled();
     expect(screen.queryByRole("button", { name: /remove api key/i })).not.toBeInTheDocument();
+
+    const providerSelect = screen.getByLabelText(/^provider$/i) as HTMLSelectElement;
+    const optionLabels = [...providerSelect.options].map((option) => option.textContent);
+    expect(optionLabels).toEqual([
+      "Transparent rules (no external service)",
+      "Anthropic Claude",
+      "OpenAI ChatGPT",
+      "Google Gemini",
+    ]);
+
+    fireEvent.change(providerSelect, { target: { value: "gemini" } });
+    expect(screen.getByPlaceholderText("gemini-2.0-flash")).toBeInTheDocument();
+    expect(screen.getByText(/set a google gemini api key below/i)).toBeInTheDocument();
   });
 });

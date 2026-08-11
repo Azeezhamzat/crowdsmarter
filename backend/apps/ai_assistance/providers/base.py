@@ -42,6 +42,23 @@ class AIReviewOutput:
         return asdict(self)
 
 
+@dataclass(frozen=True)
+class AnalyticsObservation:
+    severity: str
+    title: str
+    detail: str
+
+
+@dataclass(frozen=True)
+class AnalyticsNarrative:
+    headline: str
+    observations: list[AnalyticsObservation] = field(default_factory=list)
+    generated_by: str = ""
+
+    def as_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
 class AIProvider(Protocol):
     """Replaceable provider contract. Providers may use rules, local models, or APIs."""
 
@@ -51,3 +68,6 @@ class AIProvider(Protocol):
 
     def review_decision(self, *, snapshot: dict[str, Any]) -> AIReviewOutput:
         """Return advisory output without mutating any organisational record."""
+
+    def summarise_analytics(self, *, metrics: dict[str, Any]) -> AnalyticsNarrative:
+        """Return a short narrative over organisation-wide decision metrics."""

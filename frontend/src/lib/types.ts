@@ -650,6 +650,18 @@ export type OrganisationAnalytics = {
   definitions: Record<string, string>;
 };
 
+export type AnalyticsObservation = {
+  severity: "low" | "medium" | "high";
+  title: string;
+  detail: string;
+};
+
+export type AnalyticsInsight = {
+  headline: string;
+  observations: AnalyticsObservation[];
+  generated_by: string;
+};
+
 export type DiscussionKind = "note" | "question" | "concern" | "update";
 
 export type DiscussionEntry = {

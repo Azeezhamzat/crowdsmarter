@@ -8,6 +8,8 @@ from .base import AIProvider
 PROVIDER_BACKENDS = {
     "rules": "apps.ai_assistance.providers.rules.RuleBasedAIProvider",
     "anthropic": "apps.ai_assistance.providers.anthropic.AnthropicAIProvider",
+    "openai": "apps.ai_assistance.providers.openai.OpenAIProvider",
+    "gemini": "apps.ai_assistance.providers.gemini.GeminiProvider",
 }
 
 
@@ -31,8 +33,10 @@ def get_provider() -> AIProvider:
             raise TypeError(
                 f"Configured AI provider requires a non-empty '{attribute}' string."
             )
-    if not callable(getattr(provider, "review_decision", None)):
-        raise TypeError(
-            "Configured AI provider requires a callable 'review_decision' method."
-        )
+    callable_attributes = ["review_decision", "summarise_analytics"]
+    for attribute in callable_attributes:
+        if not callable(getattr(provider, attribute, None)):
+            raise TypeError(
+                f"Configured AI provider requires a callable '{attribute}' method."
+            )
     return provider

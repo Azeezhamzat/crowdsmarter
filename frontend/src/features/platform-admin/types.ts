@@ -144,7 +144,7 @@ export type PlatformUser = User & {
   last_login: string | null;
 };
 
-export type AIProviderKey = "rules" | "anthropic";
+export type AIProviderKey = "rules" | "anthropic" | "openai" | "gemini";
 
 export type PlatformContactSettings = {
   public_contact_email: string;
