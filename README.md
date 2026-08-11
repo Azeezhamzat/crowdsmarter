@@ -139,4 +139,6 @@ The backend and frontend are provider-neutral OCI containers. PostgreSQL, SMTP, 
 
 Upgrading to the platform-governance release is documented in [the Phase 18B upgrade guide](docs/upgrading-phase-18a-to-phase-18b.md). Earlier upgrade paths remain in `docs/`. The remaining product-maturity gates are explicit in [the product maturity roadmap](docs/product-maturity-roadmap.md).
 
-Start with [architecture](docs/architecture.md), [domain model](docs/domain-model.md), [permissions](docs/permissions.md), [decision workflow](docs/decision-workflow.md), [API](docs/api.md), [security](docs/security.md), [testing](docs/testing.md), and [developer onboarding](docs/developer-onboarding.md).
+New to the product itself (not the code)? Read the [master manual](docs/master-manual.md) first — it walks through using CrowdSmarter as an organisation member and as a platform administrator, in plain language.
+
+For implementation detail, start with [architecture](docs/architecture.md), [domain model](docs/domain-model.md), [permissions](docs/permissions.md), [decision workflow](docs/decision-workflow.md), [API](docs/api.md), [security](docs/security.md), [testing](docs/testing.md), and [developer onboarding](docs/developer-onboarding.md).
