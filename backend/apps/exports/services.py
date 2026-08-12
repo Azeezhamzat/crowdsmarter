@@ -45,6 +45,8 @@ from apps.foresight.models import (
     ScenarioSignpost, Signpost, SignpostObservation, StrategicImplication, SystemStakeholder,
     ThreeHorizonItem, Watchlist, WatchlistSignal, WindTunnelAssessment,
 )
+from apps.ideation.models import Idea, IdeaVote, OpenSession
+from apps.ideation.models import SessionParticipant as OpenSessionParticipant
 from apps.lessons.models import Lesson
 from apps.organisations.models import Membership, MembershipEvent, Organisation, OrganisationDeletionRequest
 from apps.methodology.models import DecisionMethod, DecisionMethodUsage, DecisionMethodVersion
@@ -54,7 +56,7 @@ from apps.reviews.models import DecisionReview
 from apps.risks.models import Risk
 from apps.workspaces.models import Workspace
 
-EXPORT_SCHEMA_VERSION = "1.8"
+EXPORT_SCHEMA_VERSION = "1.9"
 SENSITIVE_FIELD_NAMES = {"password", "token_digest"}
 
 
@@ -323,6 +325,10 @@ def _organisation_datasets(organisation: Organisation) -> dict[str, list[dict[st
         "foresight_scenario_signposts": _records(ScenarioSignpost.objects.filter(signpost__scenario_set__canvas__organisation=organisation)),
         "foresight_signpost_observations": _records(SignpostObservation.objects.filter(signpost__scenario_set__canvas__organisation=organisation)),
         "foresight_scenario_implications": _records(ScenarioImplicationLink.objects.filter(scenario__scenario_set__canvas__organisation=organisation)),
+        "open_sessions": _records(OpenSession.objects.filter(organisation=organisation)),
+        "open_session_participants": _records(OpenSessionParticipant.objects.filter(session__organisation=organisation)),
+        "ideas": _records(Idea.objects.filter(session__organisation=organisation)),
+        "idea_votes": _records(IdeaVote.objects.filter(idea__session__organisation=organisation)),
         "audit_events": _records(AuditEvent.objects.filter(organisation=organisation)),
     }
 
@@ -521,6 +527,10 @@ def _decision_datasets(decision: Decision) -> dict[str, list[dict[str, Any]]]:
                 scenario__scenario_set__linked_decision=decision
             )
         ),
+        "open_sessions": _records(OpenSession.objects.filter(decision=decision)),
+        "open_session_participants": _records(OpenSessionParticipant.objects.filter(session__decision=decision)),
+        "ideas": _records(Idea.objects.filter(session__decision=decision)),
+        "idea_votes": _records(IdeaVote.objects.filter(idea__session__decision=decision)),
     }
 
 

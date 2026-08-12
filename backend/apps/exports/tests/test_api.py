@@ -314,3 +314,67 @@ def test_organisation_export_preserves_systems_mapping_and_feedback_loop_order(
             str(confidence.id),
             str(capability.id),
         ]
+
+
+@pytest.mark.django_db
+def test_organisation_export_includes_open_session_ideation_data_without_token_digest(
+    organisation_factory,
+):  # type: ignore[no-untyped-def]
+    from apps.exports.services import build_organisation_export
+    from apps.ideation import services as ideation_services
+
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    session = ideation_services.create_session(
+        actor=owner, organisation=organisation, title="Ideathon", prompt="What should we try?",
+    )
+    session = ideation_services.open_session(actor=owner, session=session)
+    participant, _token = ideation_services.identify_participant(
+        session=session, name="External participant", email="participant@example.com",
+    )
+    idea = ideation_services.submit_idea(
+        session=session, participant=participant, title="A promising idea", description="Details.",
+    )
+    ideation_services.cast_vote(idea=idea, participant=participant)
+
+    archive = build_organisation_export(organisation=organisation)
+    with zipfile.ZipFile(io.BytesIO(archive.content)) as zf:
+        names = set(zf.namelist())
+        assert "json/open_sessions.json" in names
+        assert "json/open_session_participants.json" in names
+        assert "json/ideas.json" in names
+        assert "json/idea_votes.json" in names
+
+        sessions = json.loads(zf.read("json/open_sessions.json").decode())
+        assert [s["title"] for s in sessions] == ["Ideathon"]
+
+        ideas = json.loads(zf.read("json/ideas.json").decode())
+        assert [i["title"] for i in ideas] == ["A promising idea"]
+
+        participants_payload = zf.read("json/open_session_participants.json").decode()
+        assert "token_digest" not in participants_payload
+        assert "participant@example.com" in participants_payload
+
+
+@pytest.mark.django_db
+def test_decision_export_scopes_open_sessions_to_that_decision(
+    decision_factory,
+):  # type: ignore[no-untyped-def]
+    from apps.exports.services import build_decision_export
+    from apps.ideation import services as ideation_services
+
+    decision = decision_factory()
+    owner = decision.organisation.created_by
+    linked_session = ideation_services.create_session(
+        actor=owner, organisation=decision.organisation, decision=decision,
+        title="Community input", prompt="What matters here?",
+    )
+    ideation_services.create_session(
+        actor=owner, organisation=decision.organisation,
+        title="Unrelated ideathon", prompt="Something else entirely",
+    )
+
+    archive = build_decision_export(decision=decision)
+    with zipfile.ZipFile(io.BytesIO(archive.content)) as zf:
+        sessions = json.loads(zf.read("json/open_sessions.json").decode())
+        assert [s["title"] for s in sessions] == [linked_session.title]
