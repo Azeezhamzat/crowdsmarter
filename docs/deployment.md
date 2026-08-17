@@ -16,6 +16,60 @@ The smallest credible deployment is one Linux host running:
 
 This can run on owned hardware or a suitable free compute allowance. Free-tier terms change, so the application does not encode a hosting provider.
 
+## Concrete walkthrough: DigitalOcean droplet
+
+This section is one specific, tested realization of the shape above. It does
+not replace the provider-neutral guidance elsewhere in this document — it is
+what `docker-compose.prod.yml`, `docker-compose.tls.yml`, and
+`frontend/nginx.prod.conf` in this repository are for.
+
+1. **Create the droplet.** A Basic 2GB/1vCPU plan is enough to start (the
+   full stack — Postgres, Redis, gunicorn, Nginx — idles under 1GB); resize
+   later if needed. Ubuntu LTS image. Point `crowdsmarter.com` and
+   `www.crowdsmarter.com`'s DNS `A` records at the droplet's IP before
+   continuing — certificate issuance in step 5 needs this to already be live.
+2. **Install Docker.** `curl -fsSL https://get.docker.com | sh` (or
+   DigitalOcean's Docker one-click marketplace image), then clone this
+   repository onto the droplet.
+3. **Configure secrets.** Copy `.env.production.example` to `.env.production`
+   and fill in every blank value: a generated `DJANGO_SECRET_KEY`
+   (`python -c "import secrets; print(secrets.token_urlsafe(64))"`), a
+   strong `POSTGRES_PASSWORD` (used in both the `POSTGRES_PASSWORD` and
+   `DATABASE_URL` lines), and `EMAIL_HOST_PASSWORD` for the
+   `hello@crowdsmarter.com` mailbox. Never commit this file — it is already
+   covered by `.gitignore`.
+4. **Bring the stack up over HTTP first**, so Let's Encrypt's HTTP-01
+   challenge has something to answer:
+   ```bash
+   docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+   docker compose -f docker-compose.prod.yml --env-file .env.production exec backend python manage.py migrate
+   docker compose -f docker-compose.prod.yml --env-file .env.production exec backend python manage.py createsuperuser
+   ```
+   Confirm `http://crowdsmarter.com` loads before continuing.
+5. **Issue the certificate:**
+   ```bash
+   docker compose -f docker-compose.prod.yml --env-file .env.production \
+     run --rm certbot certonly --webroot -w /var/www/certbot \
+     -d crowdsmarter.com -d www.crowdsmarter.com \
+     --email hello@crowdsmarter.com --agree-tos --no-eff-email
+   ```
+6. **Switch to HTTPS** by layering the TLS override and rebuilding just the
+   frontend container:
+   ```bash
+   docker compose -f docker-compose.prod.yml -f docker-compose.tls.yml \
+     --env-file .env.production up -d --build frontend
+   ```
+   From this point on, always pass both `-f` flags together for any compose
+   command against this stack.
+7. **Automate renewal.** Certbot's certificates expire after 90 days. Add a
+   host crontab entry that renews and reloads Nginx without downtime:
+   ```cron
+   0 3 * * mon docker compose -f /path/to/repo/docker-compose.prod.yml -f /path/to/repo/docker-compose.tls.yml --env-file /path/to/repo/.env.production run --rm certbot renew --quiet && docker compose -f /path/to/repo/docker-compose.prod.yml -f /path/to/repo/docker-compose.tls.yml --env-file /path/to/repo/.env.production exec frontend nginx -s reload
+   ```
+8. **Redeploy on future changes:** `git pull` on the droplet, then repeat the
+   `up -d --build` command from step 6 (both `-f` flags), and run `migrate`
+   again if the change included a new migration.
+
 ## Required production configuration
 
 At minimum set:

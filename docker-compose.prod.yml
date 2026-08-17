@@ -1,0 +1,137 @@
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-crowdsmarter}
+      POSTGRES_USER: ${POSTGRES_USER:-crowdsmarter}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.production}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-crowdsmarter} -d ${POSTGRES_DB:-crowdsmarter}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      target: production
+    restart: unless-stopped
+    env_file: .env.production
+    environment:
+      DJANGO_SETTINGS_MODULE: crowdsmarter.settings.production
+      DATABASE_URL: ${DATABASE_URL:-postgresql://crowdsmarter:crowdsmarter@db:5432/crowdsmarter}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      CACHE_URL: ${CACHE_URL:-redis://redis:6379/0}
+    volumes:
+      - media_data:/app/media
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import urllib.request;
+          urllib.request.urlopen('http://localhost:8000/health/live/', timeout=2)
+      interval: 10s
+      timeout: 3s
+      retries: 20
+      start_period: 15s
+
+  worker:
+    build:
+      context: ./backend
+      target: production
+    restart: unless-stopped
+    env_file: .env.production
+    environment:
+      DJANGO_SETTINGS_MODULE: crowdsmarter.settings.production
+      DATABASE_URL: ${DATABASE_URL:-postgresql://crowdsmarter:crowdsmarter@db:5432/crowdsmarter}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/0}
+    command: celery -A crowdsmarter worker --loglevel=INFO
+    volumes:
+      - media_data:/app/media
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    profiles: ["workers"]
+
+  scheduler:
+    build:
+      context: ./backend
+      target: production
+    restart: unless-stopped
+    env_file: .env.production
+    environment:
+      DJANGO_SETTINGS_MODULE: crowdsmarter.settings.production
+      DATABASE_URL: ${DATABASE_URL:-postgresql://crowdsmarter:crowdsmarter@db:5432/crowdsmarter}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/0}
+    command: celery -A crowdsmarter beat --loglevel=INFO --schedule=/tmp/celerybeat-schedule
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    profiles: ["workers"]
+
+  # HTTP-only bootstrap config. Serves the app on port 80 and answers
+  # Let's Encrypt's HTTP-01 challenge at /.well-known/acme-challenge/.
+  # Once a certificate exists, layer docker-compose.tls.yml on top to
+  # switch this same container to the HTTPS config on port 443.
+  frontend:
+    build:
+      context: ./frontend
+      target: production
+    restart: unless-stopped
+    environment:
+      BACKEND_UPSTREAM: backend:8000
+    ports:
+      - "80:80"
+    volumes:
+      - certbot_www:/var/www/certbot:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  # Not started by `up`. Run on demand:
+  #   docker compose -f docker-compose.prod.yml --env-file .env.production \
+  #     run --rm certbot certonly --webroot -w /var/www/certbot \
+  #     -d crowdsmarter.com -d www.crowdsmarter.com \
+  #     --email hello@crowdsmarter.com --agree-tos --no-eff-email
+  # and again periodically for renewal (see docs/deployment.md).
+  certbot:
+    image: certbot/certbot:latest
+    volumes:
+      - certbot_certs:/etc/letsencrypt
+      - certbot_www:/var/www/certbot
+    profiles: ["certbot"]
+
+volumes:
+  postgres_data:
+  redis_data:
+  media_data:
+  certbot_certs:
+  certbot_www:

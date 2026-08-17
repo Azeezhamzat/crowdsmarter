@@ -1,0 +1,18 @@
+# Layer this on top of docker-compose.prod.yml once a Let's Encrypt
+# certificate exists in the certbot_certs volume (see docs/deployment.md):
+#
+#   docker compose -f docker-compose.prod.yml -f docker-compose.tls.yml \
+#     --env-file .env.production up -d --build frontend
+#
+# From that point on, always pass both -f flags together.
+services:
+  frontend:
+    environment:
+      DOMAIN: crowdsmarter.com
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./frontend/nginx.prod.conf:/etc/nginx/templates/default.conf.template:ro
+      - certbot_certs:/etc/letsencrypt:ro
+      - certbot_www:/var/www/certbot:ro
