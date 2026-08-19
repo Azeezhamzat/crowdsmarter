@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CrowdSmarter | Participatory grantmaking, run properly</title>
+<meta name="description" content="CrowdSmarter helps funders run participatory, evidence-linked grant rounds — from open call to award — with community voice, reviewer disagreement, and funding decisions your board and every applicant can see.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='29' fill='%230F2F35'/%3E%3Ctext x='50' y='54' text-anchor='middle' dominant-baseline='middle' font-family='Arial, sans-serif' font-weight='700' font-size='44' letter-spacing='-2' fill='%23DBF0E8'%3ECS%3C/text%3E%3C/svg%3E">
+<style>
+  :root {
+    --ink: #0f2f35;
+    --green: #1b7a72;
+    --green-dark: #0f2f35;
+    --muted: #5a6f6a;
+    --mist: #d9e1dc;
+    --paper: #fbfaf6;
+    --card: #ffffff;
+    --page-gutter: max(1.25rem, 4vw);
+    --content-width: 1180px;
+    --shadow-sm: 0 10px 28px rgba(15,47,53,.06);
+    --shadow-md: 0 24px 60px rgba(15,47,53,.11);
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 88px; }
+  body {
+    margin: 0;
+    min-width: 320px;
+    overflow-x: hidden;
+    font-family: "Inter", "Segoe UI", Arial, sans-serif;
+    font-size: 17px;
+    line-height: 1.6;
+    color: var(--ink);
+    background: var(--paper);
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  ::selection { background: #d9e1dc; color: var(--ink); }
+  a { color: inherit; }
+  img, svg { display: block; max-width: 100%; }
+  button, input, textarea, select { font: inherit; }
+  h1, h2, h3 { margin: 0; font-weight: 800; letter-spacing: -.028em; text-wrap: balance; }
+  p { margin: 0; }
+  section[id] { scroll-margin-top: 88px; }
+
+  a:focus-visible,
+  button:focus-visible {
+    outline: 3px solid rgba(27,122,114,.28);
+    outline-offset: 4px;
+    border-radius: 8px;
+  }
+
+  .wrap { width: min(calc(100% - (var(--page-gutter) * 2)), var(--content-width)); margin-inline: auto; }
+  .eyebrow {
+    margin: 0 0 .8rem;
+    color: var(--green);
+    text-transform: uppercase;
+    letter-spacing: .145em;
+    font-size: .8rem;
+    line-height: 1.35;
+    font-weight: 800;
+  }
+
+  .button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: .55rem;
+    min-height: 46px;
+    padding: .78rem 1.3rem;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    font-size: .98rem;
+    line-height: 1;
+    font-weight: 750;
+    text-decoration: none;
+    cursor: pointer;
+    transition: transform .2s ease, background-color .2s ease, border-color .2s ease, box-shadow .2s ease;
+  }
+  .button:hover { transform: translateY(-1px); }
+  .button--primary { color: #fff; background: var(--green-dark); box-shadow: 0 9px 20px rgba(15,47,53,.14); }
+  .button--primary:hover { background: #123d43; box-shadow: 0 12px 26px rgba(15,47,53,.18); }
+  .button--secondary { color: var(--ink); background: rgba(255,255,255,.56); border-color: var(--mist); }
+  .button--secondary:hover { background: #fff; border-color: #cdeae2; }
+  .button--light { color: var(--ink); background: #fff; }
+  .button--light:hover { background: #eef7f5; }
+
+  /* Header */
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5rem;
+    min-height: 76px;
+    padding: .8rem max(var(--page-gutter), calc((100vw - var(--content-width)) / 2));
+    background: rgba(251,250,246,.94);
+    border-bottom: 1px solid rgba(217,225,220,.88);
+    box-shadow: 0 5px 18px rgba(15,47,53,.025);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+  .brand { display: flex; align-items: center; gap: .72rem; min-width: max-content; text-decoration: none; }
+  .brand svg { flex: 0 0 auto; }
+  .brand strong { display: block; font-size: 1.1rem; line-height: 1.1; letter-spacing: -.015em; }
+  .brand small { display: block; margin-top: .22rem; color: var(--muted); font-size: .82rem; line-height: 1.3; letter-spacing: .005em; }
+  nav.primary { display: flex; align-items: center; justify-content: center; gap: clamp(1rem, 2vw, 1.65rem); }
+  nav.primary a {
+    position: relative;
+    padding: .4rem 0;
+    color: #33473f;
+    font-size: .97rem;
+    line-height: 1.2;
+    font-weight: 700;
+    text-decoration: none;
+  }
+  nav.primary a::after {
+    content: "";
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: 2px;
+    border-radius: 2px;
+    background: var(--green);
+    transform: scaleX(0);
+    transform-origin: center;
+    transition: transform .2s ease;
+  }
+  nav.primary a:hover::after { transform: scaleX(1); }
+  .header-actions { display: flex; align-items: center; gap: .9rem; min-width: max-content; }
+  .header-actions .button { min-height: 46px; padding: .8rem 1.24rem; font-size: .95rem; }
+
+  /* Hero */
+  .hero {
+    position: relative;
+    isolation: isolate;
+    padding: clamp(3.7rem, 5.4vw, 5rem) max(var(--page-gutter), calc((100vw - var(--content-width)) / 2)) clamp(4rem, 6vw, 5.4rem);
+    overflow: hidden;
+    background:
+      radial-gradient(circle at 88% 16%, rgba(27,122,114,.09), transparent 29%),
+      radial-gradient(circle at 8% 86%, rgba(217,225,220,.52), transparent 25%),
+      linear-gradient(180deg, #fff 0%, var(--paper) 78%);
+  }
+  .hero::after {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    right: -10rem;
+    bottom: -13rem;
+    width: 34rem;
+    height: 34rem;
+    border: 1px solid rgba(27,122,114,.1);
+    border-radius: 50%;
+    box-shadow: 0 0 0 74px rgba(27,122,114,.025), 0 0 0 150px rgba(27,122,114,.018);
+  }
+  .hero-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.04fr) minmax(500px, .96fr);
+    gap: clamp(2.2rem, 4vw, 4rem);
+    align-items: center;
+  }
+  .hero-inner { max-width: 640px; }
+  .proof-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: .62rem;
+    margin: 0 0 1.3rem;
+    padding: .58rem .96rem .58rem .64rem;
+    color: #123d43;
+    background: rgba(238,247,245,.92);
+    border: 1px solid #cdeae2;
+    border-radius: 999px;
+    font-size: .94rem;
+    line-height: 1;
+    font-weight: 750;
+    letter-spacing: .015em;
+  }
+  .proof-pill__icon {
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    color: #fff;
+    background: var(--green);
+    border-radius: 50%;
+  }
+  .proof-pill__icon svg { width: 13px; height: 13px; }
+  .hero h1 {
+    max-width: 15.5ch;
+    margin-bottom: 1.35rem;
+    font-size: clamp(3rem, 4.8vw, 4.35rem);
+    line-height: 1.01;
+    letter-spacing: -.048em;
+  }
+  .hero-title-line { display: block; color: var(--ink); }
+  .hero h1 .accent { color: var(--green); }
+  .hero p.lead {
+    max-width: 55ch;
+    margin-bottom: 1.75rem;
+    color: #33473f;
+    font-size: clamp(1.14rem, 1.45vw, 1.25rem);
+    line-height: 1.68;
+  }
+  .hero-actions { display: flex; flex-wrap: wrap; gap: .8rem; margin-bottom: 1.55rem; }
+  .hero-micro { max-width: 58ch; margin-bottom: 1.35rem; color: var(--muted); font-size: 1rem; line-height: 1.62; }
+  .trust-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, max-content));
+    gap: .72rem 1.25rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid rgba(217,225,220,.9);
+  }
+  .trust-row span { display: flex; align-items: center; gap: .5rem; color: #33473f; font-size: .96rem; line-height: 1.45; font-weight: 700; }
+  .trust-row svg { width: 16px; height: 16px; flex: 0 0 auto; color: var(--green); }
+
+  /* Hero visual */
+  .hero-visual { position: relative; width: min(100%, 660px); justify-self: end; }
+  .hero-visual::before {
+    content: "";
+    position: absolute;
+    inset: 8% 5% -5% 8%;
+    z-index: -1;
+    background: rgba(27,122,114,.075);
+    border-radius: 34px;
+    filter: blur(22px);
+  }
+  .hero-visual > svg { width: 100%; height: auto; filter: drop-shadow(0 26px 55px rgba(15,47,53,.14)); }
+  .hero-visual__chip {
+    position: absolute;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: .58rem;
+    padding: .68rem .9rem;
+    color: #123d43;
+    background: rgba(255,255,255,.96);
+    border: 1px solid var(--mist);
+    border-radius: 12px;
+    box-shadow: 0 14px 34px rgba(15,47,53,.12);
+    font-size: .94rem;
+    line-height: 1;
+    font-weight: 750;
+    white-space: nowrap;
+    backdrop-filter: blur(8px);
+  }
+  .hero-visual__chip::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    flex: 0 0 auto;
+    background: var(--green);
+    border-radius: 50%;
+    box-shadow: 0 0 0 4px rgba(27,122,114,.12);
+  }
+  .hero-visual__chip--top { top: 2%; left: 2%; }
+  .hero-visual__chip--bottom { right: 2%; bottom: -2%; color: #dbf0e8; background: rgba(15,47,53,.98); border-color: var(--green-dark); }
+  .hero-visual__chip--bottom::before { background: #8fd6cb; box-shadow: 0 0 0 4px rgba(143,214,203,.14); }
+
+  /* Proof strip */
+  .proof-strip {
+    display: grid;
+    grid-template-columns: minmax(180px, .38fr) minmax(0, 1fr);
+    gap: 2rem;
+    align-items: start;
+    padding: 1.7rem max(var(--page-gutter), calc((100vw - var(--content-width)) / 2)) 2rem;
+    background: rgba(255,255,255,.44);
+    border-top: 1px solid var(--mist);
+    border-bottom: 1px solid var(--mist);
+  }
+  .proof-strip .eyebrow { margin-top: .25rem; margin-bottom: 0; }
+  .proof-strip p:last-child { max-width: 76ch; color: var(--muted); font-size: 1.02rem; line-height: 1.75; }
+
+  section.block { padding: clamp(4.5rem, 7vw, 6.8rem) max(var(--page-gutter), calc((100vw - var(--content-width)) / 2)); }
+  .section-intro { max-width: 745px; margin-bottom: clamp(2.3rem, 4vw, 3.3rem); }
+  .section-intro h2 { margin-bottom: .9rem; font-size: clamp(2rem, 3.5vw, 2.85rem); line-height: 1.08; }
+  .section-intro p { color: var(--muted); font-size: 1.06rem; line-height: 1.74; }
+  .section-intro .eyebrow { color: var(--green); font-size: .8rem; line-height: 1.35; }
+
+  /* Use cases / card grid */
+  .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 1.2rem; }
+  .use-case {
+    position: relative;
+    min-height: 100%;
+    padding: 1.8rem;
+    overflow: hidden;
+    background: var(--card);
+    border: 1px solid var(--mist);
+    border-radius: 18px;
+    box-shadow: var(--shadow-sm);
+    transition: transform .22s ease, box-shadow .22s ease, border-color .22s ease;
+  }
+  .use-case::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 0;
+    height: 3px;
+    background: var(--green);
+    transform: scaleX(.22);
+    transform-origin: left;
+    transition: transform .22s ease;
+  }
+  .use-case:hover { transform: translateY(-4px); border-color: #cdeae2; box-shadow: var(--shadow-md); }
+  .use-case:hover::before { transform: scaleX(1); }
+  .use-case h3 { margin-bottom: .62rem; font-size: 1.22rem; line-height: 1.3; }
+  .use-case p { margin-bottom: 1rem; color: var(--muted); font-size: 1rem; line-height: 1.7; }
+  .use-case ul { margin: 0; padding: 1rem 0 0; list-style: none; border-top: 1px solid var(--mist); }
+  .use-case li { padding: .3rem 0; color: #345a55; font-size: .95rem; line-height: 1.5; }
+  .use-case li::before { content: "•"; margin-right: .55rem; color: var(--green); }
+
+  /* Lifecycle */
+  #platform { background: rgba(255,255,255,.46); }
+  .lifecycle-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0,1fr));
+    overflow: hidden;
+    background: var(--card);
+    border: 1px solid var(--mist);
+    border-radius: 20px;
+    box-shadow: var(--shadow-sm);
+  }
+  .lifecycle-grid article { position: relative; padding: 1.65rem 1.35rem 1.75rem; border-right: 1px solid var(--mist); }
+  .lifecycle-grid article:last-child { border-right: 0; }
+  .lifecycle-grid article::after {
+    content: "";
+    position: absolute;
+    right: -5px;
+    top: 38px;
+    z-index: 2;
+    width: 9px;
+    height: 9px;
+    background: var(--card);
+    border-top: 1px solid var(--mist);
+    border-right: 1px solid var(--mist);
+    transform: rotate(45deg);
+  }
+  .lifecycle-grid article:last-child::after { display: none; }
+  .lifecycle-grid .num { display: block; margin-bottom: 1.25rem; color: #87958d; font-size: .76rem; line-height: 1; font-weight: 800; letter-spacing: .08em; }
+  .lifecycle-grid h3 { margin-bottom: .55rem; font-size: 1.18rem; }
+  .lifecycle-grid p { color: var(--muted); font-size: .98rem; line-height: 1.68; }
+
+  /* Dark blocks and journey */
+  .block--dark { color: #fff; background: var(--green-dark); }
+  .block--dark .eyebrow { color: #8fd6cb; }
+  .block--dark .section-intro p { color: #bcd8d2; }
+  .journey-steps { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 1rem; margin-bottom: 3rem; }
+  .journey-step {
+    display: grid;
+    grid-template-columns: 42px 1fr;
+    gap: 1rem;
+    min-height: 100%;
+    padding: 1.5rem;
+    background: rgba(255,255,255,.055);
+    border: 1px solid rgba(255,255,255,.14);
+    border-radius: 16px;
+    transition: background-color .2s ease, transform .2s ease;
+  }
+  .journey-step:hover { transform: translateY(-3px); background: rgba(255,255,255,.08); }
+  .journey-step span.num,
+  .timeline-step .num {
+    display: grid;
+    place-items: center;
+    color: var(--ink);
+    background: #fff;
+    border-radius: 50%;
+    font-weight: 800;
+  }
+  .journey-step span.num { width: 42px; height: 42px; }
+  .journey-step h3 { margin-bottom: .42rem; color: #fff; font-size: 1.15rem; line-height: 1.35; }
+  .journey-step p { color: #c9ded9; font-size: .98rem; line-height: 1.68; }
+  .timeline-intro { max-width: 72ch; margin-bottom: 2rem; color: #bcd8d2; line-height: 1.72; }
+  .timeline { position: relative; max-width: 830px; }
+  .timeline::before { content: ""; position: absolute; top: 27px; bottom: 27px; left: 27px; width: 1px; background: rgba(255,255,255,.2); }
+  .timeline-step { position: relative; display: grid; grid-template-columns: 54px 1fr; gap: 1.65rem; padding-bottom: 2.25rem; }
+  .timeline-step:last-child { padding-bottom: 0; }
+  .timeline-step .num { position: relative; z-index: 1; width: 54px; height: 54px; box-shadow: 0 0 0 7px var(--green-dark); }
+  .timeline-step .label { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin-bottom: .35rem; color: #8fd6cb; font-size: .78rem; font-weight: 800; letter-spacing: .11em; text-transform: uppercase; }
+  .timeline-step .stage-tag { padding: .18rem .55rem; color: #d7ede8; background: rgba(255,255,255,.11); border-radius: 999px; font-size: .71rem; letter-spacing: .04em; }
+  .timeline-step h3 { margin-bottom: .38rem; color: #fff; font-size: 1.36rem; }
+  .timeline-step p { max-width: 61ch; color: #c9ded9; font-size: 1.02rem; line-height: 1.68; }
+  .charter-panel {
+    margin-top: 3.6rem;
+    padding: clamp(1.8rem, 4vw, 2.8rem);
+    background: rgba(255,255,255,.06);
+    border: 1px solid rgba(255,255,255,.15);
+    border-radius: 22px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
+  }
+  .charter-panel h3 { margin-bottom: .65rem; color: #fff; font-size: clamp(1.4rem, 2.4vw, 1.8rem); }
+  .charter-panel > p { max-width: 62ch; margin-bottom: 1.7rem; color: #c9ded9; line-height: 1.68; }
+  .charter-stats { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: .7rem; margin-bottom: 1.8rem; }
+  .charter-stats div { padding: 1rem; background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.06); border-radius: 12px; }
+  .charter-stats small { display: block; color: #9fc4bd; font-size: .74rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+  .charter-stats strong { display: block; margin-top: .38rem; color: #fff; font-size: 1rem; line-height: 1.4; }
+
+  /* Difference */
+  .difference-layout { display: grid; grid-template-columns: 1fr auto 1fr; gap: 1.35rem; align-items: stretch; margin-bottom: 2.3rem; }
+  .difference-card { padding: 1.7rem; background: var(--card); border: 1px solid var(--mist); border-radius: 16px; box-shadow: var(--shadow-sm); }
+  .difference-card span.label { display: block; margin-bottom: .72rem; color: var(--muted); font-size: .8rem; line-height: 1.3; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
+  .difference-card.positive { background: #eef7f5; border-color: #cdeae2; }
+  .difference-card.positive span.label { color: var(--green); }
+  .difference-card p { color: #33473f; font-size: 1.02rem; line-height: 1.7; }
+  .difference-arrow { align-self: center; color: var(--green); font-size: 1.5rem; font-weight: 800; }
+  .grid-5 { display: grid; grid-template-columns: repeat(6, minmax(0,1fr)); gap: 1rem; }
+  .capability-card { grid-column: span 2; min-height: 100%; padding: 1.55rem; background: var(--card); border: 1px solid var(--mist); border-radius: 16px; transition: transform .2s ease, border-color .2s ease; }
+  .capability-card:nth-child(4) { grid-column: 2 / span 2; }
+  .capability-card:nth-child(5) { grid-column: 4 / span 2; }
+  .capability-card:hover { transform: translateY(-3px); border-color: #cdeae2; }
+  .capability-card h3 { margin-bottom: .52rem; font-size: 1.16rem; line-height: 1.35; }
+  .capability-card p { color: var(--muted); font-size: .98rem; line-height: 1.68; }
+
+  /* Outcomes */
+  .grid-4 { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 1rem; }
+  .outcome-card { min-height: 100%; padding: 1.55rem; background: rgba(255,255,255,.055); border: 1px solid rgba(255,255,255,.13); border-radius: 16px; }
+  .outcome-card .num { color: #8fd6cb; font-size: .76rem; font-weight: 800; letter-spacing: .08em; }
+  .outcome-card h3 { margin: .7rem 0 .5rem; color: #fff; font-size: 1.17rem; line-height: 1.35; }
+  .outcome-card p { color: #c9ded9; font-size: .97rem; line-height: 1.68; }
+
+  /* Trust */
+  .trust-panel { display: grid; grid-template-columns: 1.02fr .98fr; gap: clamp(2.5rem, 6vw, 5rem); align-items: start; }
+  .trust-copy h2 { margin-bottom: 1rem; font-size: clamp(2rem, 3.3vw, 2.65rem); line-height: 1.08; }
+  .trust-copy > p { max-width: 54ch; margin-bottom: 1.35rem; color: var(--muted); line-height: 1.72; }
+  .trust-copy a.text-link { display: inline-flex; align-items: center; gap: .4rem; margin-bottom: 1.45rem; color: var(--green); font-weight: 750; text-decoration: none; }
+  .trust-copy a.text-link:hover { text-decoration: underline; text-underline-offset: 4px; }
+  .trust-contact-links { display: flex; flex-wrap: wrap; gap: .7rem 1.35rem; font-size: .95rem; }
+  .trust-contact-links a { color: var(--muted); text-decoration: underline; text-underline-offset: 3px; }
+  .trust-list { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 1rem; }
+  .trust-item { position: relative; min-height: 100%; padding: 1.05rem 1.05rem 1.05rem 2.8rem; background: rgba(255,255,255,.5); border: 1px solid var(--mist); border-radius: 13px; }
+  .trust-item::before {
+    content: "✓";
+    position: absolute;
+    top: 1.05rem;
+    left: 1rem;
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    color: #fff;
+    background: var(--green);
+    border-radius: 50%;
+    font-size: .68rem;
+    font-weight: 800;
+  }
+  .trust-item strong { display: block; margin-bottom: .22rem; font-size: 1.02rem; line-height: 1.35; }
+  .trust-item span { display: block; color: var(--muted); font-size: .92rem; line-height: 1.62; }
+
+  /* Final CTA */
+  .final-cta {
+    position: relative;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 2.5rem;
+    width: min(calc(100% - (var(--page-gutter) * 2)), var(--content-width));
+    margin: 0 auto clamp(4rem, 7vw, 6.5rem);
+    padding: clamp(2.3rem, 5vw, 3.6rem);
+    overflow: hidden;
+    color: #fff;
+    background: var(--green-dark);
+    border-radius: 26px;
+    box-shadow: 0 26px 60px rgba(15,47,53,.16);
+  }
+  .final-cta::after {
+    content: "";
+    position: absolute;
+    right: -7rem;
+    bottom: -10rem;
+    width: 24rem;
+    height: 24rem;
+    border: 1px solid rgba(143,214,203,.2);
+    border-radius: 50%;
+    box-shadow: 0 0 0 60px rgba(143,214,203,.04), 0 0 0 120px rgba(143,214,203,.025);
+  }
+  .final-cta > * { position: relative; z-index: 1; }
+  .final-cta h2 { max-width: 29ch; margin-bottom: .75rem; font-size: clamp(1.7rem, 3.1vw, 2.35rem); line-height: 1.12; }
+  .final-cta p { max-width: 48ch; color: #bcd8d2; line-height: 1.65; }
+  .final-cta-actions { display: flex; flex-direction: column; align-items: flex-end; gap: .8rem; min-width: max-content; }
+  .final-cta-actions a.signin { color: #cfe8e2; font-size: .94rem; text-decoration: underline; }
+
+  footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5rem;
+    padding: 2.3rem max(var(--page-gutter), calc((100vw - var(--content-width)) / 2)) 2.6rem;
+    color: var(--muted);
+    border-top: 1px solid var(--mist);
+    font-size: .92rem;
+  }
+  footer .brand small { color: var(--muted); }
+  .footer-links { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: .65rem 1.25rem; }
+  .footer-links a { color: #33473f; font-weight: 700; text-decoration: none; }
+  .footer-links a:hover { color: var(--green); }
+
+  @media (max-width: 1050px) {
+    nav.primary { display: none; }
+    .hero-grid { grid-template-columns: minmax(0, 1fr) minmax(430px, .92fr); gap: 2.3rem; }
+    .trust-row { grid-template-columns: 1fr; }
+    .grid-4 { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  }
+
+  @media (max-width: 900px) {
+    .hero { padding-top: 4.3rem; }
+    .hero-grid { grid-template-columns: 1fr; }
+    .hero-inner { max-width: 720px; }
+    .hero h1 { max-width: 15.5ch; }
+    .hero-visual { width: min(100%, 660px); justify-self: center; margin-top: 1rem; }
+    .hero-visual__chip--top { left: 1%; }
+    .hero-visual__chip--bottom { right: 1%; }
+    .proof-strip { grid-template-columns: 1fr; gap: .65rem; }
+    .grid-3 { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    .lifecycle-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    .lifecycle-grid article { border-right: 1px solid var(--mist); border-bottom: 1px solid var(--mist); }
+    .lifecycle-grid article:nth-child(2n) { border-right: 0; }
+    .lifecycle-grid article:nth-last-child(-n+2) { border-bottom: 0; }
+    .lifecycle-grid article:last-child { grid-column: 1 / -1; border-top: 1px solid var(--mist); }
+    .lifecycle-grid article::after { display: none; }
+    .journey-steps { grid-template-columns: 1fr; }
+    .grid-5 { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    .capability-card,
+    .capability-card:nth-child(4),
+    .capability-card:nth-child(5) { grid-column: auto; }
+    .capability-card:last-child { grid-column: 1 / -1; }
+    .trust-panel { grid-template-columns: 1fr; }
+    .trust-list { max-width: 720px; }
+  }
+
+  @media (max-width: 680px) {
+    header { min-height: 68px; padding-block: .65rem; }
+    .brand small { display: none; }
+    .header-actions .button { min-height: 42px; padding: .7rem .95rem; font-size: .86rem; }
+    .hero { padding-top: 3.8rem; }
+    .hero h1 { font-size: clamp(2.65rem, 13vw, 3.6rem); }
+    .hero-actions { flex-direction: column; align-items: stretch; }
+    .hero-actions .button { width: 100%; }
+    .hero-visual__chip { display: none; }
+    .grid-3,
+    .grid-4,
+    .grid-5,
+    .trust-list { grid-template-columns: 1fr; }
+    .capability-card:last-child { grid-column: auto; }
+    .lifecycle-grid { grid-template-columns: 1fr; }
+    .lifecycle-grid article,
+    .lifecycle-grid article:nth-child(2n),
+    .lifecycle-grid article:nth-last-child(-n+2),
+    .lifecycle-grid article:last-child { grid-column: auto; border-right: 0; border-bottom: 1px solid var(--mist); border-top: 0; }
+    .lifecycle-grid article:last-child { border-bottom: 0; }
+    .difference-layout { grid-template-columns: 1fr; }
+    .difference-arrow { justify-self: center; transform: rotate(90deg); }
+    .timeline-step { grid-template-columns: 46px 1fr; gap: 1.1rem; }
+    .timeline::before { left: 23px; }
+    .timeline-step .num { width: 46px; height: 46px; box-shadow: 0 0 0 6px var(--green-dark); }
+    .charter-stats { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    .final-cta { align-items: flex-start; flex-direction: column; border-radius: 20px; }
+    .final-cta-actions { width: 100%; align-items: stretch; min-width: 0; }
+    footer { align-items: flex-start; flex-direction: column; }
+    .footer-links { justify-content: flex-start; }
+  }
+
+  @media (max-width: 430px) {
+    .header-actions .button { padding-inline: .78rem; }
+    .header-actions .button { font-size: 0; }
+    .header-actions .button::after { content: "Book assessment"; font-size: .84rem; }
+    .charter-stats { grid-template-columns: 1fr; }
+    .proof-pill { font-size: .8rem; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <a class="brand" href="#top" aria-label="CrowdSmarter home">
+    <svg width="36" height="36" viewBox="0 0 100 100" role="img" aria-hidden="true">
+      <rect width="100" height="100" rx="29" fill="#0F2F35"/>
+      <text x="50" y="54" text-anchor="middle" dominant-baseline="middle" font-family="Inter, Arial, sans-serif" font-weight="700" font-size="44" letter-spacing="-2" fill="#DBF0E8">CS</text>
+    </svg>
+    <span><strong>CrowdSmarter</strong><small>Systems thinking. Futures thinking. Collective intelligence.</small></span>
+  </a>
+  <nav class="primary" aria-label="Primary">
+    <a href="#platform">Platform</a>
+    <a href="#use-cases">Grant rounds</a>
+    <a href="#sprint">The Sprint</a>
+    <a href="#why-us">Why us</a>
+    <a href="#trust">Trust</a>
+  </nav>
+  <div class="header-actions">
+    <a class="button button--primary" href="mailto:hello@crowdsmarter.com?subject=Grant%20round%20fit%20assessment">Book a fit assessment</a>
+  </div>
+</header>
+
+<main id="top">
+
+  <section class="hero">
+    <div class="hero-grid">
+      <div class="hero-inner">
+        <p class="eyebrow">Participatory grantmaking, run properly</p>
+        <div class="proof-pill">
+          <span class="proof-pill__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M12 3 5.5 5.8v5.4c0 4.2 2.6 7.8 6.5 9.8 3.9-2 6.5-5.6 6.5-9.8V5.8L12 3Z" stroke="currentColor" stroke-width="2"/><path d="m8.7 12 2.1 2.1 4.5-4.6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+          Every award traceable to evidence and community voice
+        </div>
+        <h1><span class="hero-title-line">Grantmaking your</span><span class="hero-title-line">community can</span><span class="hero-title-line accent">actually see.</span></h1>
+        <p class="lead">CrowdSmarter runs a participatory grant round from open call to award — community input, reviewer scoring, and every funding decision tied to evidence, in one record your board and your applicants can both see.</p>
+        <div class="hero-actions">
+          <a class="button button--primary" href="mailto:hello@crowdsmarter.com?subject=Grant%20round%20fit%20assessment">Book a fit assessment <span aria-hidden="true">→</span></a>
+          <a class="button button--secondary" href="#platform">See how a round runs</a>
+        </div>
+        <p class="hero-micro">For funders ready to move past spreadsheets, email threads, and decisions no one outside the room can see.</p>
+        <div class="trust-row" aria-label="Core trust principles">
+          <span><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.7"/><path d="m6.5 10.2 2.2 2.2 4.8-5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>Funder-owned award records</span>
+          <span><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.7"/><path d="m6.5 10.2 2.2 2.2 4.8-5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>Reviewer disagreement stays visible</span>
+          <span><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.7"/><path d="m6.5 10.2 2.2 2.2 4.8-5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>Community voice, not just staff opinion</span>
+        </div>
+      </div>
+
+      <div class="hero-visual" aria-label="Illustration of a grant round from open call and community input to a reviewed, traceable award decision">
+        <div class="hero-visual__chip hero-visual__chip--top">Evidence trail maintained</div>
+        <svg viewBox="0 0 620 560" role="img" aria-labelledby="heroDiagramTitle heroDiagramDesc">
+          <title id="heroDiagramTitle">CrowdSmarter grant round workflow</title>
+          <desc id="heroDiagramDesc">Applications and community input flow into structured reviewer scoring, producing a human-authorised award record linked to reporting and the next round.</desc>
+          <defs>
+            <linearGradient id="heroCanvas" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#ffffff"/>
+              <stop offset="100%" stop-color="#eef7f5"/>
+            </linearGradient>
+            <filter id="softShadow" x="-20%" y="-20%" width="140%" height="150%">
+              <feDropShadow dx="0" dy="12" stdDeviation="14" flood-color="#0f2f35" flood-opacity=".09"/>
+            </filter>
+          </defs>
+
+          <rect x="8" y="8" width="604" height="544" rx="30" fill="url(#heroCanvas)" stroke="#d9e1dc" stroke-width="1.5"/>
+          <rect x="8" y="8" width="604" height="58" rx="30" fill="#ffffff"/>
+          <path d="M8 66h604" stroke="#d9e1dc"/>
+          <circle cx="36" cy="37" r="5" fill="#d9e1dc"/>
+          <circle cx="54" cy="37" r="5" fill="#d9e1dc"/>
+          <circle cx="72" cy="37" r="5" fill="#d9e1dc"/>
+          <text x="100" y="42" fill="#0f2f35" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="800">Grant round workspace</text>
+          <rect x="489" y="24" width="94" height="26" rx="13" fill="#eef7f5" stroke="#cdeae2"/>
+          <circle cx="507" cy="37" r="4" fill="#1b7a72"/>
+          <text x="519" y="41" fill="#123d43" font-family="Inter, Arial, sans-serif" font-size="10" font-weight="800">LIVE ROUND</text>
+
+          <text x="40" y="96" fill="#1b7a72" font-family="Inter, Arial, sans-serif" font-size="10" font-weight="800" letter-spacing="1.4">ANTICIPATE</text>
+          <text x="226" y="96" fill="#1b7a72" font-family="Inter, Arial, sans-serif" font-size="10" font-weight="800" letter-spacing="1.4">DELIBERATE</text>
+          <text x="430" y="96" fill="#1b7a72" font-family="Inter, Arial, sans-serif" font-size="10" font-weight="800" letter-spacing="1.4">DECIDE</text>
+
+          <!-- Applications and evidence -->
+          <g filter="url(#softShadow)">
+            <rect x="38" y="114" width="158" height="308" rx="18" fill="#ffffff" stroke="#d9e1dc"/>
+          </g>
+          <text x="58" y="143" fill="#0f2f35" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="800">Applications</text>
+          <text x="58" y="162" fill="#5a6f6a" font-family="Inter, Arial, sans-serif" font-size="10.5">Tied to the round</text>
+
+          <rect x="56" y="184" width="122" height="54" rx="10" fill="#eef7f5" stroke="#cdeae2"/>
+          <circle cx="72" cy="201" r="5" fill="#1b7a72"/>
+          <text x="84" y="204" fill="#123d43" font-family="Inter, Arial, sans-serif" font-size="10.5" font-weight="800">ELIGIBILITY MET</text>
+          <rect x="70" y="216" width="88" height="6" rx="3" fill="#d9e1dc"/>
+
+          <rect x="56" y="250" width="122" height="54" rx="10" fill="#ffffff" stroke="#d9e1dc"/>
+          <circle cx="72" cy="267" r="5" fill="#3a9a90"/>
+          <text x="84" y="270" fill="#123d43" font-family="Inter, Arial, sans-serif" font-size="10.5" font-weight="800">COMMUNITY VOTE</text>
+          <rect x="70" y="282" width="76" height="6" rx="3" fill="#d9e1dc"/>
+
+          <rect x="56" y="316" width="122" height="54" rx="10" fill="#ffffff" stroke="#d9e1dc"/>
+          <circle cx="72" cy="333" r="5" fill="#0f2f35"/>
+          <text x="84" y="336" fill="#123d43" font-family="Inter, Arial, sans-serif" font-size="10.5" font-weight="800">COSTS REVIEWED</text>
+          <rect x="70" y="348" width="96" height="6" rx="3" fill="#d9e1dc"/>
+
+          <rect x="56" y="386" width="122" height="20" rx="10" fill="#0f2f35"/>
+          <text x="117" y="400" text-anchor="middle" fill="#dbf0e8" font-family="Inter, Arial, sans-serif" font-size="9.5" font-weight="800">24 APPLICATIONS</text>
+
+          <!-- Connectors -->
+          <path d="M196 267h25" stroke="#1b7a72" stroke-width="2.3" stroke-linecap="round"/>
+          <path d="m216 261 7 6-7 6" fill="none" stroke="#1b7a72" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M405 267h17" stroke="#1b7a72" stroke-width="2.3" stroke-linecap="round"/>
+          <path d="m417 261 7 6-7 6" fill="none" stroke="#1b7a72" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>
+
+          <!-- Reviewer scoring -->
+          <g filter="url(#softShadow)">
+            <rect x="222" y="114" width="184" height="308" rx="18" fill="#ffffff" stroke="#d9e1dc"/>
+          </g>
+          <text x="242" y="143" fill="#0f2f35" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="800">Reviewer scoring</text>
+          <text x="242" y="162" fill="#5a6f6a" font-family="Inter, Arial, sans-serif" font-size="10.5">Independent scores, then synthesis</text>
+
+          <text x="242" y="198" fill="#33473f" font-family="Inter, Arial, sans-serif" font-size="10.5" font-weight="700">Community garden expansion</text>
+          <rect x="242" y="208" width="142" height="10" rx="5" fill="#d9e1dc"/>
+          <rect x="242" y="208" width="108" height="10" rx="5" fill="#1b7a72"/>
+          <text x="384" y="217" text-anchor="end" fill="#123d43" font-family="Inter, Arial, sans-serif" font-size="9" font-weight="800">76</text>
+
+          <text x="242" y="246" fill="#33473f" font-family="Inter, Arial, sans-serif" font-size="10.5" font-weight="700">Youth mentoring programme</text>
+          <rect x="242" y="256" width="142" height="10" rx="5" fill="#d9e1dc"/>
+          <rect x="242" y="256" width="81" height="10" rx="5" fill="#3a9a90"/>
+          <text x="384" y="265" text-anchor="end" fill="#123d43" font-family="Inter, Arial, sans-serif" font-size="9" font-weight="800">57</text>
+
+          <rect x="242" y="292" width="144" height="78" rx="11" fill="#eef7f5" stroke="#cdeae2"/>
+          <text x="258" y="314" fill="#1b7a72" font-family="Inter, Arial, sans-serif" font-size="9" font-weight="800" letter-spacing=".7">MINORITY VIEW</text>
+          <text x="258" y="335" fill="#123d43" font-family="Inter, Arial, sans-serif" font-size="10.5" font-weight="700">1 reviewer flags a risk</text>
+          <rect x="258" y="348" width="105" height="6" rx="3" fill="#d9e1dc"/>
+
+          <g transform="translate(242 387)">
+            <circle cx="9" cy="9" r="9" fill="#0f2f35"/>
+            <circle cx="31" cy="9" r="9" fill="#1b7a72"/>
+            <circle cx="53" cy="9" r="9" fill="#3a9a90"/>
+            <circle cx="75" cy="9" r="9" fill="#d9e1dc"/>
+            <text x="98" y="13" fill="#5a6f6a" font-family="Inter, Arial, sans-serif" font-size="8.8" font-weight="700">9 reviewers</text>
+          </g>
+
+          <!-- Award record -->
+          <g filter="url(#softShadow)">
+            <rect x="424" y="114" width="168" height="308" rx="18" fill="#0f2f35" stroke="#0f2f35"/>
+          </g>
+          <rect x="442" y="134" width="132" height="24" rx="12" fill="rgba(255,255,255,.09)"/>
+          <circle cx="457" cy="146" r="4" fill="#8fd6cb"/>
+          <text x="468" y="150" fill="#dbf0e8" font-family="Inter, Arial, sans-serif" font-size="8.6" font-weight="800">READY FOR AWARD</text>
+          <text x="442" y="184" fill="#8fd6cb" font-family="Inter, Arial, sans-serif" font-size="9.2" font-weight="800" letter-spacing=".7">AWARD RECORD</text>
+          <text x="442" y="216" fill="#ffffff" font-family="Inter, Arial, sans-serif" font-size="15.5" font-weight="800">Fund the garden</text>
+          <text x="442" y="242" fill="#ffffff" font-family="Inter, Arial, sans-serif" font-size="16.5" font-weight="800">expansion</text>
+          <path d="M442 266h132" stroke="rgba(255,255,255,.16)"/>
+
+          <text x="442" y="289" fill="#9fc4bd" font-family="Inter, Arial, sans-serif" font-size="9.2" font-weight="700">GRANT OWNER</text>
+          <text x="442" y="309" fill="#ffffff" font-family="Inter, Arial, sans-serif" font-size="11.2" font-weight="800">Program Officer</text>
+          <text x="442" y="336" fill="#9fc4bd" font-family="Inter, Arial, sans-serif" font-size="9.2" font-weight="700">REVIEW CONDITION</text>
+          <text x="442" y="356" fill="#ffffff" font-family="Inter, Arial, sans-serif" font-size="11.2" font-weight="800">Report due Q3</text>
+          <rect x="442" y="376" width="132" height="30" rx="15" fill="#ffffff"/>
+          <path d="m457 391 4 4 8-9" fill="none" stroke="#1b7a72" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <text x="476" y="395" fill="#0f2f35" font-family="Inter, Arial, sans-serif" font-size="8.8" font-weight="800">AWARD CONFIRMED</text>
+
+          <!-- Reporting and learning ribbon -->
+          <rect x="38" y="452" width="544" height="68" rx="16" fill="#ffffff" stroke="#d9e1dc"/>
+          <circle cx="68" cy="486" r="16" fill="#eef7f5" stroke="#cdeae2"/>
+          <path d="m61 486 5 5 10-12" fill="none" stroke="#1b7a72" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+          <text x="96" y="482" fill="#0f2f35" font-family="Inter, Arial, sans-serif" font-size="11.5" font-weight="800">Award terms and reporting stay linked</text>
+          <text x="96" y="500" fill="#5a6f6a" font-family="Inter, Arial, sans-serif" font-size="9.5">The reasoning survives the funding cycle and improves the next round.</text>
+          <path d="M446 486h72" stroke="#d9e1dc" stroke-width="2" stroke-linecap="round"/>
+          <circle cx="476" cy="486" r="5" fill="#1b7a72"/>
+          <circle cx="518" cy="486" r="5" fill="#0f2f35"/>
+          <text x="545" y="490" fill="#1b7a72" font-family="Inter, Arial, sans-serif" font-size="9" font-weight="800">LEARN</text>
+        </svg>
+        <div class="hero-visual__chip hero-visual__chip--bottom">Human authority retained</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="proof-strip">
+    <p class="eyebrow">Where this comes from</p>
+    <p>CrowdSmarter draws on research in participatory grantmaking, collective intelligence, and strategic foresight. Funders keep saying they want the communities they serve to help decide who gets funded — but most still run that process in spreadsheets and email. We're working with an initial group of charter grant programmes to run one real round end to end, properly.</p>
+  </section>
+
+  <section class="block" id="use-cases">
+    <div class="section-intro">
+      <p class="eyebrow">Built for grantmaking that includes real voices</p>
+      <h2>Designed for rounds where community input and rigour both have to hold.</h2>
+    </div>
+    <div class="grid-3">
+      <article class="use-case">
+        <h3>Participatory grant rounds</h3>
+        <p>Bring community reviewers alongside staff, with every score and every disagreement kept visible.</p>
+        <ul><li>Community-selected reviewers</li><li>Conflict-of-interest disclosure</li><li>Minority views preserved, not averaged away</li></ul>
+      </article>
+      <article class="use-case">
+        <h3>Multi-funder & pooled funds</h3>
+        <p>Run one shared, transparent process across funders co-financing the same pool of money.</p>
+        <ul><li>Shared eligibility criteria</li><li>One accountable record</li><li>Joint reporting back to every funder</li></ul>
+      </article>
+      <article class="use-case">
+        <h3>Regranting & intermediary funds</h3>
+        <p>Keep a defensible evidence chain from your funding decision all the way to the final grantee.</p>
+        <ul><li>Sub-grantee evidence trail</li><li>Intermediary accountability</li><li>Funder-ready reporting on request</li></ul>
+      </article>
+    </div>
+  </section>
+
+  <section class="block" id="platform">
+    <div class="section-intro">
+      <p class="eyebrow">One continuous intelligence chain</p>
+      <h2>The missing connection between an open call and an accountable award.</h2>
+      <p>In most grant programmes, the call, community input, scoring, approval, disbursement, and reporting live in separate tools — or no tool at all. CrowdSmarter keeps every stage connected, so the reasoning behind a funding decision is still there when a board member, an auditor, or a declined applicant asks why.</p>
+    </div>
+    <div class="lifecycle-grid">
+      <article><span class="num">01</span><h3>Anticipate</h3><p>Design the round: eligibility, total pool, timeline, and criteria published before the call opens.</p></article>
+      <article><span class="num">02</span><h3>Deliberate</h3><p>Open the call. Applications, community votes, reviewer evidence, assumptions, and disclosed conflicts of interest.</p></article>
+      <article><span class="num">03</span><h3>Decide</h3><p>Score without hiding disagreement: option comparison, minority reports, executive synthesis, explicit authority.</p></article>
+      <article><span class="num">04</span><h3>Act</h3><p>Award and disburse, with monitoring dates, conditions, and rejected-applicant feedback as explicit commitments.</p></article>
+      <article><span class="num">05</span><h3>Learn</h3><p>Report to funders and community, and carry lessons into eligibility and criteria for the next round.</p></article>
+    </div>
+  </section>
+
+  <section class="block block--dark" id="sprint">
+    <div class="section-intro">
+      <p class="eyebrow">Platform and service, as one journey</p>
+      <h2>Bring one real grant round through a structured first engagement.</h2>
+      <p>CrowdSmarter combines a governed grant-round platform with a facilitated Grant Round Sprint. Start with one real round, establish a process that holds up to scrutiny, then reuse it for every round after.</p>
+    </div>
+    <div class="journey-steps">
+      <div class="journey-step"><span class="num">1</span><div><h3>Fit assessment and demonstration</h3><p>A short conversation and live walkthrough to confirm CrowdSmarter fits your next round.</p></div></div>
+      <div class="journey-step"><span class="num">2</span><div><h3>Facilitated Grant Round Sprint</h3><p>Run one real round — open call through award — through the platform with guided facilitation.</p></div></div>
+      <div class="journey-step"><span class="num">3</span><div><h3>Platform adoption and scaling</h3><p>Continue running future rounds independently, with a reusable template and criteria.</p></div></div>
+    </div>
+    <p class="timeline-intro">Inside the Sprint, one real round plays out over six to ten weeks:</p>
+    <div class="timeline">
+      <div class="timeline-step">
+        <span class="num">1</span>
+        <div>
+          <p class="label">Week 1 <span class="stage-tag">Anticipate</span></p>
+          <h3>Design the round</h3>
+          <p>Set eligibility, total pool, timeline, and criteria — published before a single application arrives.</p>
+        </div>
+      </div>
+      <div class="timeline-step">
+        <span class="num">2</span>
+        <div>
+          <p class="label">Weeks 1 to 4 <span class="stage-tag">Deliberate</span></p>
+          <h3>Open the call</h3>
+          <p>Collect applications, community input, and reviewer evidence — with conflicts of interest disclosed up front.</p>
+        </div>
+      </div>
+      <div class="timeline-step">
+        <span class="num">3</span>
+        <div>
+          <p class="label">Weeks 4 to 6 <span class="stage-tag">Decide</span></p>
+          <h3>Score without hiding disagreement</h3>
+          <p>Compare applications, analyse budget robustness, and keep minority views visible instead of forcing consensus.</p>
+        </div>
+      </div>
+      <div class="timeline-step">
+        <span class="num">4</span>
+        <div>
+          <p class="label">Weeks 6 to 10 <span class="stage-tag">Decide → Act</span></p>
+          <h3>Award and give real feedback</h3>
+          <p>Finalise awards, set monitoring dates, and give every declined applicant a reason, not a form rejection.</p>
+        </div>
+      </div>
+    </div>
+    <div class="charter-panel">
+      <p class="eyebrow">Charter grant programme</p>
+      <h3>Start with one real, funded round.</h3>
+      <p>Charter grant programmes run a first Grant Round Sprint and help shape the platform's development before wider release.</p>
+      <div class="charter-stats">
+        <div><small>Duration</small><strong>6 to 10 weeks</strong></div>
+        <div><small>Team</small><strong>5 to 25 reviewers</strong></div>
+        <div><small>Format</small><strong>Hybrid or remote</strong></div>
+        <div><small>Outcome</small><strong>Funded portfolio + reusable round</strong></div>
+      </div>
+      <a class="button button--light" href="mailto:hello@crowdsmarter.com?subject=Charter%20grant%20programme">Apply as a charter grant programme →</a>
+    </div>
+  </section>
+
+  <section class="block" id="difference">
+    <div class="section-intro">
+      <p class="eyebrow">A deliberately different way to run a round</p>
+      <h2>Keep the reasoning visible across the tools you already use.</h2>
+      <p>CrowdSmarter connects the reasoning and accountability around the tools you already run applications through — forms, spreadsheets, documents, and email.</p>
+    </div>
+    <div class="difference-layout">
+      <div class="difference-card">
+        <span class="label">A commonly fragmented round</span>
+        <p>Applications land in a form tool. Scores live in a spreadsheet. Community input happens nowhere official. Declined applicants never learn why.</p>
+      </div>
+      <div class="difference-arrow">→</div>
+      <div class="difference-card positive">
+        <span class="label">CrowdSmarter's round</span>
+        <p>One traceable path connects the open call, community and reviewer input, the funding decision, and the report back — to your board and to every applicant.</p>
+      </div>
+    </div>
+    <div class="grid-5">
+      <div class="capability-card"><h3>Participatory by design</h3><p>Open a public link for community applications and voting, without adding every visitor as a full member of your organisation.</p></div>
+      <div class="capability-card"><h3>Evidence tied to every application</h3><p>Attach supporting documents and mark whether each one supports or challenges a specific application, not just the round in general.</p></div>
+      <div class="capability-card"><h3>Scoring with visible disagreement</h3><p>Blind rounds, consent, quorum, confidence, and minority reports — no forced consensus, no quietly overruled reviewer.</p></div>
+      <div class="capability-card"><h3>Advisory, replaceable AI</h3><p>AI can flag gaps and duplicate evidence, but cannot silently edit a score, select a winner, or exercise funding authority.</p></div>
+      <div class="capability-card"><h3>Reporting that closes the loop</h3><p>Export a complete, funder-ready record, and carry lessons into the eligibility criteria for the next round.</p></div>
+    </div>
+  </section>
+
+  <section class="block block--dark">
+    <div class="section-intro">
+      <p class="eyebrow">What you walk away with</p>
+      <h2>A concrete result, not just a workshop.</h2>
+    </div>
+    <div class="grid-4">
+      <div class="outcome-card"><span class="num">01</span><h3>A complete award record</h3><p>Every funded and declined application, the evidence behind each score, and who decided — in one auditable history.</p></div>
+      <div class="outcome-card"><span class="num">02</span><h3>A defensible comparison</h3><p>See exactly why funded applications outscored the rest, not just the final ranking.</p></div>
+      <div class="outcome-card"><span class="num">03</span><h3>Feedback applicants can use</h3><p>Give declined applicants a real reason — closing a loop most funders quietly skip.</p></div>
+      <div class="outcome-card"><span class="num">04</span><h3>A reusable round template</h3><p>Eligibility, scoring rubric, and workflow your team can run again next cycle without starting from zero.</p></div>
+    </div>
+  </section>
+
+  <section class="block" id="why-us">
+    <div class="section-intro">
+      <p class="eyebrow">Why CrowdSmarter runs it this way</p>
+      <h2>Built by people who think in systems, futures, and collective judgement — not just software.</h2>
+      <p>Grantmaking gets treated like a series of separate transactions: one application, one score, one email. We don't build it that way, because that's not what it actually is.</p>
+    </div>
+    <div class="grid-3">
+      <article class="use-case">
+        <h3>Systems thinking</h3>
+        <p>A grant round isn't a transaction — it's one system connecting your funding pool, your applicants, and the community they serve. Rounds are designed so feedback flows back into eligibility and criteria, not just into a closed file.</p>
+      </article>
+      <article class="use-case">
+        <h3>Futures thinking</h3>
+        <p>Rounds get designed around where the need is heading, not just what was fundable last year — using the same scenario and signal tools built for strategic foresight work, applied to who you fund next.</p>
+      </article>
+      <article class="use-case">
+        <h3>Collective intelligence</h3>
+        <p>Structuring many honest voices — staff, board, community reviewers — into one defensible decision, without averaging away the disagreement that actually matters.</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="block" id="trust">
+    <div class="trust-panel">
+      <div class="trust-copy">
+        <p class="eyebrow">Designed for organisational trust</p>
+        <h2>Your award records should stay inspectable, portable, and under human authority.</h2>
+        <p>Your organisation keeps authority over every award, exports its own records at any time, and can inspect the full history behind each decision. Community applicants join with just a name and email — no account, no password, nothing else collected.</p>
+        <a class="text-link" href="mailto:hello@crowdsmarter.com?subject=Governance%20requirements">Discuss your governance requirements →</a>
+        <div class="trust-contact-links">
+          <a href="mailto:hello@crowdsmarter.com?subject=CrowdSmarter%20privacy%20enquiry">Privacy enquiries</a>
+          <a href="mailto:hello@crowdsmarter.com?subject=CrowdSmarter%20security%20report">Security reports</a>
+        </div>
+      </div>
+      <div class="trust-list">
+        <div class="trust-item"><strong>Human authority</strong><span>No automated final awards or silent AI changes.</span></div>
+        <div class="trust-item"><strong>Tenant isolation</strong><span>Organisation-scoped permissions and object-level controls.</span></div>
+        <div class="trust-item"><strong>Traceable reasoning</strong><span>Evidence, dissent, transitions, and summaries retain history.</span></div>
+        <div class="trust-item"><strong>Customer ownership</strong><span>Exportable records and provider-independent architecture.</span></div>
+        <div class="trust-item"><strong>Secure defaults</strong><span>Session authentication, CSRF protection, rate limits, and validated inputs.</span></div>
+        <div class="trust-item"><strong>Long-term maintainability</strong><span>Explicit services, tests, documentation, and safe upgrades.</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="final-cta">
+    <div>
+      <p class="eyebrow" style="color:#8fd6cb;">Bring a real round</p>
+      <h2>See whether CrowdSmarter fits the way your organisation needs to fund, include, and account for it.</h2>
+      <p>We'll shape the demonstration around your next round and give you a direct assessment of whether CrowdSmarter is a good fit.</p>
+    </div>
+    <div class="final-cta-actions">
+      <a class="button button--light" href="mailto:hello@crowdsmarter.com?subject=Grant%20round%20fit%20assessment">Book a fit assessment →</a>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="brand" style="display:flex; align-items:center; gap:.65rem;">
+    <svg width="30" height="30" viewBox="0 0 100 100" role="img" aria-hidden="true">
+      <rect width="100" height="100" rx="29" fill="#0F2F35"/>
+      <text x="50" y="54" text-anchor="middle" dominant-baseline="middle" font-family="Inter, Arial, sans-serif" font-weight="700" font-size="44" letter-spacing="-2" fill="#DBF0E8">CS</text>
+    </svg>
+    <span><strong>CrowdSmarter</strong><br><small>Systems thinking. Futures thinking. Collective intelligence.</small></span>
+  </div>
+  <div class="footer-links">
+    <a href="mailto:hello@crowdsmarter.com?subject=CrowdSmarter%20enquiry">hello@crowdsmarter.com</a>
+    <a href="mailto:hello@crowdsmarter.com?subject=Grant%20round%20fit%20assessment">Book a fit assessment</a>
+    <span>Human authority retained</span>
+    <span>Working with organisations across Africa, Europe, and the Middle East</span>
+  </div>
+</footer>
+
+</body>
+</html>
