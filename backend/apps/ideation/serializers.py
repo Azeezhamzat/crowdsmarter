@@ -27,6 +27,7 @@ class IdeaSerializer(serializers.ModelSerializer):
             "id",
             "title",
             "description",
+            "requested_amount",
             "status",
             "status_label",
             "submitted_by_participant",
@@ -45,6 +46,9 @@ class IdeaSerializer(serializers.ModelSerializer):
 class IdeaCreateSerializer(StrictSerializer):
     title = serializers.CharField(max_length=240)
     description = serializers.CharField(required=False, allow_blank=True, default="")
+    requested_amount = serializers.DecimalField(
+        max_digits=14, decimal_places=2, required=False, allow_null=True, default=None, min_value=0
+    )
 
 
 class SessionJoinSerializer(StrictSerializer):
@@ -69,6 +73,7 @@ class OpenSessionPublicSerializer(_IdeasFromContextMixin, serializers.ModelSeria
     organisation_name = serializers.CharField(source="organisation.name", read_only=True)
     status_label = serializers.CharField(source="get_status_display", read_only=True)
     ideas = serializers.SerializerMethodField()
+    decision_template_key = serializers.SerializerMethodField()
 
     class Meta:
         model = OpenSession
@@ -82,14 +87,23 @@ class OpenSessionPublicSerializer(_IdeasFromContextMixin, serializers.ModelSeria
             "status_label",
             "voting_enabled",
             "submission_deadline",
+            "decision_template_key",
             "ideas",
         ]
         read_only_fields = fields
+
+    def get_decision_template_key(self, obj: OpenSession) -> str | None:
+        # Only the flavor, never the linked decision's title/content — this page is
+        # reachable by anonymous visitors.
+        return obj.decision.source_template_key if obj.decision_id else None
 
 
 class OpenSessionSummarySerializer(serializers.ModelSerializer):
     status_label = serializers.CharField(source="get_status_display", read_only=True)
     decision_title = serializers.CharField(source="decision.title", read_only=True, allow_null=True)
+    decision_template_key = serializers.CharField(
+        source="decision.source_template_key", read_only=True, allow_null=True
+    )
     idea_count = serializers.IntegerField(read_only=True)
     created_by = DecisionUserSerializer(read_only=True)
 
@@ -104,6 +118,7 @@ class OpenSessionSummarySerializer(serializers.ModelSerializer):
             "public_slug",
             "decision_id",
             "decision_title",
+            "decision_template_key",
             "voting_enabled",
             "idea_count",
             "created_by",

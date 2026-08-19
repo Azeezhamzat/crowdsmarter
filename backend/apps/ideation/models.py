@@ -117,6 +117,7 @@ class Idea(UUIDTimeStampedModel):
     session = models.ForeignKey(OpenSession, on_delete=models.CASCADE, related_name="ideas")
     title = models.CharField(max_length=240)
     description = models.TextField(blank=True)
+    requested_amount = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
     submitted_by_participant = models.ForeignKey(
         SessionParticipant,
         on_delete=models.PROTECT,

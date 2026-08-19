@@ -5,6 +5,7 @@ import { Link, useParams } from "react-router";
 import { Icon } from "../../components/Icon";
 import { StatusMessage } from "../../components/StatusMessage";
 import { ApiError } from "../../lib/api";
+import { getTerminology } from "../../lib/terminology";
 import { getOrganisation } from "../organisations/api";
 import { getOrganisationPortfolio } from "../portfolio/api";
 import { createOrganisationSession, listOrganisationSessions } from "./api";
@@ -122,7 +123,10 @@ export function OrganisationSessionsPage() {
               {session.decision_title ? <small className="muted">Linked to: {session.decision_title}</small> : null}
             </div>
             <div className="portfolio-card__meta">
-              <div><span className="meta-label">Ideas</span><strong>{session.idea_count}</strong></div>
+              <div>
+                <span className="meta-label">{getTerminology(session.decision_template_key).ideaNounPlural}</span>
+                <strong>{session.idea_count}</strong>
+              </div>
               <div><span className="meta-label">Created by</span><strong>{session.created_by.email}</strong></div>
               <Link className="portfolio-open-link" to={`/organisations/${organisationId}/sessions/${session.id}`}>
                 Manage <Icon name="arrow-right" size={17} />

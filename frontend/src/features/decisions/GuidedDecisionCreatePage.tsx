@@ -8,6 +8,7 @@ import { z } from "zod";
 import { FieldError } from "../../components/FieldError";
 import { StatusMessage } from "../../components/StatusMessage";
 import { ApiError } from "../../lib/api";
+import { getTerminology } from "../../lib/terminology";
 import type { DecisionMethod, DecisionTemplate } from "../../lib/types";
 import { fetchCurrentUser } from "../auth/api";
 import { listMemberships } from "../organisations/api";
@@ -149,6 +150,7 @@ export function GuidedDecisionCreatePage() {
     },
     [selectedMethod, selectedTemplateKey, templates.data],
   );
+  const terms = getTerminology(selectedTemplateKey);
 
   const create = useMutation({
     mutationFn: (values: FormInput) =>
@@ -218,7 +220,7 @@ export function GuidedDecisionCreatePage() {
       <Link className="back-link" to={`/workspaces/${workspaceId}`}>← {workspace.data.name}</Link>
       <div className="page-heading guided-create__heading">
         <div>
-          <p className="eyebrow">Guided decision creation</p>
+          <p className="eyebrow">Guided {terms.decisionNoun.toLowerCase()} creation</p>
           <h1>Start with a clear, governable question</h1>
           <p className="muted">Templates provide prompts, not answers. Every field remains editable and every decision remains human-owned.</p>
         </div>
@@ -304,7 +306,7 @@ export function GuidedDecisionCreatePage() {
         {step === 2 ? (
           <section className="creation-panel" aria-labelledby="boundaries-title">
             <p className="eyebrow">Boundaries</p>
-            <h2 id="boundaries-title">Make the decision small enough to govern</h2>
+            <h2 id="boundaries-title">Make the {terms.decisionNoun.toLowerCase()} small enough to govern</h2>
             <p className="field-guidance">{selectedTemplate?.scope_prompt}</p>
             <label htmlFor="create-scope">Scope and exclusions</label>
             <textarea id="create-scope" rows={5} {...form.register("scope")} />
@@ -327,7 +329,7 @@ export function GuidedDecisionCreatePage() {
             <p className="eyebrow">Authority and timing</p>
             <h2 id="authority-title">Name accountability before the work begins</h2>
             {memberships.isError ? <StatusMessage kind="error">Organisation members could not be loaded.</StatusMessage> : null}
-            <label htmlFor="create-owner">Decision owner</label>
+            <label htmlFor="create-owner">{terms.decisionNoun} owner</label>
             <select id="create-owner" {...form.register("owner_id")}>
               {ownerChoices.map((item) => (
                 <option key={item.id} value={item.user.id}>{memberName(item.user.first_name, item.user.last_name, item.user.email)}</option>

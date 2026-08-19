@@ -266,6 +266,97 @@ def test_shortlist_and_promote_idea_to_real_decision_option(
 
 
 @pytest.mark.django_db
+def test_requested_amount_carries_from_idea_to_promoted_option(
+    api_client, organisation_factory, decision_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    decision = decision_factory(
+        workspace=organisation.workspaces.get(is_default=True), owner=owner, source_template_key="grant_round",
+    )
+    session = services.create_session(
+        actor=owner, organisation=organisation, decision=decision, title="Round 1", prompt="Applications?",
+    )
+    services.open_session(actor=owner, session=session)
+    participant, _ = services.identify_participant(session=session, name="Ada", email="ada@example.com")
+    idea = services.submit_idea(
+        session=session,
+        participant=participant,
+        title="Community garden expansion",
+        description="Expand the shared plots to a second neighbourhood.",
+        requested_amount="15000.00",
+    )
+    assert idea.requested_amount == pytest.approx(15000.00)
+
+    api_client.force_authenticate(owner)
+    promote = api_client.post(
+        reverse("ideation:idea-promote", kwargs={"session_id": session.id, "idea_id": idea.id}),
+        {"decision_id": str(decision.id)},
+        format="json",
+    )
+    assert promote.status_code == 200
+    idea.refresh_from_db()
+    option = DecisionOption.objects.get(id=idea.promoted_to_option_id)
+    assert option.estimated_cost == pytest.approx(15000.00)
+
+
+@pytest.mark.django_db
+def test_public_session_exposes_decision_template_key_but_nothing_else(
+    organisation_factory, decision_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    decision = decision_factory(
+        workspace=organisation.workspaces.get(is_default=True),
+        owner=owner,
+        title="Internal-only decision title",
+        source_template_key="grant_round",
+    )
+    session = services.create_session(
+        actor=owner, organisation=organisation, decision=decision, title="Open round", prompt="Applications?",
+    )
+    services.open_session(actor=owner, session=session)
+
+    client, _ = _csrf_client()
+    detail = client.get(reverse("ideation:public-detail", kwargs={"public_slug": session.public_slug}))
+    assert detail.status_code == 200
+    body = detail.json()
+    assert body["decision_template_key"] == "grant_round"
+    assert "Internal-only decision title" not in str(body)
+
+    client, csrf_token = _csrf_client()
+    join = client.post(
+        reverse("ideation:public-join", kwargs={"public_slug": session.public_slug}),
+        {"name": "Ife", "email": "ife@example.com"},
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+    token = join.json()["participant_token"]
+    submit = client.post(
+        reverse("ideation:public-idea-create", kwargs={"public_slug": session.public_slug}),
+        {"title": "Youth mentoring programme", "requested_amount": "5000.00"},
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+        HTTP_X_PARTICIPANT_TOKEN=token,
+    )
+    assert submit.status_code == 200
+    assert submit.json()["ideas"][0]["requested_amount"] == "5000.00"
+
+
+@pytest.mark.django_db
+def test_public_session_decision_template_key_is_null_without_a_linked_decision(
+    organisation_factory,
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    session = services.create_session(actor=organisation.created_by, organisation=organisation, title="S", prompt="P")
+    services.open_session(actor=organisation.created_by, session=session)
+
+    client, _ = _csrf_client()
+    detail = client.get(reverse("ideation:public-detail", kwargs={"public_slug": session.public_slug}))
+    assert detail.json()["decision_template_key"] is None
+
+
+@pytest.mark.django_db
 def test_promote_rejects_a_decision_from_another_organisation(
     api_client, organisation_factory, decision_factory
 ):  # type: ignore[no-untyped-def]

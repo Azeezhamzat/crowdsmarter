@@ -9,6 +9,7 @@ import { FieldError } from "../../components/FieldError";
 import { LogoMark } from "../../components/Logo";
 import { StatusMessage } from "../../components/StatusMessage";
 import { ApiError } from "../../lib/api";
+import { getTerminology } from "../../lib/terminology";
 import type { Idea } from "../../lib/types";
 import { getStoredParticipantToken, getPublicSession, joinSession, removeVote, submitIdea, voteIdea } from "./api";
 
@@ -21,6 +22,7 @@ type JoinForm = z.infer<typeof joinSchema>;
 const ideaSchema = z.object({
   title: z.string().trim().min(3, "Give the idea a short title.").max(240),
   description: z.string().trim().max(4000),
+  requested_amount: z.string().trim(),
 });
 type IdeaForm = z.infer<typeof ideaSchema>;
 
@@ -39,18 +41,25 @@ function IdeaCard({
   onVote,
   onUnvote,
   isPending,
+  amountFieldLabel,
 }: {
   idea: Idea;
   canVote: boolean;
   onVote: () => void;
   onUnvote: () => void;
   isPending: boolean;
+  amountFieldLabel: string;
 }) {
   return (
     <li className="idea-card">
       <div className="idea-card__body">
         <h3>{idea.title}</h3>
         {idea.description ? <p>{idea.description}</p> : null}
+        {idea.requested_amount ? (
+          <p className="muted">
+            <strong>{amountFieldLabel}:</strong> {idea.requested_amount}
+          </p>
+        ) : null}
         <small className="muted">
           {submitterLabel(idea)} · {idea.status_label}
         </small>
@@ -85,6 +94,9 @@ export function OpenSessionPublicPage() {
     enabled: Boolean(publicSlug),
   });
 
+  const terms = getTerminology(session.data?.decision_template_key);
+  const isGrantRound = session.data?.decision_template_key === "grant_round";
+
   const joinForm = useForm<JoinForm>({ resolver: zodResolver(joinSchema), defaultValues: { name: "", email: "" } });
   const join = useMutation({
     mutationFn: (values: JoinForm) => joinSession(publicSlug, values),
@@ -94,9 +106,13 @@ export function OpenSessionPublicPage() {
     },
   });
 
-  const ideaForm = useForm<IdeaForm>({ resolver: zodResolver(ideaSchema), defaultValues: { title: "", description: "" } });
+  const ideaForm = useForm<IdeaForm>({
+    resolver: zodResolver(ideaSchema),
+    defaultValues: { title: "", description: "", requested_amount: "" },
+  });
   const submit = useMutation({
-    mutationFn: (values: IdeaForm) => submitIdea(publicSlug, values),
+    mutationFn: (values: IdeaForm) =>
+      submitIdea(publicSlug, { ...values, requested_amount: values.requested_amount || undefined }),
     onSuccess: (data) => {
       queryClient.setQueryData(queryKey, data);
       ideaForm.reset();
@@ -172,11 +188,13 @@ export function OpenSessionPublicPage() {
           ) : null}
 
           {hasToken && session.data.status === "open" ? (
-            <section className="open-session-submit" aria-label="Submit an idea">
-              <h2>Submit an idea</h2>
+            <section className="open-session-submit" aria-label={terms.submitIdeaCta}>
+              <h2>{terms.submitIdeaCta}</h2>
               {submit.isError ? (
                 <StatusMessage kind="error">
-                  {submit.error instanceof ApiError ? submit.error.message : "Could not submit that idea."}
+                  {submit.error instanceof ApiError
+                    ? submit.error.message
+                    : `Could not submit that ${terms.ideaNoun.toLowerCase()}.`}
                 </StatusMessage>
               ) : null}
               <form onSubmit={ideaForm.handleSubmit((values) => submit.mutate(values))} noValidate>
@@ -185,17 +203,29 @@ export function OpenSessionPublicPage() {
                 <FieldError message={ideaForm.formState.errors.title?.message} />
                 <label htmlFor="idea-description">Description</label>
                 <textarea id="idea-description" rows={3} {...ideaForm.register("description")} />
+                {isGrantRound ? (
+                  <>
+                    <label htmlFor="idea-amount">{terms.amountFieldLabel}</label>
+                    <input
+                      id="idea-amount"
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      {...ideaForm.register("requested_amount")}
+                    />
+                  </>
+                ) : null}
                 <button className="button button--secondary" type="submit" disabled={submit.isPending}>
-                  {submit.isPending ? "Submitting…" : "Submit idea"}
+                  {submit.isPending ? "Submitting…" : `Submit ${terms.ideaNoun.toLowerCase()}`}
                 </button>
               </form>
             </section>
           ) : null}
 
-          <section className="open-session-ideas" aria-label="Submitted ideas">
-            <h2>Ideas ({session.data.ideas.length})</h2>
+          <section className="open-session-ideas" aria-label={`Submitted ${terms.ideaNounPlural.toLowerCase()}`}>
+            <h2>{terms.ideaNounPlural} ({session.data.ideas.length})</h2>
             {session.data.ideas.length === 0 ? (
-              <p className="muted">No ideas yet — be the first.</p>
+              <p className="muted">No {terms.ideaNounPlural.toLowerCase()} yet — be the first.</p>
             ) : (
               <ul className="idea-list">
                 {session.data.ideas.map((idea) => (
@@ -206,6 +236,7 @@ export function OpenSessionPublicPage() {
                     isPending={vote.isPending || unvote.isPending}
                     onVote={() => vote.mutate(idea.id)}
                     onUnvote={() => unvote.mutate(idea.id)}
+                    amountFieldLabel={terms.amountFieldLabel}
                   />
                 ))}
               </ul>

@@ -24,7 +24,9 @@ def test_template_catalog_returns_versioned_human_prompts(
 
     assert response.status_code == 200
     keys = {item["key"] for item in response.json()}
-    assert {"blank", "technology_adoption", "pilot_experiment"}.issubset(keys)
+    assert {"blank", "technology_adoption", "pilot_experiment", "grant_round"}.issubset(keys)
+    grant_round = next(item for item in response.json() if item["key"] == "grant_round")
+    assert grant_round["checklist"]
     technology = next(item for item in response.json() if item["key"] == "technology_adoption")
     assert technology["version"] == 1
     assert "Should" in technology["question_prompt"]

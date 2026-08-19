@@ -270,6 +270,41 @@ TEMPLATES: tuple[DecisionTemplate, ...] = (
             "Implementation and review plan",
         ),
     ),
+    DecisionTemplate(
+        key="grant_round",
+        name="Grant round",
+        summary=(
+            "Run a participatory, evidence-informed grant round from open call to award."
+        ),
+        best_for=(
+            "Foundations, funds, and grant committees allocating money across "
+            "competing applications."
+        ),
+        question_prompt=(
+            "Which applications should this round fund, at what amounts, and why "
+            "these over the rest?"
+        ),
+        purpose_prompt=(
+            "State what change this funding round is meant to enable, and for whom."
+        ),
+        context_prompt=(
+            "Describe the funding pool, prior rounds, community need, and why this "
+            "round is opening now."
+        ),
+        scope_prompt=(
+            "Define eligibility, total funding available, round timeline, and what "
+            "this round explicitly excludes."
+        ),
+        contribution_prompt=(
+            "Request applicant evidence, community and reviewer input, and any "
+            "conflicts of interest to disclose."
+        ),
+        checklist=(
+            "Published eligibility criteria",
+            "Reviewer conflict-of-interest check",
+            "Rejected-applicant feedback plan",
+        ),
+    ),
 )
 
 TEMPLATE_BY_KEY = {template.key: template for template in TEMPLATES}

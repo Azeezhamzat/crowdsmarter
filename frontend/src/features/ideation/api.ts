@@ -41,7 +41,7 @@ export async function joinSession(
 
 export async function submitIdea(
   publicSlug: string,
-  input: { title: string; description?: string },
+  input: { title: string; description?: string; requested_amount?: string },
 ): Promise<OpenSessionPublic> {
   await ensureCsrfCookie();
   return apiRequest<OpenSessionPublic>(`/public/sessions/${publicSlug}/ideas/`, {

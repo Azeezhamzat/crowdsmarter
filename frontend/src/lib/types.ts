@@ -1944,6 +1944,7 @@ export type Idea = {
   id: string;
   title: string;
   description: string;
+  requested_amount: string | null;
   status: IdeaStatus;
   status_label: string;
   submitted_by_participant: { name: string } | null;
@@ -1963,6 +1964,7 @@ export type OpenSessionPublic = {
   status_label: string;
   voting_enabled: boolean;
   submission_deadline: string | null;
+  decision_template_key: string | null;
   ideas: Idea[];
 };
 
@@ -1975,6 +1977,7 @@ export type OpenSessionSummary = {
   public_slug: string;
   decision_id: string | null;
   decision_title: string | null;
+  decision_template_key: string | null;
   voting_enabled: boolean;
   idea_count: number;
   created_by: User;

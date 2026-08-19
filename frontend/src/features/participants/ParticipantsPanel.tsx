@@ -6,6 +6,7 @@ import { z } from "zod";
 import { FieldError } from "../../components/FieldError";
 import { StatusMessage } from "../../components/StatusMessage";
 import { ApiError } from "../../lib/api";
+import { getTerminology } from "../../lib/terminology";
 import type { ParticipantRole } from "../../lib/types";
 import {
   addParticipant,
@@ -28,10 +29,14 @@ type AssignableRole = Exclude<ParticipantRole, "decision_owner">;
 export function ParticipantsPanel({
   decisionId,
   canManage,
+  templateKey,
 }: {
   decisionId: string;
   canManage: boolean;
+  templateKey?: string | null;
 }) {
+  const terms = getTerminology(templateKey);
+  const roleLabel = (role: string) => terms.roleLabels[role as ParticipantRole] ?? role.replaceAll("_", " ");
   const queryClient = useQueryClient();
   const participants = useQuery({
     queryKey: ["decisions", decisionId, "participants"],
@@ -70,17 +75,17 @@ export function ParticipantsPanel({
 
   return (
     <section className="side-panel participants-panel" aria-labelledby="participants-title">
-      <h2 id="participants-title">Participants</h2>
+      <h2 id="participants-title">{terms.committeeLabel}</h2>
       <p className="muted">Make stakeholder involvement explicit before contribution opens.</p>
-      {participants.isPending ? <p>Loading participants…</p> : null}
+      {participants.isPending ? <p>Loading {terms.committeeLabel.toLowerCase()}…</p> : null}
       {participants.isError ? (
-        <StatusMessage kind="error">Participants could not be loaded.</StatusMessage>
+        <StatusMessage kind="error">{terms.committeeLabel} could not be loaded.</StatusMessage>
       ) : null}
       {mutationError ? (
         <StatusMessage kind="error">
           {mutationError instanceof ApiError
             ? mutationError.message
-            : "The participant change failed."}
+            : `The ${terms.committeeLabel.toLowerCase()} change failed.`}
         </StatusMessage>
       ) : null}
 
@@ -96,7 +101,7 @@ export function ParticipantsPanel({
               <span className="table-secondary">{participant.user.email}</span>
             </div>
             {participant.role === "decision_owner" || !canManage ? (
-              <span className="role-badge">{participant.role_label}</span>
+              <span className="role-badge">{terms.roleLabels[participant.role] ?? participant.role_label}</span>
             ) : (
               <div className="participant-actions">
                 <select
@@ -112,7 +117,7 @@ export function ParticipantsPanel({
                 >
                   {assignableRoles.map((role) => (
                     <option value={role} key={role}>
-                      {role.replaceAll("_", " ")}
+                      {roleLabel(role)}
                     </option>
                   ))}
                 </select>
@@ -141,11 +146,11 @@ export function ParticipantsPanel({
           <input id="participant-email" type="email" {...form.register("email")} />
           <FieldError message={form.formState.errors.email?.message} />
 
-          <label htmlFor="participant-role">Decision role</label>
+          <label htmlFor="participant-role">{terms.decisionNoun} role</label>
           <select id="participant-role" {...form.register("role")}>
             {assignableRoles.map((role) => (
               <option value={role} key={role}>
-                {role.replaceAll("_", " ")}
+                {roleLabel(role)}
               </option>
             ))}
           </select>

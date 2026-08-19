@@ -20,11 +20,13 @@ const sessionId = "00000000-0000-0000-0000-000000000002";
 
 const baseSession = {
   id: sessionId, title: "Q3 ideathon", prompt: "How do we cut onboarding time in half?", status: "open" as const,
-  status_label: "Open", public_slug: "abc123", decision_id: null, decision_title: null, voting_enabled: true,
+  status_label: "Open", public_slug: "abc123", decision_id: null, decision_title: null,
+  decision_template_key: null, voting_enabled: true,
   idea_count: 1, created_by: { id: "u1", email: "owner@example.com", first_name: "", last_name: "" },
   created_at: "2026-08-01T10:00:00Z", description: "",
   ideas: [{
-    id: "idea-1", title: "Promising idea", description: "Worth trying.", status: "submitted" as const,
+    id: "idea-1", title: "Promising idea", description: "Worth trying.", requested_amount: null,
+    status: "submitted" as const,
     status_label: "Submitted", submitted_by_participant: { name: "Ada" }, submitted_by_user: null,
     vote_count: 3, voted_by_me: false, created_at: "2026-08-01T10:00:00Z",
   }],
@@ -74,6 +76,26 @@ describe("OpenSessionOrganiserPage", () => {
 
     await waitFor(() => expect(promoteIdea).toHaveBeenCalledWith(sessionId, "idea-1", "d1"));
     expect(await screen.findByText(/ada · promoted/i)).toBeInTheDocument();
+  });
+
+  it("uses grant-round terminology and shows the requested amount when linked to a grant round", async () => {
+    vi.mocked(getOrganiserSession).mockResolvedValue({
+      ...baseSession,
+      decision_template_key: "grant_round",
+      ideas: [{ ...baseSession.ideas[0]!, requested_amount: "15000.00" }],
+    });
+    vi.mocked(getOrganisationPortfolio).mockResolvedValue({
+      organisation: { id: organisationId } as never,
+      summary: { total: 0, active: 0, overdue: 0, unresolved_discussion: 0, status_counts: {} },
+      decisions: [{ id: "d1", title: "2026 Community Impact Grant Round" } as never],
+      watchlist: {} as never,
+    });
+
+    renderPage();
+    expect(await screen.findByRole("heading", { name: "Applications (1)" })).toBeInTheDocument();
+    expect(screen.getByText(/requested amount:/i)).toBeInTheDocument();
+    expect(screen.getByText("15000.00")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /promote to application/i })).toBeInTheDocument();
   });
 
   it("closes and reopens a session", async () => {

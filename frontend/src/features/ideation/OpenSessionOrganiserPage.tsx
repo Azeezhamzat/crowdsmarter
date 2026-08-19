@@ -4,6 +4,7 @@ import { Link, useParams } from "react-router";
 
 import { StatusMessage } from "../../components/StatusMessage";
 import { ApiError } from "../../lib/api";
+import { getTerminology, type Terminology } from "../../lib/terminology";
 import type { Idea } from "../../lib/types";
 import { getOrganisationPortfolio } from "../portfolio/api";
 import { getOrganiserSession, promoteIdea, setSessionState, shortlistIdea } from "./api";
@@ -17,7 +18,17 @@ function submitterLabel(idea: Idea): string {
   return "Someone";
 }
 
-function IdeaRow({ sessionId, idea, decisions }: { sessionId: string; idea: Idea; decisions: Array<{ id: string; title: string }> }) {
+function IdeaRow({
+  sessionId,
+  idea,
+  decisions,
+  terms,
+}: {
+  sessionId: string;
+  idea: Idea;
+  decisions: Array<{ id: string; title: string }>;
+  terms: Terminology;
+}) {
   const queryClient = useQueryClient();
   const [decisionId, setDecisionId] = useState("");
   const queryKey = ["sessions", sessionId, "organiser"];
@@ -36,9 +47,18 @@ function IdeaRow({ sessionId, idea, decisions }: { sessionId: string; idea: Idea
       <div className="idea-card__body">
         <h3>{idea.title}</h3>
         {idea.description ? <p>{idea.description}</p> : null}
+        {idea.requested_amount ? (
+          <p className="muted">
+            <strong>{terms.amountFieldLabel}:</strong> {idea.requested_amount}
+          </p>
+        ) : null}
         <small className="muted">{submitterLabel(idea)} · {idea.status_label} · {idea.vote_count} vote{idea.vote_count === 1 ? "" : "s"}</small>
         {promote.isError ? (
-          <StatusMessage kind="error">{promote.error instanceof ApiError ? promote.error.message : "Could not promote this idea."}</StatusMessage>
+          <StatusMessage kind="error">
+            {promote.error instanceof ApiError
+              ? promote.error.message
+              : `Could not promote this ${terms.ideaNoun.toLowerCase()}.`}
+          </StatusMessage>
         ) : null}
         {idea.status === "promoted" ? null : (
           <div className="button-row">
@@ -60,7 +80,7 @@ function IdeaRow({ sessionId, idea, decisions }: { sessionId: string; idea: Idea
               disabled={!decisionId || promote.isPending}
               onClick={() => promote.mutate()}
             >
-              {promote.isPending ? "Promoting…" : "Promote to option"}
+              {promote.isPending ? "Promoting…" : `Promote to ${terms.optionNoun.toLowerCase()}`}
             </button>
           </div>
         )}
@@ -77,6 +97,7 @@ export function OpenSessionOrganiserPage() {
   const queryKey = ["sessions", sessionId, "organiser"];
 
   const session = useQuery({ queryKey, queryFn: () => getOrganiserSession(sessionId), enabled: Boolean(sessionId) });
+  const terms = getTerminology(session.data?.decision_template_key);
   const portfolio = useQuery({
     queryKey: ["organisations", organisationId, "portfolio-decisions"],
     queryFn: () => getOrganisationPortfolio(organisationId, {}),
@@ -135,14 +156,20 @@ export function OpenSessionOrganiserPage() {
             <p className="muted">Anyone with this link can join and submit ideas once the session is open.</p>
           </section>
 
-          <section aria-label="Ideas">
-            <h2>Ideas ({session.data.ideas.length})</h2>
+          <section aria-label={terms.ideaNounPlural}>
+            <h2>{terms.ideaNounPlural} ({session.data.ideas.length})</h2>
             {session.data.ideas.length === 0 ? (
-              <p className="muted">No ideas submitted yet.</p>
+              <p className="muted">No {terms.ideaNounPlural.toLowerCase()} submitted yet.</p>
             ) : (
               <div className="idea-list">
                 {session.data.ideas.map((idea) => (
-                  <IdeaRow key={idea.id} sessionId={sessionId} idea={idea} decisions={portfolio.data?.decisions ?? []} />
+                  <IdeaRow
+                    key={idea.id}
+                    sessionId={sessionId}
+                    idea={idea}
+                    decisions={portfolio.data?.decisions ?? []}
+                    terms={terms}
+                  />
                 ))}
               </div>
             )}

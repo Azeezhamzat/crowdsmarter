@@ -40,6 +40,7 @@ const baseSession = {
   status_label: "Open",
   voting_enabled: true,
   submission_deadline: null,
+  decision_template_key: null,
   ideas: [],
 };
 
@@ -54,6 +55,7 @@ describe("OpenSessionPublicPage", () => {
       ...baseSession,
       ideas: [{
         id: "idea-1", title: "Solar-powered cold storage", description: "Shared cold storage.",
+        requested_amount: null,
         status: "submitted", status_label: "Submitted",
         submitted_by_participant: { name: "Amaka Obi" }, submitted_by_user: null,
         vote_count: 0, voted_by_me: false, created_at: "2026-08-01T10:00:00Z",
@@ -84,6 +86,7 @@ describe("OpenSessionPublicPage", () => {
       ...baseSession,
       ideas: [{
         id: "idea-1", title: "Existing idea", description: "",
+        requested_amount: null,
         status: "submitted", status_label: "Submitted",
         submitted_by_participant: { name: "Kwame" }, submitted_by_user: null,
         vote_count: 2, voted_by_me: false, created_at: "2026-08-01T10:00:00Z",
@@ -93,6 +96,7 @@ describe("OpenSessionPublicPage", () => {
       ...baseSession,
       ideas: [{
         id: "idea-1", title: "Existing idea", description: "",
+        requested_amount: null,
         status: "submitted", status_label: "Submitted",
         submitted_by_participant: { name: "Kwame" }, submitted_by_user: null,
         vote_count: 3, voted_by_me: true, created_at: "2026-08-01T10:00:00Z",
@@ -103,6 +107,28 @@ describe("OpenSessionPublicPage", () => {
     expect(await screen.findByText("Existing idea")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /vote \(2\)/i }));
     expect(await screen.findByRole("button", { name: /voted \(3\)/i })).toBeInTheDocument();
+  });
+
+  it("uses grant-round terminology and shows a requested-amount field when linked to a grant round", async () => {
+    vi.mocked(getStoredParticipantToken).mockReturnValue("existing-token");
+    vi.mocked(getPublicSession).mockResolvedValue({
+      ...baseSession,
+      decision_template_key: "grant_round",
+      ideas: [{
+        id: "idea-1", title: "Community garden expansion", description: "",
+        requested_amount: "15000.00",
+        status: "submitted", status_label: "Submitted",
+        submitted_by_participant: { name: "Ada" }, submitted_by_user: null,
+        vote_count: 0, voted_by_me: false, created_at: "2026-08-01T10:00:00Z",
+      }],
+    });
+
+    renderPage();
+    expect(await screen.findByRole("heading", { name: /submit an application/i })).toBeInTheDocument();
+    expect(screen.getByLabelText("Requested amount")).toBeInTheDocument();
+    expect(await screen.findByText("Community garden expansion")).toBeInTheDocument();
+    expect(screen.getByText(/requested amount:/i)).toBeInTheDocument();
+    expect(screen.getByText("15000.00")).toBeInTheDocument();
   });
 
   it("shows a not-found message for an invalid or unopened session link", async () => {

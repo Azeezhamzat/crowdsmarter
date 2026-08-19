@@ -128,6 +128,7 @@ export function DecisionReasoningPage() {
         <OptionsSection
           decisionId={decisionId}
           canContribute={current.can_contribute_reasoning}
+          templateKey={current.source_template_key}
         />
       ) : null}
       {section === "criteria" ? (
@@ -141,6 +142,7 @@ export function DecisionReasoningPage() {
         <EvidenceSection
           decisionId={decisionId}
           canContribute={current.can_contribute_reasoning}
+          templateKey={current.source_template_key}
         />
       ) : null}
       {section === "assumptions" ? (

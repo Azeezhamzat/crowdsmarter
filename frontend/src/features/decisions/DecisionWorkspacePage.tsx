@@ -294,7 +294,7 @@ export function DecisionWorkspacePage() {
 
       <details id="participants" className="workspace-disclosure" open={summary.participants.total < 2}>
         <summary><div><strong>Participants and roles</strong><span>{summary.participants.total} active participant(s)</span></div></summary>
-        <div className="disclosure-body"><ParticipantsPanel decisionId={current.id} canManage={current.can_manage_participants} /></div>
+        <div className="disclosure-body"><ParticipantsPanel decisionId={current.id} canManage={current.can_manage_participants} templateKey={current.source_template_key} /></div>
       </details>
 
       <details className="workspace-disclosure">

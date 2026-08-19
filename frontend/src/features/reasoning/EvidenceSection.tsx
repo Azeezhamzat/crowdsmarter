@@ -6,6 +6,7 @@ import { z } from "zod";
 import { FieldError } from "../../components/FieldError";
 import { StatusMessage } from "../../components/StatusMessage";
 import { ApiError } from "../../lib/api";
+import { getTerminology } from "../../lib/terminology";
 import { getDecision } from "../decisions/api";
 import { listSources } from "../foresight/api";
 import {
@@ -55,12 +56,15 @@ type EvidenceForm = z.infer<typeof evidenceSchema>;
 type EvidenceSectionProps = {
   decisionId: string;
   canContribute: boolean;
+  templateKey?: string | null;
 };
 
 export function EvidenceSection({
   decisionId,
   canContribute,
+  templateKey,
 }: EvidenceSectionProps) {
+  const terms = getTerminology(templateKey);
   const queryClient = useQueryClient();
   const query = useQuery({
     queryKey: ["decisions", decisionId, "evidence"],
@@ -130,14 +134,14 @@ export function EvidenceSection({
     <div className="reasoning-grid">
       <section className="page-primary">
         <p className="eyebrow">Traceable support</p>
-        <h2>Evidence</h2>
+        <h2>{terms.evidenceNoun}</h2>
         <p className="muted">
           Record what a source indicates, where it came from, and whether it
-          supports or challenges an option.
+          supports or challenges one of the {terms.optionNounPlural.toLowerCase()}.
         </p>
-        {query.isPending ? <p>Loading evidence…</p> : null}
+        {query.isPending ? <p>Loading {terms.evidenceNoun.toLowerCase()}…</p> : null}
         {query.isError ? (
-          <StatusMessage kind="error">Evidence could not be loaded.</StatusMessage>
+          <StatusMessage kind="error">{terms.evidenceNoun} could not be loaded.</StatusMessage>
         ) : null}
         <div className="reasoning-list">
           {query.data?.map((item) => (
@@ -177,7 +181,7 @@ export function EvidenceSection({
               <p>{item.summary}</p>
               {optionTitle(item.option_id) ? (
                 <p>
-                  <strong>Related option:</strong> {optionTitle(item.option_id)}
+                  <strong>Related {terms.optionNoun.toLowerCase()}:</strong> {optionTitle(item.option_id)}
                 </p>
               ) : null}
               <p>
@@ -197,17 +201,17 @@ export function EvidenceSection({
             </article>
           ))}
           {query.data?.length === 0 ? (
-            <p className="muted">No evidence has been recorded.</p>
+            <p className="muted">No {terms.evidenceNoun.toLowerCase()} has been recorded.</p>
           ) : null}
         </div>
       </section>
 
       <aside className="side-panel">
         <p className="eyebrow">Attributable source</p>
-        <h2>Add evidence</h2>
+        <h2>Add {terms.evidenceNoun.toLowerCase()}</h2>
         {!canContribute ? (
           <p className="muted">
-            New evidence cannot be added in this state by your role.
+            New {terms.evidenceNoun.toLowerCase()} cannot be added in this state by your role.
           </p>
         ) : (
           <form
@@ -226,9 +230,9 @@ export function EvidenceSection({
             />
             <FieldError message={form.formState.errors.summary?.message} />
 
-            <label htmlFor="evidence-option">Related option</label>
+            <label htmlFor="evidence-option">Related {terms.optionNoun.toLowerCase()}</label>
             <select id="evidence-option" {...form.register("option_id")}>
-              <option value="">Whole decision</option>
+              <option value="">Whole {terms.decisionNoun.toLowerCase()}</option>
               {options.data
                 ?.filter((item) => item.status === "active")
                 .map((item) => (
@@ -308,7 +312,7 @@ export function EvidenceSection({
               <StatusMessage kind="error">
                 {create.error instanceof ApiError
                   ? create.error.message
-                  : "Evidence could not be saved."}
+                  : `${terms.evidenceNoun} could not be saved.`}
               </StatusMessage>
             ) : null}
             <button
@@ -316,7 +320,7 @@ export function EvidenceSection({
               type="submit"
               disabled={create.isPending}
             >
-              {create.isPending ? "Saving…" : "Add evidence"}
+              {create.isPending ? "Saving…" : `Add ${terms.evidenceNoun.toLowerCase()}`}
             </button>
           </form>
         )}

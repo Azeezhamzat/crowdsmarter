@@ -43,13 +43,15 @@ describe("OrganisationSessionsPage", () => {
       {
         id: "s1", title: "Q3 ideathon", prompt: "How do we cut onboarding time in half?", status: "open",
         status_label: "Open", public_slug: "abc123", decision_id: null, decision_title: null,
+        decision_template_key: null,
         voting_enabled: true, idea_count: 4, created_by: { id: "u1", email: "owner@example.com", first_name: "", last_name: "" },
         created_at: "2026-08-01T10:00:00Z",
       },
     ]);
     vi.mocked(createOrganisationSession).mockResolvedValue({
       id: "s2", title: "New session", prompt: "What should we try?", status: "draft", status_label: "Draft",
-      public_slug: "xyz789", decision_id: null, decision_title: null, voting_enabled: true, idea_count: 0,
+      public_slug: "xyz789", decision_id: null, decision_title: null, decision_template_key: null,
+      voting_enabled: true, idea_count: 0,
       created_by: { id: "u1", email: "owner@example.com", first_name: "", last_name: "" }, created_at: "2026-08-02T10:00:00Z",
     });
 

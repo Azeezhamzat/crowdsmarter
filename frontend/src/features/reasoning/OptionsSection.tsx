@@ -6,6 +6,7 @@ import { z } from "zod";
 import { FieldError } from "../../components/FieldError";
 import { StatusMessage } from "../../components/StatusMessage";
 import { ApiError } from "../../lib/api";
+import { getTerminology } from "../../lib/terminology";
 import { createOption, listOptions, updateOption } from "./api";
 
 const optionSchema = z
@@ -50,12 +51,15 @@ type OptionForm = z.infer<typeof optionSchema>;
 type OptionsSectionProps = {
   decisionId: string;
   canContribute: boolean;
+  templateKey?: string | null;
 };
 
 export function OptionsSection({
   decisionId,
   canContribute,
+  templateKey,
 }: OptionsSectionProps) {
+  const terms = getTerminology(templateKey);
   const queryClient = useQueryClient();
   const query = useQuery({
     queryKey: ["decisions", decisionId, "options"],
@@ -118,14 +122,14 @@ export function OptionsSection({
     <div className="reasoning-grid">
       <section className="page-primary">
         <p className="eyebrow">Alternatives</p>
-        <h2>Decision options</h2>
+        <h2>{terms.optionNounPlural}</h2>
         <p className="muted">
           Preserve credible alternatives, including the status quo where it is a
           real choice.
         </p>
-        {query.isPending ? <p>Loading options…</p> : null}
+        {query.isPending ? <p>Loading {terms.optionNounPlural.toLowerCase()}…</p> : null}
         {query.isError ? (
-          <StatusMessage kind="error">Options could not be loaded.</StatusMessage>
+          <StatusMessage kind="error">{terms.optionNounPlural} could not be loaded.</StatusMessage>
         ) : null}
         <div className="reasoning-list">
           {query.data?.map((option) => (
@@ -183,7 +187,7 @@ export function OptionsSection({
               ) : null}
               {option.estimated_cost ? (
                 <p>
-                  <strong>Estimated cost:</strong> {option.estimated_cost}
+                  <strong>{terms.amountFieldLabel}:</strong> {option.estimated_cost}
                   {option.cost_notes ? ` — ${option.cost_notes}` : ""}
                 </p>
               ) : null}
@@ -220,17 +224,17 @@ export function OptionsSection({
             </article>
           ))}
           {query.data?.length === 0 ? (
-            <p className="muted">No options have been recorded.</p>
+            <p className="muted">No {terms.optionNounPlural.toLowerCase()} have been recorded.</p>
           ) : null}
         </div>
       </section>
 
       <aside className="side-panel">
         <p className="eyebrow">Human contribution</p>
-        <h2>Add an option</h2>
+        <h2>{terms.addOptionCta}</h2>
         {!canContribute ? (
           <p className="muted">
-            Your role or the current lifecycle state does not permit new options.
+            Your role or the current lifecycle state does not permit new {terms.optionNounPlural.toLowerCase()}.
           </p>
         ) : (
           <form
@@ -265,7 +269,7 @@ export function OptionsSection({
 
             <div className="form-row">
               <div>
-                <label htmlFor="option-cost">Estimated cost</label>
+                <label htmlFor="option-cost">{terms.amountFieldLabel}</label>
                 <input
                   id="option-cost"
                   type="number"
@@ -372,7 +376,7 @@ export function OptionsSection({
               <StatusMessage kind="error">
                 {create.error instanceof ApiError
                   ? create.error.message
-                  : "The option could not be saved."}
+                  : `The ${terms.optionNoun.toLowerCase()} could not be saved.`}
               </StatusMessage>
             ) : null}
             <button
@@ -380,7 +384,7 @@ export function OptionsSection({
               type="submit"
               disabled={create.isPending}
             >
-              {create.isPending ? "Saving…" : "Add option"}
+              {create.isPending ? "Saving…" : `Add ${terms.optionNoun.toLowerCase()}`}
             </button>
           </form>
         )}

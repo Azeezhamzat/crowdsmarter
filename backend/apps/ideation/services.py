@@ -159,6 +159,7 @@ def submit_idea(
     user: User | None = None,
     title: str,
     description: str = "",
+    requested_amount: Any | None = None,
 ) -> Idea:
     if session.status != OpenSession.Status.OPEN:
         raise IdeationServiceError("This session is not currently accepting submissions.")
@@ -166,6 +167,7 @@ def submit_idea(
         session=session,
         title=title,
         description=description,
+        requested_amount=requested_amount,
         submitted_by_participant=participant,
         submitted_by_user=user,
     )
@@ -232,7 +234,13 @@ def promote_idea_to_decision(*, actor: User, idea: Idea, decision: Decision):
         raise IdeationServiceError("This idea has already been promoted.")
     if decision.organisation_id != idea.session.organisation_id:
         raise IdeationServiceError({"decision": "The decision must belong to this session's organisation."})
-    option = create_option(actor=actor, decision=decision, title=idea.title, description=idea.description)
+    option = create_option(
+        actor=actor,
+        decision=decision,
+        title=idea.title,
+        description=idea.description,
+        estimated_cost=idea.requested_amount,
+    )
     idea.status = Idea.Status.PROMOTED
     idea.promoted_to_option = option
     idea.full_clean(validate_unique=False, validate_constraints=False)
@@ -297,7 +305,7 @@ PUBLICLY_VISIBLE_STATUSES = {OpenSession.Status.OPEN, OpenSession.Status.CLOSED,
 
 def public_session_by_slug(*, public_slug: str) -> OpenSession:
     session = get_object_or_404(
-        OpenSession.objects.select_related("organisation"),
+        OpenSession.objects.select_related("organisation", "decision"),
         public_slug=public_slug,
     )
     if session.status not in PUBLICLY_VISIBLE_STATUSES:
