@@ -257,8 +257,18 @@
     border-radius: 34px;
     filter: blur(22px);
   }
-  .hero-particles { position: absolute; inset: 1.3% 1.3% .9% 1.3%; z-index: 0; border-radius: 30px; overflow: hidden; pointer-events: none; }
-  .hero-visual > svg { position: relative; z-index: 1; width: 100%; height: auto; filter: drop-shadow(0 26px 55px rgba(15,47,53,.14)); }
+  .hero-video {
+    position: relative;
+    z-index: 1;
+    display: block;
+    width: 100%;
+    aspect-ratio: 620 / 560;
+    object-fit: cover;
+    border-radius: 30px;
+    background: #eef7f5;
+    box-shadow: 0 26px 55px rgba(15,47,53,.16), 0 0 0 1.5px #d9e1dc;
+  }
+  .hero-particles { position: absolute; inset: 0; z-index: 2; border-radius: 30px; overflow: hidden; pointer-events: none; mix-blend-mode: screen; opacity: .75; }
   .hero-visual__chip {
     position: absolute;
     z-index: 2;
@@ -696,129 +706,10 @@
         </div>
       </div>
 
-      <div class="hero-visual" aria-label="Illustration of a grant round from open call and community input to a reviewed, traceable award decision">
+      <div class="hero-visual" aria-label="Video: a grant round moving from open call and community input to a reviewed, traceable award decision">
+        <video class="hero-video" id="heroVideo" src="assets/hero.mp4" autoplay muted loop playsinline preload="auto" aria-hidden="true" tabindex="-1"></video>
         <canvas class="hero-particles" id="heroParticles" aria-hidden="true"></canvas>
         <div class="hero-visual__chip hero-visual__chip--top">Evidence trail maintained</div>
-        <svg viewBox="0 0 620 560" role="img" aria-labelledby="heroDiagramTitle heroDiagramDesc">
-          <title id="heroDiagramTitle">CrowdSmarter grant round workflow</title>
-          <desc id="heroDiagramDesc">Applications and community input flow into structured reviewer scoring, producing a human-authorised award record linked to reporting and the next round.</desc>
-          <defs>
-            <linearGradient id="heroCanvas" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stop-color="#ffffff"/>
-              <stop offset="100%" stop-color="#eef7f5"/>
-            </linearGradient>
-            <filter id="softShadow" x="-20%" y="-20%" width="140%" height="150%">
-              <feDropShadow dx="0" dy="12" stdDeviation="14" flood-color="#0f2f35" flood-opacity=".09"/>
-            </filter>
-          </defs>
-
-          <rect x="8" y="8" width="604" height="544" rx="30" fill="url(#heroCanvas)" stroke="#d9e1dc" stroke-width="1.5"/>
-          <rect x="8" y="8" width="604" height="58" rx="30" fill="#ffffff"/>
-          <path d="M8 66h604" stroke="#d9e1dc"/>
-          <circle cx="36" cy="37" r="5" fill="#d9e1dc"/>
-          <circle cx="54" cy="37" r="5" fill="#d9e1dc"/>
-          <circle cx="72" cy="37" r="5" fill="#d9e1dc"/>
-          <text x="100" y="42" fill="#0f2f35" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="800">Grant round workspace</text>
-          <rect x="489" y="24" width="94" height="26" rx="13" fill="#eef7f5" stroke="#cdeae2"/>
-          <circle cx="507" cy="37" r="4" fill="#1b7a72" style="animation: pulseDot 2.2s ease-in-out infinite; transform-box: fill-box; transform-origin: center;"/>
-          <text x="519" y="41" fill="#123d43" font-family="Inter, Arial, sans-serif" font-size="10" font-weight="800">LIVE ROUND</text>
-
-          <text x="40" y="96" fill="#1b7a72" font-family="Inter, Arial, sans-serif" font-size="10" font-weight="800" letter-spacing="1.4">ANTICIPATE</text>
-          <text x="226" y="96" fill="#1b7a72" font-family="Inter, Arial, sans-serif" font-size="10" font-weight="800" letter-spacing="1.4">DELIBERATE</text>
-          <text x="430" y="96" fill="#1b7a72" font-family="Inter, Arial, sans-serif" font-size="10" font-weight="800" letter-spacing="1.4">DECIDE</text>
-
-          <!-- Applications and evidence -->
-          <g filter="url(#softShadow)" class="stage-panel stage-panel--anticipate">
-            <rect x="38" y="114" width="158" height="308" rx="18" fill="#ffffff" stroke="#d9e1dc"/>
-          </g>
-          <text x="58" y="143" fill="#0f2f35" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="800">Applications</text>
-          <text x="58" y="162" fill="#5a6f6a" font-family="Inter, Arial, sans-serif" font-size="10.5">Tied to the round</text>
-
-          <rect x="56" y="184" width="122" height="54" rx="10" fill="#eef7f5" stroke="#cdeae2"/>
-          <circle cx="72" cy="201" r="5" fill="#1b7a72"/>
-          <text x="84" y="204" fill="#123d43" font-family="Inter, Arial, sans-serif" font-size="10.5" font-weight="800">ELIGIBILITY MET</text>
-          <rect x="70" y="216" width="88" height="6" rx="3" fill="#d9e1dc"/>
-
-          <rect x="56" y="250" width="122" height="54" rx="10" fill="#ffffff" stroke="#d9e1dc"/>
-          <circle cx="72" cy="267" r="5" fill="#3a9a90"/>
-          <text x="84" y="270" fill="#123d43" font-family="Inter, Arial, sans-serif" font-size="10.5" font-weight="800">COMMUNITY VOTE</text>
-          <rect x="70" y="282" width="76" height="6" rx="3" fill="#d9e1dc"/>
-
-          <rect x="56" y="316" width="122" height="54" rx="10" fill="#ffffff" stroke="#d9e1dc"/>
-          <circle cx="72" cy="333" r="5" fill="#0f2f35"/>
-          <text x="84" y="336" fill="#123d43" font-family="Inter, Arial, sans-serif" font-size="10.5" font-weight="800">COSTS REVIEWED</text>
-          <rect x="70" y="348" width="96" height="6" rx="3" fill="#d9e1dc"/>
-
-          <rect x="56" y="386" width="122" height="20" rx="10" fill="#0f2f35"/>
-          <text x="117" y="400" text-anchor="middle" fill="#dbf0e8" font-family="Inter, Arial, sans-serif" font-size="9.5" font-weight="800">24 APPLICATIONS</text>
-
-          <!-- Connectors -->
-          <path class="flow-connector" d="M196 267h25" stroke="#1b7a72" stroke-width="2.3" stroke-linecap="round" stroke-dasharray="5 4"/>
-          <path d="m216 261 7 6-7 6" fill="none" stroke="#1b7a72" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>
-          <path class="flow-connector" d="M405 267h17" stroke="#1b7a72" stroke-width="2.3" stroke-linecap="round" stroke-dasharray="5 4"/>
-          <path d="m417 261 7 6-7 6" fill="none" stroke="#1b7a72" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>
-
-          <!-- Reviewer scoring -->
-          <g filter="url(#softShadow)" class="stage-panel stage-panel--deliberate">
-            <rect x="222" y="114" width="184" height="308" rx="18" fill="#ffffff" stroke="#d9e1dc"/>
-          </g>
-          <text x="242" y="143" fill="#0f2f35" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="800">Reviewer scoring</text>
-          <text x="242" y="162" fill="#5a6f6a" font-family="Inter, Arial, sans-serif" font-size="10.5">Independent scores, then synthesis</text>
-
-          <text x="242" y="198" fill="#33473f" font-family="Inter, Arial, sans-serif" font-size="10.5" font-weight="700">Community garden expansion</text>
-          <rect x="242" y="208" width="142" height="10" rx="5" fill="#d9e1dc"/>
-          <rect class="score-bar score-bar--a" x="242" y="208" width="108" height="10" rx="5" fill="#1b7a72" style="transform-box: fill-box;"/>
-          <text x="384" y="217" text-anchor="end" fill="#123d43" font-family="Inter, Arial, sans-serif" font-size="9" font-weight="800">76</text>
-
-          <text x="242" y="246" fill="#33473f" font-family="Inter, Arial, sans-serif" font-size="10.5" font-weight="700">Youth mentoring programme</text>
-          <rect x="242" y="256" width="142" height="10" rx="5" fill="#d9e1dc"/>
-          <rect class="score-bar score-bar--b" x="242" y="256" width="81" height="10" rx="5" fill="#3a9a90" style="transform-box: fill-box;"/>
-          <text x="384" y="265" text-anchor="end" fill="#123d43" font-family="Inter, Arial, sans-serif" font-size="9" font-weight="800">57</text>
-
-          <rect x="242" y="292" width="144" height="78" rx="11" fill="#eef7f5" stroke="#cdeae2"/>
-          <text x="258" y="314" fill="#1b7a72" font-family="Inter, Arial, sans-serif" font-size="9" font-weight="800" letter-spacing=".7">MINORITY VIEW</text>
-          <text x="258" y="335" fill="#123d43" font-family="Inter, Arial, sans-serif" font-size="10.5" font-weight="700">1 reviewer flags a risk</text>
-          <rect x="258" y="348" width="105" height="6" rx="3" fill="#d9e1dc"/>
-
-          <g transform="translate(242 387)">
-            <circle cx="9" cy="9" r="9" fill="#0f2f35"/>
-            <circle cx="31" cy="9" r="9" fill="#1b7a72"/>
-            <circle cx="53" cy="9" r="9" fill="#3a9a90"/>
-            <circle cx="75" cy="9" r="9" fill="#d9e1dc"/>
-            <text x="98" y="13" fill="#5a6f6a" font-family="Inter, Arial, sans-serif" font-size="8.8" font-weight="700">9 reviewers</text>
-          </g>
-
-          <!-- Award record -->
-          <g filter="url(#softShadow)" class="stage-panel stage-panel--decide">
-            <rect x="424" y="114" width="168" height="308" rx="18" fill="#0f2f35" stroke="#0f2f35"/>
-          </g>
-          <rect x="442" y="134" width="132" height="24" rx="12" fill="rgba(255,255,255,.09)"/>
-          <circle cx="457" cy="146" r="4" fill="#8fd6cb"/>
-          <text x="468" y="150" fill="#dbf0e8" font-family="Inter, Arial, sans-serif" font-size="8.6" font-weight="800">READY FOR AWARD</text>
-          <text x="442" y="184" fill="#8fd6cb" font-family="Inter, Arial, sans-serif" font-size="9.2" font-weight="800" letter-spacing=".7">AWARD RECORD</text>
-          <text x="442" y="216" fill="#ffffff" font-family="Inter, Arial, sans-serif" font-size="15.5" font-weight="800">Fund the garden</text>
-          <text x="442" y="242" fill="#ffffff" font-family="Inter, Arial, sans-serif" font-size="16.5" font-weight="800">expansion</text>
-          <path d="M442 266h132" stroke="rgba(255,255,255,.16)"/>
-
-          <text x="442" y="289" fill="#9fc4bd" font-family="Inter, Arial, sans-serif" font-size="9.2" font-weight="700">GRANT OWNER</text>
-          <text x="442" y="309" fill="#ffffff" font-family="Inter, Arial, sans-serif" font-size="11.2" font-weight="800">Program Officer</text>
-          <text x="442" y="336" fill="#9fc4bd" font-family="Inter, Arial, sans-serif" font-size="9.2" font-weight="700">REVIEW CONDITION</text>
-          <text x="442" y="356" fill="#ffffff" font-family="Inter, Arial, sans-serif" font-size="11.2" font-weight="800">Report due Q3</text>
-          <rect x="442" y="376" width="132" height="30" rx="15" fill="#ffffff"/>
-          <path d="m457 391 4 4 8-9" fill="none" stroke="#1b7a72" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          <text x="476" y="395" fill="#0f2f35" font-family="Inter, Arial, sans-serif" font-size="8.8" font-weight="800">AWARD CONFIRMED</text>
-
-          <!-- Reporting and learning ribbon -->
-          <rect x="38" y="452" width="544" height="68" rx="16" fill="#ffffff" stroke="#d9e1dc"/>
-          <circle cx="68" cy="486" r="16" fill="#eef7f5" stroke="#cdeae2"/>
-          <path d="m61 486 5 5 10-12" fill="none" stroke="#1b7a72" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-          <text x="96" y="482" fill="#0f2f35" font-family="Inter, Arial, sans-serif" font-size="11.5" font-weight="800">Award terms and reporting stay linked</text>
-          <text x="96" y="500" fill="#5a6f6a" font-family="Inter, Arial, sans-serif" font-size="9.5">The reasoning survives the funding cycle and improves the next round.</text>
-          <path d="M446 486h72" stroke="#d9e1dc" stroke-width="2" stroke-linecap="round"/>
-          <circle cx="476" cy="486" r="5" fill="#1b7a72"/>
-          <circle cx="518" cy="486" r="5" fill="#0f2f35"/>
-          <text x="545" y="490" fill="#1b7a72" font-family="Inter, Arial, sans-serif" font-size="9" font-weight="800">LEARN</text>
-        </svg>
         <div class="hero-visual__chip hero-visual__chip--bottom">Human authority retained</div>
       </div>
     </div>
@@ -1047,6 +938,7 @@
     var canvas = document.getElementById("heroParticles");
     if (!canvas || !canvas.getContext) return;
 
+    var video = document.getElementById("heroVideo");
     var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     var ctx = canvas.getContext("2d");
     var container = canvas.parentElement;
@@ -1124,6 +1016,7 @@
     }
 
     function start() {
+      if (video) { video.play().catch(function () {}); }
       if (running || reduceMotion) return;
       running = true;
       raf = window.requestAnimationFrame(loop);
@@ -1133,6 +1026,7 @@
       running = false;
       if (raf) window.cancelAnimationFrame(raf);
       raf = null;
+      if (video) video.pause();
     }
 
     function init() {
@@ -1140,6 +1034,11 @@
       seed(bounds);
       if (reduceMotion) {
         step(bounds);
+        if (video) {
+          video.removeAttribute("autoplay");
+          video.pause();
+          video.addEventListener("loadeddata", function () { video.currentTime = 0; }, { once: true });
+        }
         return;
       }
       if (!("IntersectionObserver" in window)) {
