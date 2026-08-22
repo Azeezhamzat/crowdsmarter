@@ -6,8 +6,9 @@ from apps.organisations.models import Membership
 from apps.participants.models import ConflictOfInterest, Participant
 from apps.participants.services import declare_conflict
 
-from apps.evaluations.models import EvaluationRound, PrioritisationPortfolio
+from apps.evaluations.models import EvaluationExercise, EvaluationRound, PrioritisationPortfolio
 from apps.evaluations.services import (
+    EvaluationServiceError,
     add_candidate,
     add_portfolio_criterion,
     create_criterion,
@@ -19,6 +20,7 @@ from apps.evaluations.services import (
     portfolio_recommendation,
     save_portfolio_assessment,
     save_submission,
+    scoring_options_for_exercise,
     transition_round,
     update_portfolio,
 )
@@ -719,3 +721,129 @@ def test_blind_portfolio_seals_aggregates_and_requires_closure_for_selection(
     visible = portfolio_recommendation(portfolio=portfolio)
     assert visible["hidden"] is False
     assert visible["candidates"][0]["recommended"] is True
+
+
+@pytest.mark.django_db
+def test_ranked_choice_instant_runoff_picks_majority_winner_after_elimination(
+    organisation_factory, decision_factory, user_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    voters = [owner]
+    for index in range(2, 6):
+        voter = user_factory(email=f"voter{index}@example.com")
+        Membership.objects.create(
+            organisation=organisation, user=voter, role=Membership.Role.CONTRIBUTOR, status=Membership.Status.ACTIVE,
+        )
+        voters.append(voter)
+    decision = decision_factory(
+        workspace=organisation.workspaces.get(is_default=True), owner=owner, title="Pick one community grant",
+    )
+    for voter in voters[1:]:
+        Participant.objects.create(
+            organisation=organisation, decision=decision, user=voter, role=Participant.Role.CONTRIBUTOR, added_by=owner,
+        )
+    option_a = create_option(actor=owner, decision=decision, title="Option A", description="Water access.")
+    option_b = create_option(actor=owner, decision=decision, title="Option B", description="School meals.")
+    option_c = create_option(actor=owner, decision=decision, title="Option C", description="Solar lighting.")
+
+    exercise = create_exercise(
+        actor=owner, decision=decision, owner_id=owner.id, title="Community pick", purpose="Choose one grant.",
+        method="ranked_choice", anonymity="attributed", blind_results_until_close=False, quorum_count=1,
+        approval_threshold=60, objection_threshold=20,
+    )
+    round_item = create_round(actor=owner, exercise=exercise)
+    transition_round(actor=owner, round=round_item, status=EvaluationRound.Status.OPEN)
+
+    # Ballots: 2x[A,B,C], 2x[B,C,A], 1x[C,A,B]
+    ballots = [
+        [option_a, option_b, option_c],
+        [option_a, option_b, option_c],
+        [option_b, option_c, option_a],
+        [option_b, option_c, option_a],
+        [option_c, option_a, option_b],
+    ]
+    for voter, ballot in zip(voters, ballots):
+        save_submission(
+            actor=voter, round=round_item, confidence=3, overall_rationale="",
+            responses=[{"option_id": option.id, "rank": rank} for rank, option in enumerate(ballot, start=1)],
+        )
+
+    result = evaluation_results(round=round_item, viewer=owner)
+    assert result["method"] == "ranked_choice"
+    order = [row["option_id"] for row in result["options"]]
+    assert order == [str(option_a.id), str(option_b.id), str(option_c.id)]
+    assert result["options"][0]["final_rank"] == 1
+    assert result["options"][0]["eliminated_in_round"] is None
+    assert result["options"][2]["eliminated_in_round"] == 1
+    assert len(result["ranked_choice_rounds"]) == 2
+    assert result["ranked_choice_rounds"][0]["eliminated_option_id"] == str(option_c.id)
+
+
+@pytest.mark.django_db
+def test_ranked_choice_rejects_incomplete_or_repeated_ranks(
+    organisation_factory, decision_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    decision = decision_factory(
+        workspace=organisation.workspaces.get(is_default=True), owner=owner, title="Pick a grant",
+    )
+    first = create_option(actor=owner, decision=decision, title="First", description="d")
+    second = create_option(actor=owner, decision=decision, title="Second", description="d")
+    exercise = create_exercise(
+        actor=owner, decision=decision, owner_id=owner.id, title="Ranked pick", purpose="p",
+        method="ranked_choice", anonymity="attributed", blind_results_until_close=False, quorum_count=1,
+        approval_threshold=60, objection_threshold=20,
+    )
+    round_item = create_round(actor=owner, exercise=exercise)
+    transition_round(actor=owner, round=round_item, status=EvaluationRound.Status.OPEN)
+
+    with pytest.raises(EvaluationServiceError):
+        save_submission(
+            actor=owner, round=round_item, confidence=3, overall_rationale="",
+            responses=[{"option_id": first.id, "rank": 1}, {"option_id": second.id, "rank": 1}],
+        )
+    with pytest.raises(EvaluationServiceError):
+        save_submission(
+            actor=owner, round=round_item, confidence=3, overall_rationale="",
+            responses=[{"option_id": first.id, "vote": "approve"}, {"option_id": second.id, "rank": 2}],
+        )
+
+
+@pytest.mark.django_db
+def test_blind_applicant_identity_hides_titles_until_managers_or_close(
+    organisation_factory, decision_factory, user_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    contributor = user_factory(email="blind-reviewer@example.com")
+    Membership.objects.create(
+        organisation=organisation, user=contributor, role=Membership.Role.CONTRIBUTOR, status=Membership.Status.ACTIVE,
+    )
+    decision = decision_factory(
+        workspace=organisation.workspaces.get(is_default=True), owner=owner, title="Blind review round",
+    )
+    Participant.objects.create(
+        organisation=organisation, decision=decision, user=contributor, role=Participant.Role.CONTRIBUTOR, added_by=owner,
+    )
+    first = create_option(actor=owner, decision=decision, title="Alpha Farms Cooperative", description="d")
+    second = create_option(actor=owner, decision=decision, title="Beta Youth Trust", description="d")
+    exercise = create_exercise(
+        actor=owner, decision=decision, owner_id=owner.id, title="Blind scorecard", purpose="p",
+        method="scorecard", anonymity="attributed", blind_results_until_close=False, blind_applicant_identity=True,
+        quorum_count=1, approval_threshold=60, objection_threshold=20,
+    )
+
+    manager_view = scoring_options_for_exercise(exercise=exercise, viewer=owner)
+    assert all(not row["blinded"] for row in manager_view)
+    assert {row["title"] for row in manager_view} == {"Alpha Farms Cooperative", "Beta Youth Trust"}
+
+    reviewer_view = scoring_options_for_exercise(exercise=exercise, viewer=contributor)
+    assert all(row["blinded"] for row in reviewer_view)
+    assert {row["title"] for row in reviewer_view} == {"Application A", "Application B"}
+
+    exercise.status = EvaluationExercise.Status.CLOSED
+    exercise.save(update_fields=["status", "updated_at"])
+    closed_view = scoring_options_for_exercise(exercise=exercise, viewer=contributor)
+    assert all(not row["blinded"] for row in closed_view)

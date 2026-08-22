@@ -1,8 +1,11 @@
-import { render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
+import { setLocale } from "../../lib/i18n";
 import { LandingPage } from "./LandingPage";
+
+afterEach(() => setLocale("en"));
 
 describe("LandingPage", () => {
   it("presents a coherent participatory-grantmaking proposition and demo conversion path", () => {
@@ -49,5 +52,23 @@ describe("LandingPage", () => {
 
     expect(screen.getByRole("heading", { name: /see whether crowdsmarter fits your next round/i })).toBeInTheDocument();
     expect(screen.getByText(/working with organisations across africa, europe, and the middle east/i)).toBeInTheDocument();
+  });
+
+  it("switches the visible copy to French and Portuguese and persists the choice", () => {
+    render(<MemoryRouter><LandingPage /></MemoryRouter>);
+
+    act(() => {
+      fireEvent.change(screen.getByRole("combobox", { name: "Language" }), { target: { value: "fr" } });
+    });
+    expect(screen.getAllByRole("link", { name: "Se connecter" })[0]).toHaveAttribute("href", "/login");
+    expect(screen.getByText(/plateforme/i)).toBeInTheDocument();
+
+    act(() => {
+      fireEvent.change(screen.getByRole("combobox", { name: "Language" }), { target: { value: "pt" } });
+    });
+    expect(screen.getAllByRole("link", { name: "Entrar" })[0]).toHaveAttribute("href", "/login");
+    expect(screen.getByText(/plataforma/i)).toBeInTheDocument();
+
+    expect(window.localStorage.getItem("crowdsmarter:locale")).toBe("pt");
   });
 });

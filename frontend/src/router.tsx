@@ -3,6 +3,8 @@ import { createBrowserRouter } from "react-router";
 import { RouteAccessibility } from "./components/RouteAccessibility";
 
 import { OrganisationAuditPage } from "./features/audit/OrganisationAuditPage";
+import { MyApplicationsPage } from "./features/applicants/MyApplicationsPage";
+import { TrustPage } from "./features/trust/TrustPage";
 import { DecisionAIReviewPage } from "./features/ai-assistance/DecisionAIReviewPage";
 import { DecisionCollaborationPage } from "./features/collaboration/DecisionCollaborationPage";
 import { OrganisationAnalyticsPage } from "./features/analytics/OrganisationAnalyticsPage";
@@ -56,6 +58,8 @@ export const router = createBrowserRouter([
   { path: "/reset-password", element: <ResetPasswordPage /> },
   { path: "/accept-invitation", element: <AcceptInvitationPage /> },
   { path: "/s/:publicSlug", element: <OpenSessionPublicPage /> },
+  { path: "/my-applications", element: <MyApplicationsPage /> },
+  { path: "/trust", element: <TrustPage /> },
   {
     element: <ProtectedRoute />,
     children: [

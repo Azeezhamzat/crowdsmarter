@@ -23,6 +23,32 @@ from apps.participants.services import conflicts_for_decision
 from .models import (EvaluationCriterion, EvaluationExercise, EvaluationResponse, EvaluationRound, EvaluationSubmission, MinorityReport, PortfolioAssessment, PortfolioCandidate, PortfolioCriterion, PortfolioSelection, PrioritisationPortfolio)
 from .policies import can_assess_portfolio, can_manage_exercise, can_manage_portfolio, can_submit_evaluation
 
+APPLICATION_LABEL_FORMAT = "Application {index}"
+
+
+def scoring_options_for_exercise(*, exercise, viewer):
+    """Active options for the scoring/ballot form, blinded to 'Application N' for non-managers.
+
+    Blinding only applies while the exercise hasn't closed - once closed, the
+    real title is restored for everyone, matching the plan's "revealed after
+    the round closes" rule. A manager always sees the real title, since they
+    administer eligibility/outcome regardless of blinding.
+    """
+    active_options = list(exercise.decision.options.filter(status=DecisionOption.Status.ACTIVE).order_by("created_at", "id"))
+    reveal = (
+        not exercise.blind_applicant_identity
+        or exercise.status in {EvaluationExercise.Status.CLOSED, EvaluationExercise.Status.ARCHIVED}
+        or can_manage_exercise(actor=viewer, exercise=exercise)
+    )
+    rows = []
+    for index, option in enumerate(active_options):
+        rows.append({
+            "id": str(option.id),
+            "title": option.title if reveal else APPLICATION_LABEL_FORMAT.format(index=chr(65 + index) if index < 26 else index + 1),
+            "blinded": not reveal,
+        })
+    return rows
+
 
 class EvaluationServiceError(ValidationError):
     pass
@@ -177,8 +203,10 @@ def _validate_responses(*, exercise, responses):
     active_options = {str(item.id): item for item in exercise.decision.options.filter(status=DecisionOption.Status.ACTIVE)}
     criteria = {str(item.id): item for item in exercise.criteria.all()}
     expected_scorecard = exercise.method in {EvaluationExercise.Method.SCORECARD, EvaluationExercise.Method.DELPHI}
+    is_ranked_choice = exercise.method == EvaluationExercise.Method.RANKED_CHOICE
     cleaned = []
     seen = set()
+    ranks_used = set()
     for value in responses:
         option = active_options.get(str(value["option_id"]))
         if option is None:
@@ -200,12 +228,23 @@ def _validate_responses(*, exercise, responses):
             raise EvaluationServiceError({"responses": "Ballot responses do not use criteria."})
         if not expected_scorecard and value.get("score") is not None:
             raise EvaluationServiceError({"responses": "Ballot responses do not use scores."})
-        if exercise.method == EvaluationExercise.Method.APPROVAL and value.get("vote") not in {
+        if is_ranked_choice:
+            rank = value.get("rank")
+            if rank is None:
+                raise EvaluationServiceError({"responses": "Every option must receive a rank."})
+            if rank < 1 or rank > len(active_options):
+                raise EvaluationServiceError({"responses": "Ranks must run from 1 to the number of active options, with no gaps or repeats."})
+            if rank in ranks_used:
+                raise EvaluationServiceError({"responses": "Each rank may be used once — this is a strict preference order."})
+            ranks_used.add(rank)
+            if value.get("vote"):
+                raise EvaluationServiceError({"responses": "Ranked-choice responses do not use a vote."})
+        elif exercise.method == EvaluationExercise.Method.APPROVAL and value.get("vote") not in {
             EvaluationResponse.Vote.APPROVE,
             EvaluationResponse.Vote.ABSTAIN,
         }:
             raise EvaluationServiceError({"responses": "Approval rounds accept only approve or abstain."})
-        if exercise.method == EvaluationExercise.Method.CONSENT and value.get("vote") not in {
+        elif exercise.method == EvaluationExercise.Method.CONSENT and value.get("vote") not in {
             EvaluationResponse.Vote.CONSENT,
             EvaluationResponse.Vote.CONCERN,
             EvaluationResponse.Vote.OBJECT,
@@ -240,7 +279,7 @@ def save_submission(*, actor, round, confidence, overall_rationale, responses, s
     submission.save()
     submission.responses.all().delete()
     for option, criterion, value in cleaned:
-        response = EvaluationResponse(organisation=item.organisation, submission=submission, option=option, criterion=criterion, score=value.get("score"), vote=value.get("vote", ""), rationale=value.get("rationale", ""))
+        response = EvaluationResponse(organisation=item.organisation, submission=submission, option=option, criterion=criterion, score=value.get("score"), vote=value.get("vote", ""), rank=value.get("rank"), rationale=value.get("rationale", ""))
         response.full_clean(validate_unique=False, validate_constraints=False)
         response.save()
     record_event(action="evaluation.submission_submitted" if submit else "evaluation.submission_saved", object_type="evaluations.EvaluationSubmission", object_id=str(submission.id), actor=actor, organisation=item.organisation, metadata={"round_id": str(item.id), "response_count": len(cleaned), "status": submission.status})
@@ -269,7 +308,7 @@ def evaluation_results(*, round, viewer):
     submitted = list(round.submissions.filter(status=EvaluationSubmission.Status.SUBMITTED).prefetch_related("responses__option", "responses__criterion", "submitted_by"))
     eligible = exercise.decision.participants.filter(status="active").exclude(role="observer").values("user_id").distinct().count()
     hidden = exercise.blind_results_until_close and round.status != EvaluationRound.Status.CLOSED
-    base = {"hidden": hidden, "round_id": str(round.id), "submission_count": len(submitted), "eligible_count": eligible, "quorum_count": exercise.quorum_count, "quorum_met": len(submitted) >= exercise.quorum_count, "method": exercise.method, "options": [], "criterion_sensitivity": [], "tornado": None, "uncertainty_narrative": ""}
+    base = {"hidden": hidden, "round_id": str(round.id), "submission_count": len(submitted), "eligible_count": eligible, "quorum_count": exercise.quorum_count, "quorum_met": len(submitted) >= exercise.quorum_count, "method": exercise.method, "options": [], "criterion_sensitivity": [], "tornado": None, "uncertainty_narrative": "", "ranked_choice_rounds": []}
     if hidden:
         return base
     conflicts = list(conflicts_for_decision(decision=exercise.decision))
@@ -334,6 +373,31 @@ def evaluation_results(*, round, viewer):
         base["criterion_sensitivity"]=_sensitivity(rows=rows, criteria=criteria, values=values)
         base["tornado"]=_tornado(rows=rows, criteria=criteria, values=values)
         base["uncertainty_narrative"]=_uncertainty_narrative(rows=rows, criterion_sensitivity=base["criterion_sensitivity"])
+    elif exercise.method == EvaluationExercise.Method.RANKED_CHOICE:
+        option_map = {}
+        ballots = []
+        for submission in submitted:
+            if any(_is_conflicted(submission.submitted_by_id, response.option_id) for response in submission.responses.all()):
+                for response in submission.responses.all():
+                    excluded_emails_by_option[response.option_id].add(submission.submitted_by.email)
+                continue
+            preferences = sorted(submission.responses.all(), key=lambda r: r.rank if r.rank is not None else 999)
+            ballot = [response.option_id for response in preferences if response.rank is not None]
+            for response in preferences:
+                option_map[response.option_id] = response.option
+            if ballot:
+                ballots.append(ballot)
+        base["options"], base["ranked_choice_rounds"] = _instant_runoff(option_map=option_map, ballots=ballots)
+        for row in base["options"]:
+            option_uuid = next((oid for oid in option_map if str(oid) == row["option_id"]), None)
+            row["excluded_response_count"] = len(excluded_emails_by_option.get(option_uuid, ()))
+            row["conflicted_reviewer_emails"] = sorted(excluded_emails_by_option.get(option_uuid, ()))
+        if base["options"]:
+            winner = base["options"][0]
+            base["uncertainty_narrative"] = (
+                f"“{winner['title']}” wins by instant runoff after "
+                f"{len(base.get('ranked_choice_rounds', []))} elimination round(s)."
+            )
     else:
         grouped=defaultdict(list); option_map={}
         for submission in submitted:
@@ -476,6 +540,86 @@ def _tornado(*, rows, criteria, values):
         })
     bars.sort(key=lambda item: item["impact"], reverse=True)
     return {"option_id": rows[0]["option_id"], "option_title": rows[0]["title"], "base_score": rows[0]["weighted_score"], "criteria": bars}
+
+
+def _instant_runoff(*, option_map, ballots):
+    """Single-winner ranked-choice tabulation: eliminate the last place, transfer its ballots, repeat.
+
+    Returns (rows, rounds) where rows are ordered from winner (final_rank=1)
+    down to first-eliminated (highest final_rank), and rounds records each
+    elimination round's tallies for a transparent, replayable audit trail.
+    """
+    all_ids = list(option_map.keys())
+    if not all_ids:
+        return [], []
+    if len(all_ids) == 1 or not ballots:
+        oid = all_ids[0]
+        return [{
+            "option_id": str(oid), "title": option_map[oid].title, "final_rank": 1,
+            "first_round_votes": len(ballots), "eliminated_in_round": None,
+        }], []
+
+    remaining = set(all_ids)
+    elimination_order = []
+    rounds = []
+    round_number = 0
+    first_round_tally = None
+    last_tally = {}
+    winner_id = None
+    while len(remaining) > 1:
+        round_number += 1
+        tally = {oid: 0 for oid in remaining}
+        exhausted = 0
+        for ballot in ballots:
+            choice = next((oid for oid in ballot if oid in remaining), None)
+            if choice is None:
+                exhausted += 1
+            else:
+                tally[choice] += 1
+        if first_round_tally is None:
+            first_round_tally = dict(tally)
+        last_tally = tally
+        active_votes = sum(tally.values())
+        entry = {"round_number": round_number, "tallies": {str(k): v for k, v in tally.items()}, "exhausted_ballots": exhausted, "eliminated_option_id": None}
+        if active_votes == 0:
+            rounds.append(entry)
+            break
+        leader_votes = max(tally.values())
+        if leader_votes * 2 > active_votes:
+            winner_id = max(tally, key=lambda oid: tally[oid])
+            rounds.append(entry)
+            break
+        min_votes = min(tally.values())
+        tied = [oid for oid, v in tally.items() if v == min_votes]
+        eliminated = min(tied, key=lambda oid: option_map[oid].title)
+        entry["eliminated_option_id"] = str(eliminated)
+        rounds.append(entry)
+        remaining.discard(eliminated)
+        elimination_order.append(eliminated)
+
+    if winner_id is None and remaining:
+        winner_id = next(iter(remaining))
+
+    # Candidates who survived every elimination but weren't the majority winner
+    # (the race ended early once someone crossed 50%) still outrank anyone
+    # who was actually eliminated, ordered by their last-counted tally.
+    runner_ups = sorted(
+        (oid for oid in remaining if oid != winner_id),
+        key=lambda oid: last_tally.get(oid, 0),
+        reverse=True,
+    )
+    final_order = ([winner_id] if winner_id is not None else []) + runner_ups + list(reversed(elimination_order))
+    rows = []
+    for rank, oid in enumerate(final_order, start=1):
+        elim_round = next((r["round_number"] for r in rounds if r.get("eliminated_option_id") == str(oid)), None)
+        rows.append({
+            "option_id": str(oid),
+            "title": option_map[oid].title,
+            "final_rank": rank,
+            "first_round_votes": (first_round_tally or {}).get(oid, 0),
+            "eliminated_in_round": elim_round,
+        })
+    return rows, rounds
 
 
 def _uncertainty_narrative(*, rows, criterion_sensitivity):

@@ -6,6 +6,7 @@ import { StatusMessage } from "../../components/StatusMessage";
 import { ApiError } from "../../lib/api";
 import { getTerminology, type Terminology } from "../../lib/terminology";
 import type { Idea } from "../../lib/types";
+import { lookupOrganisation } from "../org-enrichment/api";
 import { getOrganisationPortfolio } from "../portfolio/api";
 import { archiveIdea, getOrganiserSession, promoteIdea, setSessionState, shortlistIdea } from "./api";
 
@@ -21,11 +22,13 @@ function submitterLabel(idea: Idea): string {
 }
 
 function IdeaRow({
+  organisationId,
   sessionId,
   idea,
   decisions,
   terms,
 }: {
+  organisationId: string;
   sessionId: string;
   idea: Idea;
   decisions: Array<{ id: string; title: string }>;
@@ -47,6 +50,10 @@ function IdeaRow({
     mutationFn: () =>
       promoteIdea(sessionId, idea.id, decisionId === CREATE_NEW_DECISION_VALUE ? null : decisionId),
     onSuccess: (data) => queryClient.setQueryData(queryKey, data),
+  });
+  const [verifyQuery, setVerifyQuery] = useState(submitterLabel(idea));
+  const verifyOrganisation = useMutation({
+    mutationFn: () => lookupOrganisation(organisationId, verifyQuery),
   });
 
   return (
@@ -70,6 +77,30 @@ function IdeaRow({
               : `Could not promote this ${terms.ideaNoun.toLowerCase()}.`}
           </StatusMessage>
         ) : null}
+        <div className="verify-organisation">
+          <input
+            aria-label="Organisation name or registration number to verify"
+            value={verifyQuery}
+            onChange={(event) => setVerifyQuery(event.target.value)}
+          />
+          <button
+            className="button button--quiet button--compact"
+            type="button"
+            disabled={verifyOrganisation.isPending || !verifyQuery.trim()}
+            onClick={() => verifyOrganisation.mutate()}
+          >
+            {verifyOrganisation.isPending ? "Verifying…" : "Verify organisation"}
+          </button>
+          {verifyOrganisation.data ? (
+            verifyOrganisation.data.found ? (
+              <p className="muted">
+                {verifyOrganisation.data.legal_name} · {verifyOrganisation.data.ein_or_charity_number} · {verifyOrganisation.data.standing}
+              </p>
+            ) : (
+              <p className="muted">{verifyOrganisation.data.detail}</p>
+            )
+          ) : null}
+        </div>
         {idea.status === "promoted" ? null : (
           <div className="button-row">
             <button
@@ -184,6 +215,7 @@ export function OpenSessionOrganiserPage() {
                 {session.data.ideas.map((idea) => (
                   <IdeaRow
                     key={idea.id}
+                    organisationId={organisationId}
                     sessionId={sessionId}
                     idea={idea}
                     decisions={portfolio.data?.decisions ?? []}

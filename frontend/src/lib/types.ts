@@ -204,6 +204,71 @@ export type OptionReversibility =
 export type EligibilityStatus = "pending" | "eligible" | "ineligible";
 export type OutcomeStatus = "pending" | "funded" | "declined";
 
+export type DisbursementProviderKey = "manual" | "stripe";
+
+export type DisbursementConfiguration = {
+  id: string;
+  organisation_id: string;
+  provider_key: DisbursementProviderKey;
+  provider_key_label: string;
+  stripe_account_id: string;
+  api_key_is_set: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Disbursement = {
+  id: string;
+  option_id: string;
+  amount: string;
+  provider_key: DisbursementProviderKey;
+  provider_key_label: string;
+  status: "paid" | "failed";
+  status_label: string;
+  external_reference: string;
+  note: string;
+  issued_by: User;
+  created_at: string;
+};
+
+export type LookupProviderKey = "manual" | "candid";
+
+export type LookupConfiguration = {
+  id: string;
+  organisation_id: string;
+  provider_key: LookupProviderKey;
+  provider_key_label: string;
+  api_key_is_set: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type BudgetRollupMonth = {
+  month: string;
+  label: string;
+  awarded_total: string;
+};
+
+export type OrganisationBudgetRollup = {
+  round_count: number;
+  requested_total: string;
+  awarded_total: string;
+  funded_count: number;
+  declined_count: number;
+  pending_outcome_count: number;
+  monthly_trend: BudgetRollupMonth[];
+};
+
+export type OrganisationLookupResult = {
+  ok: boolean;
+  found: boolean;
+  legal_name: string;
+  ein_or_charity_number: string;
+  financial_summary: string;
+  standing: string;
+  detail: string;
+};
+
 export type DecisionOption = {
   id: string;
   decision_id: string;
@@ -1489,7 +1554,7 @@ export type ForesightScenarioSetWorkspace = ForesightScenarioSet & {
   };
 };
 
-export type EvaluationMethod = "scorecard" | "approval" | "consent" | "delphi";
+export type EvaluationMethod = "scorecard" | "approval" | "consent" | "delphi" | "ranked_choice";
 export type EvaluationAnonymity = "attributed" | "peer_anonymous";
 
 export type EvaluationCriterion = {
@@ -1514,8 +1579,15 @@ export type EvaluationResponseRecord = {
   criterion_title: string | null;
   score: string | null;
   vote: "approve" | "consent" | "concern" | "object" | "abstain" | "";
+  rank: number | null;
   rationale: string;
   created_at: string;
+};
+
+export type EvaluationScoringOption = {
+  id: string;
+  title: string;
+  blinded: boolean;
 };
 
 export type EvaluationSubmission = {
@@ -1553,6 +1625,18 @@ export type EvaluationOptionResult = {
   dissent_rate?: number;
   passes_threshold?: boolean;
   breakdown?: Record<string, number>;
+  final_rank?: number;
+  first_round_votes?: number;
+  eliminated_in_round?: number | null;
+  excluded_response_count?: number;
+  conflicted_reviewer_emails?: string[];
+};
+
+export type RankedChoiceRound = {
+  round_number: number;
+  tallies: Record<string, number>;
+  exhausted_ballots: number;
+  eliminated_option_id: string | null;
 };
 
 export type EvaluationResults = {
@@ -1584,6 +1668,7 @@ export type EvaluationResults = {
     }>;
   } | null;
   uncertainty_narrative: string;
+  ranked_choice_rounds: RankedChoiceRound[];
 };
 
 export type EvaluationRound = {
@@ -1627,6 +1712,7 @@ export type EvaluationExercise = {
   status_label: string;
   anonymity: EvaluationAnonymity;
   blind_results_until_close: boolean;
+  blind_applicant_identity: boolean;
   quorum_count: number;
   approval_threshold: string;
   objection_threshold: string;
@@ -2014,6 +2100,41 @@ export type Idea = {
   application_status: IdeaApplicationStatus | null;
   comments: IdeaComment[];
   created_at: string;
+};
+
+export type MyApplicationOutcome = {
+  eligibility_status: EligibilityStatus;
+  eligibility_status_label: string;
+  outcome_status: OutcomeStatus;
+  outcome_status_label: string;
+  awarded_amount: string | null;
+  outcome_note: string;
+};
+
+export type MyApplicationProgressReport = {
+  id: string;
+  body: string;
+  created_at: string;
+};
+
+export type MyApplication = {
+  id: string;
+  title: string;
+  status: IdeaStatus;
+  status_label: string;
+  requested_amount: string | null;
+  session_title: string;
+  organisation_name: string;
+  created_at: string;
+  outcome: MyApplicationOutcome | null;
+  can_submit_progress_report: boolean;
+  progress_reports: MyApplicationProgressReport[];
+};
+
+export type MyApplicationsResponse = {
+  email: string;
+  name: string;
+  applications: MyApplication[];
 };
 
 export type OpenSessionPublic = {

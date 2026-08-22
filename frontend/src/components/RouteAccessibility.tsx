@@ -12,6 +12,8 @@ const routeTitles: Array<[RegExp, string]> = [
   [/^\/reset-password\/?$/, "Choose a new password"],
   [/^\/accept-invitation\/?$/, "Accept organisation invitation"],
   [/^\/s\/[^/]+\/?$/, "Open session"],
+  [/^\/my-applications\/?$/, "My applications"],
+  [/^\/trust\/?$/, "Trust and security posture"],
   [/^\/app\/?$/, "My work"],
   [/^\/notifications\/?$/, "Notifications"],
   [/^\/contributions\/?$/, "Contribution inbox"],

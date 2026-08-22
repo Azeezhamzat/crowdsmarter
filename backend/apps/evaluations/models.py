@@ -18,6 +18,7 @@ class EvaluationExercise(UUIDTimeStampedModel):
         APPROVAL = "approval", "Approval voting"
         CONSENT = "consent", "Consent and objections"
         DELPHI = "delphi", "Delphi evaluation"
+        RANKED_CHOICE = "ranked_choice", "Ranked-choice (instant runoff)"
 
     class Status(models.TextChoices):
         DRAFT = "draft", "Draft"
@@ -37,6 +38,10 @@ class EvaluationExercise(UUIDTimeStampedModel):
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT)
     anonymity = models.CharField(max_length=24, choices=Anonymity.choices, default=Anonymity.ATTRIBUTED)
     blind_results_until_close = models.BooleanField(default=True)
+    blind_applicant_identity = models.BooleanField(
+        default=False,
+        help_text="Hide option titles/descriptions from reviewers during scoring, showing 'Application A/B/…' instead.",
+    )
     quorum_count = models.PositiveIntegerField(default=1)
     approval_threshold = models.DecimalField(max_digits=5, decimal_places=2, default=60)
     objection_threshold = models.DecimalField(max_digits=5, decimal_places=2, default=20)
@@ -163,6 +168,7 @@ class EvaluationResponse(UUIDTimeStampedModel):
     criterion = models.ForeignKey(EvaluationCriterion, on_delete=models.CASCADE, related_name="responses", null=True, blank=True)
     score = models.DecimalField(max_digits=8, decimal_places=3, null=True, blank=True)
     vote = models.CharField(max_length=20, choices=Vote.choices, blank=True)
+    rank = models.PositiveSmallIntegerField(null=True, blank=True)
     rationale = models.TextField(blank=True)
 
     class Meta:
@@ -180,13 +186,21 @@ class EvaluationResponse(UUIDTimeStampedModel):
             raise ValidationError({"option": "Select an active option from the evaluated decision."})
         if self.criterion_id and self.criterion.exercise_id != exercise.id:
             raise ValidationError({"criterion": "The criterion must belong to this exercise."})
+        is_ranked_choice = exercise is not None and exercise.method == EvaluationExercise.Method.RANKED_CHOICE
         if self.criterion_id:
             if self.score is None:
                 raise ValidationError({"score": "A criterion response requires a score."})
             if self.score < self.criterion.scale_min or self.score > self.criterion.scale_max:
                 raise ValidationError({"score": "The score is outside the criterion scale."})
+        elif is_ranked_choice:
+            if self.rank is None:
+                raise ValidationError({"rank": "A ranked-choice response requires a rank."})
+            if self.vote:
+                raise ValidationError({"vote": "Ranked-choice responses do not use a vote."})
         elif not self.vote:
             raise ValidationError({"vote": "A ballot response requires a vote."})
+        if not is_ranked_choice and self.rank is not None:
+            raise ValidationError({"rank": "Rank is only meaningful for a ranked-choice exercise."})
 
 
 class MinorityReport(UUIDTimeStampedModel):

@@ -9,7 +9,51 @@ import { StatusMessage } from "../../components/StatusMessage";
 import { ApiError } from "../../lib/api";
 import { getTerminology } from "../../lib/terminology";
 import type { DecisionOption, EligibilityStatus, OutcomeStatus } from "../../lib/types";
+import { issueDisbursement, listDisbursements } from "../disbursements/api";
 import { createOption, listOptions, setOptionEligibility, setOptionOutcome, updateOption } from "./api";
+
+function PaymentControl({ option }: { option: DecisionOption }) {
+  const queryClient = useQueryClient();
+  const queryKey = ["decision-options", option.id, "disbursements"];
+  const disbursements = useQuery({ queryKey, queryFn: () => listDisbursements(option.id) });
+  const [amount, setAmount] = useState(option.awarded_amount ?? "");
+  const [note, setNote] = useState("");
+  const issue = useMutation({
+    mutationFn: () => issueDisbursement(option.id, { amount: Number(amount), note }),
+    onSuccess: async () => {
+      setNote("");
+      await queryClient.invalidateQueries({ queryKey });
+    },
+  });
+
+  return (
+    <div className="reasoning-card__control">
+      <strong>Payments</strong>
+      {disbursements.data?.length ? (
+        <ul className="disbursement-list">
+          {disbursements.data.map((item) => (
+            <li key={item.id}>
+              <span className={`status-badge status-badge--${item.status}`}>{item.status_label}</span>
+              {item.amount} via {item.provider_key_label}
+              {item.external_reference ? ` · ${item.external_reference}` : ""}
+              {item.note ? ` — ${item.note}` : ""}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="muted">No payment has been issued yet.</p>
+      )}
+      {issue.error ? (
+        <StatusMessage kind="error">{issue.error instanceof ApiError ? issue.error.message : "The payment could not be issued."}</StatusMessage>
+      ) : null}
+      <input type="number" min={0} step="0.01" placeholder="Amount" value={amount} onChange={(event) => setAmount(event.target.value)} />
+      <input placeholder="Note (optional)" value={note} onChange={(event) => setNote(event.target.value)} />
+      <button className="button button--quiet button--compact" type="button" disabled={issue.isPending || !amount} onClick={() => issue.mutate()}>
+        {issue.isPending ? "Issuing…" : "Issue payment"}
+      </button>
+    </div>
+  );
+}
 
 function EligibilityControl({
   option,
@@ -351,6 +395,9 @@ export function OptionsSection({
                   amountFieldLabel={terms.amountFieldLabel}
                   onSave={(input) => outcome.mutate({ id: option.id, ...input })}
                 />
+              ) : null}
+              {option.can_manage_outcome && option.outcome_status === "funded" ? (
+                <PaymentControl option={option} />
               ) : null}
             </article>
           ))}

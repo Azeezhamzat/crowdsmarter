@@ -1,5 +1,5 @@
 import { apiRequest } from "../../lib/api";
-import type { OrganisationPortfolio, PersonalWork } from "../../lib/types";
+import type { OrganisationBudgetRollup, OrganisationPortfolio, PersonalWork } from "../../lib/types";
 
 export function getPersonalWork(): Promise<PersonalWork> {
   return apiRequest<PersonalWork>("/me/work/");
@@ -17,4 +17,8 @@ export function getOrganisationPortfolio(
   return apiRequest<OrganisationPortfolio>(
     `/organisations/${organisationId}/portfolio/${suffix}`,
   );
+}
+
+export function getOrganisationBudgetRollup(organisationId: string): Promise<OrganisationBudgetRollup> {
+  return apiRequest<OrganisationBudgetRollup>(`/organisations/${organisationId}/budget-rollup/`);
 }

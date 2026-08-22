@@ -1,0 +1,40 @@
+# CrowdSmarter French translations.
+# AI-assisted, not yet reviewed by a native speaker - see docs/i18n.md.
+msgid ""
+msgstr ""
+"Project-Id-Version: CrowdSmarter\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 08:44+0000\n"
+"PO-Revision-Date: 2026-08-22 08:44+0000\n"
+"Last-Translator: AI-assisted, unreviewed\n"
+"Language-Team: fr\n"
+"Language: fr\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+
+#: apps/invitations/services.py:253
+#, python-format
+msgid "Invitation to join %(organisation)s on CrowdSmarter"
+msgstr "Invitation à rejoindre %(organisation)s sur CrowdSmarter"
+
+#: apps/invitations/services.py:257
+#, python-format
+msgid ""
+"You have been invited to join %(organisation)s as %(role)s.\n"
+"\n"
+"Accept the invitation and create or connect your account here:\n"
+"%(url)s\n"
+"\n"
+"This link expires at %(expires)s.\n"
+"If you were not expecting this invitation, you can ignore this email."
+msgstr ""
+"Vous avez été invité(e) à rejoindre %(organisation)s en tant que "
+"%(role)s.\n"
+"\n"
+"Acceptez l'invitation et créez ou connectez votre compte ici :\n"
+"%(url)s\n"
+"\n"
+"Ce lien expire le %(expires)s.\n"
+"Si vous n'attendiez pas cette invitation, vous pouvez ignorer cet e-mail."

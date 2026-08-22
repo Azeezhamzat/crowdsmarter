@@ -6,6 +6,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.decisions.selectors import decision_for_user
+from apps.organisations.selectors import organisation_for_user
 
 from .permissions import CanEditDecisionOption
 from .selectors import option_for_user, options_for_decision
@@ -15,8 +16,9 @@ from .serializers import (
     DecisionOptionOutcomeSerializer,
     DecisionOptionSerializer,
     DecisionOptionUpdateSerializer,
+    OrganisationBudgetRollupSerializer,
 )
-from .services import create_option, set_eligibility, set_outcome, update_option
+from .services import create_option, organisation_budget_rollup, set_eligibility, set_outcome, update_option
 
 
 class DecisionOptionListCreateView(APIView):
@@ -83,3 +85,14 @@ class DecisionOptionOutcomeView(APIView):
         serializer.is_valid(raise_exception=True)
         option = set_outcome(actor=request.user, option=option, **serializer.validated_data)
         return Response(DecisionOptionSerializer(option, context={"request": request}).data)
+
+
+class OrganisationBudgetRollupView(APIView):
+    """Cross-round budget totals and a monthly awarded trend for every grant round in one organisation."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, organisation_id):  # type: ignore[no-untyped-def]
+        organisation = organisation_for_user(user=request.user, organisation_id=organisation_id)
+        data = organisation_budget_rollup(organisation=organisation)
+        return Response(OrganisationBudgetRollupSerializer(data).data)

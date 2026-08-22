@@ -1,12 +1,13 @@
 from django.urls import path
 
-from .views import (EvaluationCriterionCreateView, EvaluationExerciseDetailView, EvaluationExerciseListCreateView, EvaluationResultsView, EvaluationRoundCreateView, EvaluationRoundTransitionView, EvaluationSubmissionView, MinorityReportCreateView, PortfolioAssessmentView, PortfolioCandidateCreateView, PortfolioCriterionCreateView, PortfolioSelectionView, PrioritisationPortfolioDetailView, PrioritisationPortfolioListCreateView)
+from .views import (EvaluationCriterionCreateView, EvaluationExerciseDetailView, EvaluationExerciseListCreateView, EvaluationResultsView, EvaluationRoundCreateView, EvaluationRoundTransitionView, EvaluationScoringOptionsView, EvaluationSubmissionView, MinorityReportCreateView, PortfolioAssessmentView, PortfolioCandidateCreateView, PortfolioCriterionCreateView, PortfolioSelectionView, PrioritisationPortfolioDetailView, PrioritisationPortfolioListCreateView)
 
 app_name="evaluations"
 urlpatterns=[
     path("decisions/<uuid:decision_id>/evaluations/",EvaluationExerciseListCreateView.as_view(),name="decision-evaluations"),
     path("evaluations/<uuid:exercise_id>/",EvaluationExerciseDetailView.as_view(),name="evaluation-detail"),
     path("evaluations/<uuid:exercise_id>/criteria/",EvaluationCriterionCreateView.as_view(),name="evaluation-criteria"),
+    path("evaluations/<uuid:exercise_id>/scoring-options/",EvaluationScoringOptionsView.as_view(),name="evaluation-scoring-options"),
     path("evaluations/<uuid:exercise_id>/rounds/",EvaluationRoundCreateView.as_view(),name="evaluation-rounds"),
     path("evaluation-rounds/<uuid:round_id>/",EvaluationRoundTransitionView.as_view(),name="evaluation-round-transition"),
     path("evaluation-rounds/<uuid:round_id>/submission/",EvaluationSubmissionView.as_view(),name="evaluation-submission"),

@@ -205,3 +205,19 @@ class DecisionOptionOutcomeSerializer(StrictSerializer):
                 {"awarded_amount": "A funded outcome requires an awarded amount."}
             )
         return attrs
+
+
+class BudgetRollupMonthSerializer(serializers.Serializer):
+    month = serializers.CharField()
+    label = serializers.CharField()
+    awarded_total = serializers.DecimalField(max_digits=14, decimal_places=2)
+
+
+class OrganisationBudgetRollupSerializer(serializers.Serializer):
+    round_count = serializers.IntegerField()
+    requested_total = serializers.DecimalField(max_digits=14, decimal_places=2)
+    awarded_total = serializers.DecimalField(max_digits=14, decimal_places=2)
+    funded_count = serializers.IntegerField()
+    declined_count = serializers.IntegerField()
+    pending_outcome_count = serializers.IntegerField()
+    monthly_trend = BudgetRollupMonthSerializer(many=True)

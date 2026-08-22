@@ -12,6 +12,20 @@ import {
   setOrganisationBillingContact,
 } from "../billing/api";
 import {
+  clearDisbursementApiKey,
+  getDisbursementConfiguration,
+  setDisbursementApiKey,
+  setDisbursementProvider,
+  testDisbursementConnection,
+} from "../disbursements/api";
+import {
+  clearLookupApiKey,
+  getLookupConfiguration,
+  setLookupApiKey,
+  setLookupProvider,
+  testLookupConnection,
+} from "../org-enrichment/api";
+import {
   cancelOrganisationDeletion,
   deactivateOrganisation,
   getOrganisation,
@@ -38,6 +52,8 @@ export function OrganisationAdministrationPage() {
   const deletions = useQuery({ queryKey: ["organisations", organisationId, "deletion-requests"], queryFn: () => listOrganisationDeletionRequests(organisationId), enabled: Boolean(organisationId) && organisation.data?.current_user_role === "owner" });
   const aiQuality = useQuery({ queryKey: ["organisations", organisationId, "ai-review-quality"], queryFn: () => getAIReviewQualityMetrics(organisationId), enabled: Boolean(organisationId) && ["owner", "admin"].includes(organisation.data?.current_user_role ?? "") });
   const subscription = useQuery({ queryKey: ["organisations", organisationId, "subscription"], queryFn: () => getOrganisationSubscription(organisationId), enabled: Boolean(organisationId) && ["owner", "admin"].includes(organisation.data?.current_user_role ?? "") });
+  const disbursementConfig = useQuery({ queryKey: ["organisations", organisationId, "disbursement-configuration"], queryFn: () => getDisbursementConfiguration(organisationId), enabled: Boolean(organisationId) && ["owner", "admin"].includes(organisation.data?.current_user_role ?? "") });
+  const lookupConfig = useQuery({ queryKey: ["organisations", organisationId, "lookup-configuration"], queryFn: () => getLookupConfiguration(organisationId), enabled: Boolean(organisationId) && ["owner", "admin"].includes(organisation.data?.current_user_role ?? "") });
   const plans = useQuery({ queryKey: ["billing", "plans"], queryFn: () => listPlans(), enabled: Boolean(organisationId) && organisation.data?.current_user_role === "owner" });
   const [selectedPlanKey, setSelectedPlanKey] = useState("");
   const [settings, setSettings] = useState({ name: "", description: "", website_url: "", brand_name: "", primary_colour: "#315c54", invitation_policy: "owners_and_admins", default_invitation_role: "contributor", retention_days: "" });
@@ -45,6 +61,13 @@ export function OrganisationAdministrationPage() {
   const [deactivation, setDeactivation] = useState({ confirmation: "", reason: "" });
   const [reactivationRationale, setReactivationRationale] = useState("");
   const [deletion, setDeletion] = useState({ confirmation: "", reason: "" });
+  const [disbursementProviderKey, setDisbursementProviderKey] = useState<"manual" | "stripe">("manual");
+  const [stripeAccountId, setStripeAccountId] = useState("");
+  const [disbursementApiKeyInput, setDisbursementApiKeyInput] = useState("");
+  const [connectionResult, setConnectionResult] = useState<{ ok: boolean; detail: string } | null>(null);
+  const [lookupProviderKey, setLookupProviderKey] = useState<"manual" | "candid">("manual");
+  const [lookupApiKeyInput, setLookupApiKeyInput] = useState("");
+  const [lookupConnectionResult, setLookupConnectionResult] = useState<{ ok: boolean; detail: string } | null>(null);
 
   useEffect(() => {
     if (!organisation.data) return;
@@ -65,6 +88,17 @@ export function OrganisationAdministrationPage() {
     setSelectedPlanKey(subscription.data.plan.key);
   }, [subscription.data]);
 
+  useEffect(() => {
+    if (!disbursementConfig.data) return;
+    setDisbursementProviderKey(disbursementConfig.data.provider_key);
+    setStripeAccountId(disbursementConfig.data.stripe_account_id);
+  }, [disbursementConfig.data]);
+
+  useEffect(() => {
+    if (!lookupConfig.data) return;
+    setLookupProviderKey(lookupConfig.data.provider_key);
+  }, [lookupConfig.data]);
+
   const refresh = async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ["organisations", organisationId] }),
@@ -72,6 +106,8 @@ export function OrganisationAdministrationPage() {
       queryClient.invalidateQueries({ queryKey: ["organisations", organisationId, "membership-history"] }),
       queryClient.invalidateQueries({ queryKey: ["organisations", organisationId, "deletion-requests"] }),
       queryClient.invalidateQueries({ queryKey: ["organisations", organisationId, "subscription"] }),
+      queryClient.invalidateQueries({ queryKey: ["organisations", organisationId, "disbursement-configuration"] }),
+      queryClient.invalidateQueries({ queryKey: ["organisations", organisationId, "lookup-configuration"] }),
       queryClient.invalidateQueries({ queryKey: ["organisations"] }),
     ]);
   };
@@ -83,13 +119,39 @@ export function OrganisationAdministrationPage() {
   const cancelDeletion = useMutation({ mutationFn: ({ id, rationale }: { id: string; rationale: string }) => cancelOrganisationDeletion(id, rationale), onSuccess: refresh });
   const changePlan = useMutation({ mutationFn: () => changeOrganisationPlan(organisationId, { plan_key: selectedPlanKey }), onSuccess: refresh });
   const setBillingContact = useMutation({ mutationFn: (userId: string) => setOrganisationBillingContact(organisationId, { user_id: userId || null }), onSuccess: refresh });
+  const saveDisbursementProvider = useMutation({
+    mutationFn: () => setDisbursementProvider(organisationId, { provider_key: disbursementProviderKey, stripe_account_id: stripeAccountId }),
+    onSuccess: async () => { setConnectionResult(null); await refresh(); },
+  });
+  const saveDisbursementApiKey = useMutation({
+    mutationFn: () => setDisbursementApiKey(organisationId, disbursementApiKeyInput),
+    onSuccess: async () => { setDisbursementApiKeyInput(""); setConnectionResult(null); await refresh(); },
+  });
+  const removeDisbursementApiKey = useMutation({ mutationFn: () => clearDisbursementApiKey(organisationId), onSuccess: async () => { setConnectionResult(null); await refresh(); } });
+  const checkDisbursementConnection = useMutation({
+    mutationFn: () => testDisbursementConnection(organisationId),
+    onSuccess: (result) => setConnectionResult({ ok: result.ok, detail: result.detail }),
+  });
+  const saveLookupProvider = useMutation({
+    mutationFn: () => setLookupProvider(organisationId, { provider_key: lookupProviderKey }),
+    onSuccess: async () => { setLookupConnectionResult(null); await refresh(); },
+  });
+  const saveLookupApiKey = useMutation({
+    mutationFn: () => setLookupApiKey(organisationId, lookupApiKeyInput),
+    onSuccess: async () => { setLookupApiKeyInput(""); setLookupConnectionResult(null); await refresh(); },
+  });
+  const removeLookupApiKey = useMutation({ mutationFn: () => clearLookupApiKey(organisationId), onSuccess: async () => { setLookupConnectionResult(null); await refresh(); } });
+  const checkLookupConnection = useMutation({
+    mutationFn: () => testLookupConnection(organisationId),
+    onSuccess: (result) => setLookupConnectionResult({ ok: result.ok, detail: result.detail }),
+  });
 
   if (organisation.isPending || memberships.isPending) return <p>Loading organisation administration…</p>;
   if (organisation.isError || !organisation.data) return <StatusMessage kind="error">Organisation administration could not be loaded.</StatusMessage>;
   const isOwner = organisation.data.current_user_role === "owner";
   const canManage = ["owner", "admin"].includes(organisation.data.current_user_role);
   const ownerCandidates = memberships.data?.filter((item) => item.status === "active" && item.role !== "owner") ?? [];
-  const mutationError = save.error || transferOwner.error || deactivate.error || reactivate.error || requestDeletion.error || cancelDeletion.error || changePlan.error || setBillingContact.error;
+  const mutationError = save.error || transferOwner.error || deactivate.error || reactivate.error || requestDeletion.error || cancelDeletion.error || changePlan.error || setBillingContact.error || saveDisbursementProvider.error || saveDisbursementApiKey.error || removeDisbursementApiKey.error || saveLookupProvider.error || saveLookupApiKey.error || removeLookupApiKey.error;
 
   return (
     <div className="organisation-admin-page">
@@ -166,6 +228,77 @@ export function OrganisationAdministrationPage() {
               <article><strong>{aiQuality.data.correction_rate != null ? `${aiQuality.data.correction_rate}%` : "—"}</strong><span>Correction rate</span></article>
             </div>
           ) : <p className="muted">No completed AI reviews are recorded yet.</p>}
+        </section>
+      ) : null}
+
+      {canManage ? (
+        <section className="card-panel">
+          <div className="section-heading"><div><p className="eyebrow">Grant payments</p><h2>Disbursement provider</h2><p className="muted">Funded applications default to a manual ledger — mark a payment made outside the platform. Connect Stripe to issue transfers directly once you have your own account.</p></div></div>
+          {disbursementConfig.isError ? <StatusMessage kind="error">Disbursement configuration requires an owner or administrator role.</StatusMessage> : null}
+          {disbursementConfig.data ? (
+            <div className="form-grid form-grid--two">
+              <label>Provider
+                <select value={disbursementProviderKey} onChange={(event) => setDisbursementProviderKey(event.target.value as "manual" | "stripe")}>
+                  <option value="manual">Manual ledger</option>
+                  <option value="stripe">Stripe Connect</option>
+                </select>
+              </label>
+              {disbursementProviderKey === "stripe" ? (
+                <label>Stripe connected account ID
+                  <input value={stripeAccountId} onChange={(event) => setStripeAccountId(event.target.value)} placeholder="acct_..." />
+                </label>
+              ) : null}
+              <div className="form-actions">
+                <button className="button button--secondary" type="button" disabled={saveDisbursementProvider.isPending} onClick={() => saveDisbursementProvider.mutate()}>{saveDisbursementProvider.isPending ? "Saving…" : "Save provider"}</button>
+              </div>
+              {disbursementProviderKey === "stripe" ? (
+                <>
+                  <label>Stripe API key
+                    <input type="password" value={disbursementApiKeyInput} onChange={(event) => setDisbursementApiKeyInput(event.target.value)} placeholder={disbursementConfig.data.api_key_is_set ? "•••• already set" : "sk_live_..."} />
+                  </label>
+                  <div className="form-actions">
+                    <button className="button button--secondary" type="button" disabled={saveDisbursementApiKey.isPending || !disbursementApiKeyInput.trim()} onClick={() => saveDisbursementApiKey.mutate()}>{saveDisbursementApiKey.isPending ? "Saving…" : "Save key"}</button>
+                    {disbursementConfig.data.api_key_is_set ? <button className="button button--quiet" type="button" disabled={removeDisbursementApiKey.isPending} onClick={() => removeDisbursementApiKey.mutate()}>Clear key</button> : null}
+                    <button className="button button--quiet" type="button" disabled={checkDisbursementConnection.isPending} onClick={() => checkDisbursementConnection.mutate()}>{checkDisbursementConnection.isPending ? "Testing…" : "Test connection"}</button>
+                  </div>
+                </>
+              ) : null}
+              {connectionResult ? <StatusMessage kind={connectionResult.ok ? "success" : "error"}>{connectionResult.detail}</StatusMessage> : null}
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
+      {canManage ? (
+        <section className="card-panel">
+          <div className="section-heading"><div><p className="eyebrow">Applicant verification</p><h2>Organisation lookup</h2><p className="muted">Manual verification requires no setup. Connect Candid to pre-fill an applicant's legal name, EIN/charity number, and standing while reviewing submissions.</p></div></div>
+          {lookupConfig.isError ? <StatusMessage kind="error">Lookup configuration requires an owner or administrator role.</StatusMessage> : null}
+          {lookupConfig.data ? (
+            <div className="form-grid form-grid--two">
+              <label>Provider
+                <select value={lookupProviderKey} onChange={(event) => setLookupProviderKey(event.target.value as "manual" | "candid")}>
+                  <option value="manual">Manual verification</option>
+                  <option value="candid">Candid (GuideStar)</option>
+                </select>
+              </label>
+              <div className="form-actions">
+                <button className="button button--secondary" type="button" disabled={saveLookupProvider.isPending} onClick={() => saveLookupProvider.mutate()}>{saveLookupProvider.isPending ? "Saving…" : "Save provider"}</button>
+              </div>
+              {lookupProviderKey === "candid" ? (
+                <>
+                  <label>Candid API key
+                    <input type="password" value={lookupApiKeyInput} onChange={(event) => setLookupApiKeyInput(event.target.value)} placeholder={lookupConfig.data.api_key_is_set ? "•••• already set" : "Subscription key"} />
+                  </label>
+                  <div className="form-actions">
+                    <button className="button button--secondary" type="button" disabled={saveLookupApiKey.isPending || !lookupApiKeyInput.trim()} onClick={() => saveLookupApiKey.mutate()}>{saveLookupApiKey.isPending ? "Saving…" : "Save key"}</button>
+                    {lookupConfig.data.api_key_is_set ? <button className="button button--quiet" type="button" disabled={removeLookupApiKey.isPending} onClick={() => removeLookupApiKey.mutate()}>Clear key</button> : null}
+                    <button className="button button--quiet" type="button" disabled={checkLookupConnection.isPending} onClick={() => checkLookupConnection.mutate()}>{checkLookupConnection.isPending ? "Testing…" : "Test connection"}</button>
+                  </div>
+                </>
+              ) : null}
+              {lookupConnectionResult ? <StatusMessage kind={lookupConnectionResult.ok ? "success" : "error"}>{lookupConnectionResult.detail}</StatusMessage> : null}
+            </div>
+          ) : null}
         </section>
       ) : null}
 

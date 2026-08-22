@@ -1,9 +1,18 @@
 import { Link } from "react-router";
 
 import { Icon, type IconName } from "../../components/Icon";
+import { LanguageSwitcher } from "../../components/LanguageSwitcher";
 import { LogoMark } from "../../components/Logo";
 import { buildMailto, contactChannels } from "../../config/contact";
+import { useLocale, useTranslations } from "../../lib/i18n";
+import { landingCatalog } from "../../lib/catalogs/landing";
 import { HeroVideo } from "./HeroVideo";
+
+const heroTitleByLocale = {
+  en: <>Grantmaking your<br />community can<br /><span>actually see.</span></>,
+  fr: <>Un financement que<br />votre communauté<br /><span>peut vraiment voir.</span></>,
+  pt: <>Um financiamento que<br />a sua comunidade<br /><span>pode realmente ver.</span></>,
+};
 
 const lifecycleStages = [
   {
@@ -115,6 +124,8 @@ const trustPoints = [
 ];
 
 export function LandingPage() {
+  const locale = useLocale();
+  const t = useTranslations(landingCatalog);
   return (
     <div className="public-site public-site--executive">
       <header className="public-header public-header--executive">
@@ -123,33 +134,31 @@ export function LandingPage() {
           <span><strong>CrowdSmarter</strong><small>Systems. Futures. Collective intelligence.</small></span>
         </Link>
         <nav className="public-nav public-nav--executive" aria-label="Primary navigation">
-          <a href="#platform">Platform</a>
-          <a href="#how-it-works">How it works</a>
-          <a href="#why-us">Why us</a>
-          <a href="#trust">Trust</a>
+          <a href="#platform">{t.navPlatform}</a>
+          <a href="#how-it-works">{t.navHowItWorks}</a>
+          <a href="#why-us">{t.navWhyUs}</a>
+          <a href="#trust">{t.navTrust}</a>
         </nav>
         <div className="public-header__actions">
-          <Link className="public-nav__signin" to="/login">Sign in</Link>
-          <Link className="public-button public-button--primary public-header__demo" to="/request-demo">Book a fit assessment</Link>
+          <LanguageSwitcher />
+          <Link className="public-nav__signin" to="/login">{t.signIn}</Link>
+          <Link className="public-button public-button--primary public-header__demo" to="/request-demo">{t.bookAssessment}</Link>
         </div>
       </header>
 
       <main id="main-content" tabIndex={-1}>
         <HeroVideo
-          eyebrow="Participatory grantmaking"
-          title={<>Grantmaking your<br />community can<br /><span>actually see.</span></>}
-          lead="One traceable record from open call to award — community input, reviewer scoring, and evidence behind every decision."
-          primaryCta={{ label: "Book a fit assessment", href: "/request-demo" }}
-          secondaryCta={{ label: "See how it works", href: "#how-it-works" }}
-          trustItems={["Funder-owned records", "Reviewer disagreement stays visible", "Community voice, not just staff"]}
+          eyebrow={t.heroEyebrow}
+          title={heroTitleByLocale[locale]}
+          lead={t.heroLead}
+          primaryCta={{ label: t.bookAssessment, href: "/request-demo" }}
+          secondaryCta={{ label: t.heroSecondaryCta, href: "#how-it-works" }}
+          trustItems={[t.trustItem1, t.trustItem2, t.trustItem3]}
         />
 
         <section className="proof-strip" aria-label="Product foundation">
-          <p className="public-eyebrow">Where this comes from</p>
-          <p>
-            The approach draws on participatory grantmaking and collective-intelligence research, with charter
-            programmes structured around real, funded rounds before wider adoption.
-          </p>
+          <p className="public-eyebrow">{t.proofEyebrow}</p>
+          <p>{t.proofBody}</p>
         </section>
 
         <section className="public-section public-section--platform" id="platform" aria-labelledby="platform-title">
@@ -259,7 +268,7 @@ export function LandingPage() {
               <p className="public-eyebrow">Governance and trust</p>
               <h2 id="trust-title">Designed to support scrutiny, not obscure it.</h2>
               <p>Institutional confidence depends on understanding who decided, what evidence was considered, and what remained under organisational control.</p>
-              <Link className="public-text-link" to="/request-demo">Discuss your governance requirements <Icon name="arrow-right" size={16} /></Link>
+              <Link className="public-text-link" to="/trust">Read our full trust and security posture <Icon name="arrow-right" size={16} /></Link>
               <div className="trust-contact-links" aria-label="Governance contact channels">
                 <a href={buildMailto(contactChannels.privacy, "CrowdSmarter privacy enquiry")}>Privacy enquiries</a>
                 <a href={buildMailto(contactChannels.security, "CrowdSmarter security report")}>Security reports</a>
@@ -292,7 +301,7 @@ export function LandingPage() {
           <span>General enquiries and partnerships</span>
           <a href={buildMailto(contactChannels.general, "CrowdSmarter enquiry")}>{contactChannels.general}</a>
         </div>
-        <div className="public-footer__links"><Link to="/request-demo">Book a fit assessment</Link><Link to="/login">Sign in</Link><span>Human authority retained</span><span>Working with organisations across Africa, Europe, and the Middle East</span></div>
+        <div className="public-footer__links"><Link to="/request-demo">{t.bookAssessment}</Link><Link to="/login">{t.signIn}</Link><Link to="/my-applications">{t.footerApplicant}</Link><span>{t.footerHumanAuthority}</span><span>{t.footerRegions}</span></div>
       </footer>
     </div>
   );

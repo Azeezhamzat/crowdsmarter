@@ -65,12 +65,16 @@ INSTALLED_APPS = [
     "apps.platform_admin",
     "apps.billing",
     "apps.ideation",
+    "apps.applicants",
+    "apps.disbursements",
+    "apps.org_enrichment",
 ]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.locale.LocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -117,6 +121,12 @@ AUTH_USER_MODEL = "accounts.User"
 AUTHENTICATION_BACKENDS = ["apps.accounts.backends.CaseInsensitiveEmailBackend"]
 
 LANGUAGE_CODE = "en-gb"
+LANGUAGES = [
+    ("en-gb", "English"),
+    ("fr", "Français"),
+    ("pt", "Português"),
+]
+LOCALE_PATHS = [BASE_DIR / "locale"]
 TIME_ZONE = "UTC"
 USE_I18N = True
 USE_TZ = True
@@ -166,6 +176,9 @@ REST_FRAMEWORK = {
         "idea_submit": os.getenv("API_IDEA_SUBMIT_THROTTLE_RATE", "30/hour"),
         "idea_vote": os.getenv("API_IDEA_VOTE_THROTTLE_RATE", "120/hour"),
         "idea_comment": os.getenv("API_IDEA_COMMENT_THROTTLE_RATE", "60/hour"),
+        "applicant_magic_link": os.getenv("API_APPLICANT_MAGIC_LINK_THROTTLE_RATE", "10/hour"),
+        "applicant_magic_link_consume": os.getenv("API_APPLICANT_MAGIC_LINK_CONSUME_THROTTLE_RATE", "20/hour"),
+        "applicant_progress_report": os.getenv("API_APPLICANT_PROGRESS_REPORT_THROTTLE_RATE", "30/hour"),
     },
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 50,

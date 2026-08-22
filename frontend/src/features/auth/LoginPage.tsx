@@ -7,9 +7,12 @@ import { z } from "zod";
 
 import { FieldError } from "../../components/FieldError";
 import { Icon } from "../../components/Icon";
+import { LanguageSwitcher } from "../../components/LanguageSwitcher";
 import { LogoMark } from "../../components/Logo";
 import { buildMailto, contactChannels } from "../../config/contact";
 import { ApiError } from "../../lib/api";
+import { loginCatalog } from "../../lib/catalogs/login";
+import { useTranslations } from "../../lib/i18n";
 import { loginWithPassword, verifyMfaCode } from "./api";
 
 const loginSchema = z.object({
@@ -21,6 +24,7 @@ type LoginInput = z.infer<typeof loginSchema>;
 
 export function LoginPage() {
   const navigate = useNavigate();
+  const t = useTranslations(loginCatalog);
   const [showPassword, setShowPassword] = useState(false);
   const [capsLockOn, setCapsLockOn] = useState(false);
   const [mfaRequired, setMfaRequired] = useState(false);
@@ -106,8 +110,9 @@ export function LoginPage() {
         </Link>
         <div className="auth-introduction__content auth-introduction__content--executive">
           <div className="auth-context-pill"><Icon name="shield" size={16} />Secure organisational workspace</div>
-          <p className="eyebrow">Welcome back</p>
-          <h1 id="product-title">Continue the reasoning—not just the record.</h1>
+          <div className="auth-language-row"><LanguageSwitcher /></div>
+          <p className="eyebrow">{t.welcomeEyebrow}</p>
+          <h1 id="product-title">{t.heading}</h1>
           <p>Return to your organisation’s signals, scenarios, decisions, collective evaluations, implementation commitments, and learning history.</p>
           <div className="auth-proof-grid">
             <article><Icon name="search" size={19} /><span><strong>Anticipate</strong><small>Signals, systems, scenarios</small></span></article>
@@ -117,7 +122,7 @@ export function LoginPage() {
         </div>
         <div className="auth-introduction__footer">
           <span>New to CrowdSmarter?</span>
-          <Link to="/request-demo">Request a tailored demonstration <Icon name="arrow-right" size={16} /></Link>
+          <Link to="/request-demo">{t.requestDemo} <Icon name="arrow-right" size={16} /></Link>
         </div>
       </section>
 
@@ -125,9 +130,9 @@ export function LoginPage() {
         <div className="auth-card__content auth-card__content--executive">
           <div className="auth-card__heading">
             <span className="auth-card__icon"><Icon name="shield" size={23} /></span>
-            <div><p className="public-eyebrow">Authorised access</p><h2 id="sign-in-title">Sign in to CrowdSmarter</h2></div>
+            <div><p className="public-eyebrow">Authorised access</p><h2 id="sign-in-title">{t.signInHeading}</h2></div>
           </div>
-          <p className="muted">Use the email address associated with your organisation invitation.</p>
+          <p className="muted">{t.signInHint}</p>
 
           {login.error ? (
             <div className="auth-error-panel" role="alert" aria-live="assertive">
@@ -150,7 +155,7 @@ export function LoginPage() {
             }))}
             noValidate
           >
-            <label htmlFor="email">Email address</label>
+            <label htmlFor="email">{t.emailLabel}</label>
             <input
               id="email"
               type="email"
@@ -163,7 +168,7 @@ export function LoginPage() {
             />
             <FieldError message={form.formState.errors.email?.message} />
 
-            <div className="auth-label-row"><label htmlFor="password">Password</label><Link to="/forgot-password">Forgot password?</Link></div>
+            <div className="auth-label-row"><label htmlFor="password">{t.passwordLabel}</label><Link to="/forgot-password">{t.forgotPassword}</Link></div>
             <div className="password-field password-field--executive">
               <input
                 id="password"
@@ -181,7 +186,7 @@ export function LoginPage() {
             <FieldError message={form.formState.errors.password?.message} />
 
             <button aria-label="Sign in" className="button button--primary button--full button--large auth-submit" type="submit" disabled={login.isPending}>
-              {login.isPending ? "Signing in securely…" : <>Sign in securely <Icon name="arrow-right" size={18} /></>}
+              {login.isPending ? t.signingInButton : <>{t.signInButton} <Icon name="arrow-right" size={18} /></>}
             </button>
           </form>
 

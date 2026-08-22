@@ -178,3 +178,56 @@ The local Phase 17 provisioner never accepts or embeds the weak password `Admin1
 ## Governed support access
 
 Platform authority is explicit and separate from Django technical flags. Safe global summaries do not expose full tenant records. Detailed tenant access requires a specific reason, limited scope, and expiry. Operational actions require the stronger support-access level and generate attributable audit events. Platform administrators are not silently inserted into real client memberships or decision records.
+
+## Grant round trust posture (2026-08)
+
+This section exists to answer a funder's "how do you handle our data" question directly,
+without overstating what has and hasn't happened. Everything below is demonstrably true in
+the current codebase and can be independently checked by reading the referenced modules.
+Nothing here is a claim of formal certification.
+
+**In place today:**
+
+- Session-based authentication with CSRF protection on every state-changing request, including
+  the public applicant-facing endpoints (Open Session join/submit/vote, the applicant portal's
+  magic-link request/consume) — see `apps/ideation/views.py` and `apps/applicants/views.py`.
+- Rate limiting on every public endpoint (session join, idea submission, voting, comments,
+  magic-link requests, progress reports), configured per-action in `settings/base.py`.
+- Tenant isolation enforced at the selector layer before any object is returned — every
+  organisation-scoped query starts from `organisation_for_user`/`organisations_for_user` or an
+  equivalent active-membership check, never a client-supplied organisation ID trusted as-is.
+- Provider API keys (AI provider, Stripe, Candid) are Fernet-encrypted at rest
+  (`apps/platform_admin/crypto.py`), decrypted only at the moment of use, and only their last 4
+  characters ever reach an audit-log entry.
+- An append-only audit trail (`apps/audit`) records every configuration change, disbursement,
+  eligibility/outcome decision, and lookup — never mutated or deleted after the fact.
+- Two-factor authentication (TOTP + backup codes) available to every account
+  (`apps/accounts/models.py: TOTPDevice`, `MFABackupCode`).
+- Conflict-of-interest declarations automatically exclude a conflicted reviewer's scores from
+  aggregate evaluation results, with the exclusion itself surfaced transparently rather than
+  silently applied (`apps/participants` + `apps/evaluations/services.py`).
+- Eligibility and funding-outcome screening are first-class, auditable fields on every
+  application (`apps/decision_options/models.py`), decoupled from the immutable decision
+  finalisation record so a funding decision on one application never touches the audit trail
+  of the round's other decisions.
+- Immutable finalisation and immutable, versioned stakeholder positions (see the human
+  finalisation threat model above) apply identically to grant rounds — a funding decision is
+  not exempt from the same accountable-authority guarantees as any other decision type.
+
+**Explicitly not yet true, stated plainly rather than implied:**
+
+- No formal third-party certification (SOC 2, ISO 27001, Cyber Essentials, or similar) has been
+  pursued or obtained. Achieving one requires an accredited external auditor examining the live
+  production deployment and the organisation's own operational processes — it is not something
+  code alone can produce, and this document does not claim otherwise.
+- No independent penetration test or security audit of this codebase has been conducted (see
+  "Production actions before customer data" above, which remains the honest pre-launch
+  checklist).
+- Payment and organisation-lookup provider integrations (Stripe, Candid) are code-complete but
+  unverified against live production credentials — see `apps/disbursements` and
+  `apps/org_enrichment`, both of which default to a dependency-free manual mode precisely so a
+  customer is never required to trust an unverified third-party integration to use the
+  platform.
+
+The public `/trust` page in the frontend is generated from this same list — it does not make a
+claim that isn't traceable back to a specific control described here.

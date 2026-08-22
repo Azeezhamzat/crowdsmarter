@@ -10,8 +10,8 @@ from apps.decisions.selectors import decision_for_user
 from apps.organisations.models import Organisation
 
 from .selectors import (candidate_for_user, exercise_for_user, exercise_workspace_for_user, exercises_for_decision, portfolio_for_user, portfolios_for_organisation, round_for_user)
-from .serializers import (EvaluationCriterionSerializer, EvaluationCriterionWriteSerializer, EvaluationExercisePatchSerializer, EvaluationExerciseSerializer, EvaluationExerciseWriteSerializer, EvaluationRoundSerializer, EvaluationRoundTransitionSerializer, EvaluationRoundWriteSerializer, EvaluationSubmissionSerializer, EvaluationSubmissionWriteSerializer, MinorityReportSerializer, MinorityReportWriteSerializer, PortfolioAssessmentSerializer, PortfolioAssessmentWriteSerializer, PortfolioCandidateSerializer, PortfolioCandidateWriteSerializer, PortfolioCriterionSerializer, PortfolioCriterionWriteSerializer, PortfolioSelectionSerializer, PortfolioSelectionWriteSerializer, PrioritisationPortfolioPatchSerializer, PrioritisationPortfolioSerializer, PrioritisationPortfolioWriteSerializer)
-from .services import (add_candidate, add_portfolio_criterion, create_criterion, create_exercise, create_minority_report, create_portfolio, create_round, evaluation_results, save_portfolio_assessment, save_submission, set_selection, transition_round, update_exercise, update_portfolio)
+from .serializers import (EvaluationCriterionSerializer, EvaluationCriterionWriteSerializer, EvaluationExercisePatchSerializer, EvaluationExerciseSerializer, EvaluationExerciseWriteSerializer, EvaluationRoundSerializer, EvaluationRoundTransitionSerializer, EvaluationRoundWriteSerializer, EvaluationScoringOptionSerializer, EvaluationSubmissionSerializer, EvaluationSubmissionWriteSerializer, MinorityReportSerializer, MinorityReportWriteSerializer, PortfolioAssessmentSerializer, PortfolioAssessmentWriteSerializer, PortfolioCandidateSerializer, PortfolioCandidateWriteSerializer, PortfolioCriterionSerializer, PortfolioCriterionWriteSerializer, PortfolioSelectionSerializer, PortfolioSelectionWriteSerializer, PrioritisationPortfolioPatchSerializer, PrioritisationPortfolioSerializer, PrioritisationPortfolioWriteSerializer)
+from .services import (add_candidate, add_portfolio_criterion, create_criterion, create_exercise, create_minority_report, create_portfolio, create_round, evaluation_results, save_portfolio_assessment, save_submission, scoring_options_for_exercise, set_selection, transition_round, update_exercise, update_portfolio)
 
 
 class EvaluationExerciseListCreateView(APIView):
@@ -36,6 +36,15 @@ class EvaluationExerciseDetailView(APIView):
         serializer=EvaluationExercisePatchSerializer(data=request.data); serializer.is_valid(raise_exception=True)
         item=update_exercise(actor=request.user,exercise=item,fields=dict(serializer.validated_data))
         return Response(EvaluationExerciseSerializer(item,context={"request":request}).data)
+
+
+class EvaluationScoringOptionsView(APIView):
+    """Active options for the submission form — blinded to 'Application N' when the exercise asks for it."""
+    permission_classes=[IsAuthenticated]
+    def get(self,request,exercise_id):
+        exercise=exercise_for_user(user=request.user,exercise_id=exercise_id)
+        rows=scoring_options_for_exercise(exercise=exercise,viewer=request.user)
+        return Response(EvaluationScoringOptionSerializer(rows,many=True).data)
 
 
 class EvaluationCriterionCreateView(APIView):

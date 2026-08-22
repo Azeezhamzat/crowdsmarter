@@ -6,7 +6,7 @@ import { Icon } from "../../components/Icon";
 import { StatusMessage } from "../../components/StatusMessage";
 import type { DecisionUrgency, DecisionStatus, OrganisationPortfolio } from "../../lib/types";
 import { decisionLifecycle } from "../decisions/lifecycle";
-import { getOrganisationPortfolio } from "./api";
+import { getOrganisationBudgetRollup, getOrganisationPortfolio } from "./api";
 
 function formatDate(value: string | null): string {
   if (!value) return "No due date";
@@ -95,6 +95,21 @@ function RiskHeatmap({ heatmap }: { heatmap: OrganisationPortfolio["watchlist"][
   );
 }
 
+function BudgetRollupTrend({ months }: { months: Array<{ month: string; label: string; awarded_total: string }> }) {
+  const max = Math.max(1, ...months.map((item) => Number(item.awarded_total)));
+  return (
+    <div className="analytics-bars" role="img" aria-label={`Awarded amount by month. ${months.map((m) => `${m.label}: ${m.awarded_total}`).join("; ")}`}>
+      {months.map((item) => (
+        <div key={item.month}>
+          <span>{item.label}</span>
+          <div><i style={{ width: `${Math.max(2, (Number(item.awarded_total) / max) * 100)}%` }} /></div>
+          <strong>{item.awarded_total}</strong>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function OrganisationPortfolioPage() {
   const { organisationId: routeOrganisationId } = useParams<{ organisationId: string }>();
   const organisationId = routeOrganisationId ?? "";
@@ -110,6 +125,11 @@ export function OrganisationPortfolioPage() {
   const portfolio = useQuery({
     queryKey: ["organisations", organisationId, "portfolio", deferredQuery, status, urgency, myWork, overdue],
     queryFn: () => getOrganisationPortfolio(organisationId, { q: deferredQuery, status, urgency, my_work: myWork, overdue }),
+    enabled: Boolean(organisationId),
+  });
+  const budgetRollup = useQuery({
+    queryKey: ["organisations", organisationId, "budget-rollup"],
+    queryFn: () => getOrganisationBudgetRollup(organisationId),
     enabled: Boolean(organisationId),
   });
 
@@ -165,6 +185,19 @@ export function OrganisationPortfolioPage() {
             <p className="muted">Every open or monitored risk across the portfolio, plotted by likelihood and impact.</p>
             <RiskHeatmap heatmap={portfolio.data.watchlist.risk_heatmap} />
           </article>
+          {budgetRollup.data && budgetRollup.data.round_count > 0 ? (
+            <article className="card-panel">
+              <p className="eyebrow">Grant rounds</p>
+              <h2>Budget across every round</h2>
+              <p className="muted">
+                {budgetRollup.data.round_count} round{budgetRollup.data.round_count === 1 ? "" : "s"} ·{" "}
+                {budgetRollup.data.awarded_total} awarded of {budgetRollup.data.requested_total} requested ·{" "}
+                {budgetRollup.data.funded_count} funded · {budgetRollup.data.declined_count} declined ·{" "}
+                {budgetRollup.data.pending_outcome_count} pending
+              </p>
+              <BudgetRollupTrend months={budgetRollup.data.monthly_trend} />
+            </article>
+          ) : null}
         </section>
       ) : null}
 

@@ -23,3 +23,27 @@ Only active decision participants with a contribution-capable role may submit. M
 - disagreement, confidence, quorum, and threshold status remain visible;
 - method-specific validation prevents ambiguous ballot semantics;
 - later forecasting and calibration can reuse the contribution-governance patterns without conflating forecasts with preferences.
+
+## Follow-up: applicant-blind identity and ranked-choice (2026-08)
+
+Two extensions close gaps identified against comparable participatory-grantmaking tools:
+
+- `EvaluationExercise.blind_applicant_identity` hides *which option* is being scored, not just
+  *who is scoring it*. When set, a new `GET /evaluations/{exercise_id}/scoring-options/`
+  endpoint (`apps.evaluations.services.scoring_options_for_exercise`) returns each active
+  option as a stable `"Application A"`, `"Application B"`, … label instead of its real title,
+  for any non-manager while the exercise remains open. A manager (`can_manage_exercise`)
+  always sees the real title, and the real title is restored for everyone once the exercise
+  reaches `closed`/`archived` — blinding protects the scoring moment, not the audit trail.
+- A fourth method, `EvaluationExercise.Method.RANKED_CHOICE`, adds a strict-preference ballot:
+  `EvaluationResponse.rank` (1..N, no repeats, no criterion/score/vote) replaces the
+  score/vote fields for that method. `apps.evaluations.services._instant_runoff` tabulates a
+  single-winner instant-runoff (round-by-round elimination of the lowest first-preference
+  option, ballots transferring to the next standing preference) rather than full multi-winner
+  STV with quota-based surplus transfer — the single-winner case is what a "pick one grant"
+  round needs, and the elimination/tally trail is returned in full
+  (`EvaluationResults.ranked_choice_rounds`) so the outcome is replayable, not a black box.
+
+Both reuse the existing conflict-of-interest exclusion and quorum/hidden-until-close machinery
+unchanged; neither introduces a new identity or anonymity concept beyond what this ADR already
+established.

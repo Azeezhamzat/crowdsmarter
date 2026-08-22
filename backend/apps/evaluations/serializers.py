@@ -37,7 +37,7 @@ class EvaluationResponseSerializer(serializers.ModelSerializer):
     criterion_title=serializers.CharField(source="criterion.title",read_only=True,allow_null=True)
     class Meta:
         model=EvaluationResponse
-        fields=["id","option_id","option_title","criterion_id","criterion_title","score","vote","rationale","created_at"]
+        fields=["id","option_id","option_title","criterion_id","criterion_title","score","vote","rank","rationale","created_at"]
         read_only_fields=fields
 
 
@@ -96,7 +96,7 @@ class EvaluationExerciseSerializer(serializers.ModelSerializer):
     can_submit=serializers.SerializerMethodField()
     class Meta:
         model=EvaluationExercise
-        fields=["id","organisation_id","decision_id","title","purpose","method","method_label","status","status_label","anonymity","blind_results_until_close","quorum_count","approval_threshold","objection_threshold","owner","created_by","criteria","rounds","minority_reports","can_manage","can_submit","created_at","updated_at"]
+        fields=["id","organisation_id","decision_id","title","purpose","method","method_label","status","status_label","anonymity","blind_results_until_close","blind_applicant_identity","quorum_count","approval_threshold","objection_threshold","owner","created_by","criteria","rounds","minority_reports","can_manage","can_submit","created_at","updated_at"]
         read_only_fields=fields
     def get_can_manage(self,obj):
         request=self.context.get("request"); return bool(request and can_manage_exercise(actor=request.user,exercise=obj))
@@ -110,6 +110,7 @@ class EvaluationExerciseWriteSerializer(StrictSerializer):
     method=serializers.ChoiceField(choices=EvaluationExercise.Method.choices)
     anonymity=serializers.ChoiceField(choices=EvaluationExercise.Anonymity.choices,required=False,default=EvaluationExercise.Anonymity.ATTRIBUTED)
     blind_results_until_close=serializers.BooleanField(required=False,default=True)
+    blind_applicant_identity=serializers.BooleanField(required=False,default=False)
     quorum_count=serializers.IntegerField(required=False,default=1,min_value=1,max_value=10000)
     approval_threshold=serializers.DecimalField(required=False,default=60,max_digits=5,decimal_places=2,min_value=0,max_value=100)
     objection_threshold=serializers.DecimalField(required=False,default=20,max_digits=5,decimal_places=2,min_value=0,max_value=100)
@@ -122,6 +123,7 @@ class EvaluationExercisePatchSerializer(StrictSerializer):
     status=serializers.ChoiceField(choices=EvaluationExercise.Status.choices,required=False)
     anonymity=serializers.ChoiceField(choices=EvaluationExercise.Anonymity.choices,required=False)
     blind_results_until_close=serializers.BooleanField(required=False)
+    blind_applicant_identity=serializers.BooleanField(required=False)
     quorum_count=serializers.IntegerField(required=False,min_value=1,max_value=10000)
     approval_threshold=serializers.DecimalField(required=False,max_digits=5,decimal_places=2,min_value=0,max_value=100)
     objection_threshold=serializers.DecimalField(required=False,max_digits=5,decimal_places=2,min_value=0,max_value=100)
@@ -142,7 +144,14 @@ class EvaluationResponseWriteSerializer(StrictSerializer):
     criterion_id=serializers.UUIDField(required=False,allow_null=True)
     score=serializers.DecimalField(required=False,allow_null=True,max_digits=8,decimal_places=3)
     vote=serializers.ChoiceField(required=False,allow_blank=True,choices=EvaluationResponse.Vote.choices)
+    rank=serializers.IntegerField(required=False,allow_null=True,min_value=1,max_value=9999)
     rationale=serializers.CharField(required=False,allow_blank=True,max_length=8000)
+
+
+class EvaluationScoringOptionSerializer(serializers.Serializer):
+    id=serializers.UUIDField()
+    title=serializers.CharField()
+    blinded=serializers.BooleanField()
 
 
 class EvaluationSubmissionWriteSerializer(StrictSerializer):

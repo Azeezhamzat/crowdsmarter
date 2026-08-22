@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { setLocale } from "../../lib/i18n";
 import { LoginPage } from "./LoginPage";
 
 function renderPage() {
@@ -18,7 +19,10 @@ function renderPage() {
   );
 }
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  setLocale("en");
+});
 
 describe("LoginPage", () => {
   it("validates required credentials before sending a request", async () => {
@@ -65,5 +69,14 @@ describe("LoginPage", () => {
     await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(3));
     const verifyCall = vi.mocked(globalThis.fetch).mock.calls.at(2);
     expect(String(verifyCall?.[0])).toContain("/auth/mfa/verify/");
+  });
+
+  it("translates the sign-in form when the language is switched", () => {
+    renderPage();
+    fireEvent.change(screen.getByRole("combobox", { name: "Language" }), { target: { value: "pt" } });
+
+    expect(screen.getByRole("heading", { name: "Entrar no CrowdSmarter" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Endereço de e-mail")).toBeInTheDocument();
+    expect(screen.getByLabelText("Palavra-passe")).toBeInTheDocument();
   });
 });

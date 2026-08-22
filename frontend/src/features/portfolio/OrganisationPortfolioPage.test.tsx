@@ -3,12 +3,13 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 
-import { getOrganisationPortfolio } from "./api";
+import { getOrganisationBudgetRollup, getOrganisationPortfolio } from "./api";
 import { OrganisationPortfolioPage } from "./OrganisationPortfolioPage";
 
 vi.mock("./api", () => ({
   getPersonalWork: vi.fn(),
   getOrganisationPortfolio: vi.fn(),
+  getOrganisationBudgetRollup: vi.fn(),
 }));
 
 describe("OrganisationPortfolioPage", () => {
@@ -52,6 +53,15 @@ describe("OrganisationPortfolioPage", () => {
         },
       },
     });
+    vi.mocked(getOrganisationBudgetRollup).mockResolvedValue({
+      round_count: 2,
+      requested_total: "3500.00",
+      awarded_total: "2300.00",
+      funded_count: 2,
+      declined_count: 1,
+      pending_outcome_count: 0,
+      monthly_trend: [{ month: "2026-07-01", label: "Jul 2026", awarded_total: "2300.00" }],
+    });
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
       <QueryClientProvider client={client}>
@@ -87,5 +97,8 @@ describe("OrganisationPortfolioPage", () => {
     expect(screen.getByText("Risk heatmap")).toBeInTheDocument();
     expect(screen.getByRole("img", { name: /risk heatmap by likelihood and impact/i })).toBeInTheDocument();
     expect(screen.getByText("1 open or monitored risk plotted")).toBeInTheDocument();
+
+    expect(screen.getByText("Budget across every round")).toBeInTheDocument();
+    expect(screen.getByText(/2 rounds · 2300\.00 awarded of 3500\.00 requested/i)).toBeInTheDocument();
   });
 });

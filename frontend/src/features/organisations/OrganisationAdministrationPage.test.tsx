@@ -4,6 +4,8 @@ import { MemoryRouter, Route, Routes } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 
 import { getOrganisationSubscription, listPlans } from "../billing/api";
+import { getDisbursementConfiguration } from "../disbursements/api";
+import { getLookupConfiguration } from "../org-enrichment/api";
 import {
   getOrganisation,
   listMembershipHistory,
@@ -23,6 +25,24 @@ vi.mock("../billing/api", () => ({
   getOrganisationSubscription: vi.fn(), listPlans: vi.fn(),
   changeOrganisationPlan: vi.fn(), setOrganisationBillingContact: vi.fn(),
 }));
+
+vi.mock("../disbursements/api", () => ({
+  getDisbursementConfiguration: vi.fn(),
+  setDisbursementProvider: vi.fn(),
+  setDisbursementApiKey: vi.fn(),
+  clearDisbursementApiKey: vi.fn(),
+  testDisbursementConnection: vi.fn(),
+}));
+
+vi.mock("../org-enrichment/api", () => ({
+  getLookupConfiguration: vi.fn(),
+  setLookupProvider: vi.fn(),
+  setLookupApiKey: vi.fn(),
+  clearLookupApiKey: vi.fn(),
+  testLookupConnection: vi.fn(),
+}));
+
+vi.mock("../ai-assistance/api", () => ({ getAIReviewQualityMetrics: vi.fn().mockRejectedValue(new Error("not mocked")) }));
 
 describe("OrganisationAdministrationPage", () => {
   it("shows tenant policy, ownership, and attributable membership history", async () => {
@@ -60,6 +80,14 @@ describe("OrganisationAdministrationPage", () => {
       { id: "p1", key: "team", name: "Team", description: "", trial_days: 14, max_active_decisions: 25, max_active_members: 15, includes_advanced_foresight: true, includes_ai_assistance: true, support_level: "community", support_level_label: "Community" },
       { id: "p2", key: "professional", name: "Professional", description: "", trial_days: 14, max_active_decisions: null, max_active_members: 50, includes_advanced_foresight: true, includes_ai_assistance: true, support_level: "standard", support_level_label: "Standard" },
     ]);
+    vi.mocked(getDisbursementConfiguration).mockResolvedValue({
+      id: "d1", organisation_id: "o1", provider_key: "manual", provider_key_label: "Manual ledger",
+      stripe_account_id: "", api_key_is_set: false, created_at: "2026-08-01T10:00:00Z", updated_at: "2026-08-01T10:00:00Z",
+    });
+    vi.mocked(getLookupConfiguration).mockResolvedValue({
+      id: "l1", organisation_id: "o1", provider_key: "manual", provider_key_label: "Manual verification",
+      api_key_is_set: false, created_at: "2026-08-01T10:00:00Z", updated_at: "2026-08-01T10:00:00Z",
+    });
 
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
@@ -78,5 +106,11 @@ describe("OrganisationAdministrationPage", () => {
     expect(screen.getAllByText("Team").length).toBeGreaterThan(0);
     expect(screen.getByText(/2 \/ 25/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /change plan/i })).toBeInTheDocument();
+
+    expect(await screen.findByRole("heading", { name: /disbursement provider/i })).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Manual ledger")).toBeInTheDocument();
+
+    expect(await screen.findByRole("heading", { name: /organisation lookup/i })).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Manual verification")).toBeInTheDocument();
   });
 });

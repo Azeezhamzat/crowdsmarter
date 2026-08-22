@@ -40,4 +40,7 @@ urlpatterns = [
     path("api/v1/", include("apps.platform_admin.urls")),
     path("api/v1/", include("apps.billing.urls")),
     path("api/v1/", include("apps.ideation.urls")),
+    path("api/v1/", include("apps.applicants.urls")),
+    path("api/v1/", include("apps.disbursements.urls")),
+    path("api/v1/", include("apps.org_enrichment.urls")),
 ]

@@ -4,6 +4,7 @@ import type {
   EvaluationExercise,
   EvaluationResults,
   EvaluationRound,
+  EvaluationScoringOption,
   EvaluationSubmission,
   MinorityReport,
   PortfolioAssessment,
@@ -40,6 +41,10 @@ export function addEvaluationCriterion(exerciseId: string, input: Record<string,
     method: "POST",
     body: JSON.stringify(input),
   });
+}
+
+export function getScoringOptions(exerciseId: string): Promise<EvaluationScoringOption[]> {
+  return apiRequest(`/evaluations/${exerciseId}/scoring-options/`);
 }
 
 export function createEvaluationRound(exerciseId: string, title = ""): Promise<EvaluationRound> {

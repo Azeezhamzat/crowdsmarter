@@ -13,6 +13,7 @@ import {
   createEvaluationRound,
   createMinorityReport,
   getEvaluation,
+  getScoringOptions,
   listEvaluations,
   saveEvaluationSubmission,
   transitionEvaluationRound,
@@ -35,6 +36,7 @@ export function DecisionEvaluationPage() {
   const [method, setMethod] = useState<EvaluationExercise["method"]>("scorecard");
   const [anonymity, setAnonymity] = useState<EvaluationExercise["anonymity"]>("peer_anonymous");
   const [quorum, setQuorum] = useState(1);
+  const [blindApplicantIdentity, setBlindApplicantIdentity] = useState(false);
 
   const decision = useQuery({ queryKey: ["decisions", decisionId], queryFn: () => getDecision(decisionId), enabled: Boolean(decisionId) });
   const options = useQuery({ queryKey: ["decisions", decisionId, "options"], queryFn: () => listOptions(decisionId), enabled: Boolean(decisionId) });
@@ -60,6 +62,7 @@ export function DecisionEvaluationPage() {
       method,
       anonymity,
       blind_results_until_close: true,
+      blind_applicant_identity: blindApplicantIdentity,
       quorum_count: quorum,
       approval_threshold: 60,
       objection_threshold: 20,
@@ -103,12 +106,14 @@ export function DecisionEvaluationPage() {
                 <option value="approval">Approval voting</option>
                 <option value="consent">Consent and objections</option>
                 <option value="delphi">Delphi rounds</option>
+                <option value="ranked_choice">Ranked-choice (instant runoff)</option>
               </select></label>
               <label>Contribution identity<select value={anonymity} onChange={(event) => setAnonymity(event.target.value as EvaluationExercise["anonymity"])}>
                 <option value="peer_anonymous">Anonymous to peers</option>
                 <option value="attributed">Attributable</option>
               </select></label>
               <label>Minimum quorum<input type="number" min={1} value={quorum} onChange={(event) => setQuorum(Number(event.target.value))} /></label>
+              <label className="checkbox-field"><input type="checkbox" checked={blindApplicantIdentity} onChange={(event) => setBlindApplicantIdentity(event.target.checked)} /> Hide applicant names from reviewers while scoring</label>
               <button className="button button--primary" disabled={create.isPending || !title.trim()}>{create.isPending ? "Creating…" : "Create exercise"}</button>
             </form>
           </section>
@@ -249,20 +254,31 @@ function DisagreementBadge({ result }: { result: EvaluationOptionResult }) {
 function RoundPanel({ round, exercise, options, onRefresh }: { round: EvaluationRound; exercise: EvaluationExercise; options: Array<{ id: string; title: string }>; onRefresh: () => Promise<void> }) {
   const [scores, setScores] = useState<Record<string, string>>({});
   const [votes, setVotes] = useState<Record<string, string>>({});
+  const [ranks, setRanks] = useState<Record<string, string>>({});
   const [confidence, setConfidence] = useState(3);
   const [rationale, setRationale] = useState("");
   const [feedback, setFeedback] = useState("");
+
+  const scoringOptions = useQuery({
+    queryKey: ["evaluations", exercise.id, "scoring-options"],
+    queryFn: () => getScoringOptions(exercise.id),
+    enabled: round.status === "open" && exercise.can_submit,
+  });
+  const formOptions = scoringOptions.data ?? options;
 
   const transition = useMutation({ mutationFn: (status: "open" | "closed") => transitionEvaluationRound(round.id, { status, feedback_summary: feedback }), onSuccess: onRefresh });
   const submit = useMutation({
     mutationFn: () => {
       const scorecard = ["scorecard", "delphi"].includes(exercise.method);
+      const rankedChoice = exercise.method === "ranked_choice";
       const responses = scorecard
-        ? options.flatMap((option) => exercise.criteria.flatMap((criterion) => {
+        ? formOptions.flatMap((option) => exercise.criteria.flatMap((criterion) => {
           const value = scores[`${option.id}:${criterion.id}`];
           return value ? [{ option_id: option.id, criterion_id: criterion.id, score: Number(value), rationale: "" }] : [];
         }))
-        : options.flatMap((option) => votes[option.id] ? [{ option_id: option.id, criterion_id: null, vote: votes[option.id], rationale: "" }] : []);
+        : rankedChoice
+        ? formOptions.flatMap((option) => ranks[option.id] ? [{ option_id: option.id, criterion_id: null, rank: Number(ranks[option.id]), rationale: "" }] : [])
+        : formOptions.flatMap((option) => votes[option.id] ? [{ option_id: option.id, criterion_id: null, vote: votes[option.id], rationale: "" }] : []);
       return saveEvaluationSubmission(round.id, { confidence, overall_rationale: rationale, responses, submit: true });
     },
     onSuccess: onRefresh,
@@ -286,10 +302,15 @@ function RoundPanel({ round, exercise, options, onRefresh }: { round: Evaluation
       {round.status === "open" && exercise.can_submit ? (
         <form className="evaluation-ballot" onSubmit={submitForm}>
           <div className="blind-notice"><strong>Independent contribution</strong><span>{exercise.blind_results_until_close ? "Aggregate results stay hidden until the round closes." : "Live aggregates are visible."}</span></div>
+          {scoringOptions.data?.some((option) => option.blinded) ? (
+            <p className="blind-applicant-notice">Applicant names are hidden while you score — options are shown as “Application A”, “Application B”, and so on.</p>
+          ) : null}
           {["scorecard", "delphi"].includes(exercise.method) ? (
-            <div className="score-matrix table-wrap"><table><thead><tr><th>Option</th>{exercise.criteria.map((criterion) => <th key={criterion.id}>{criterion.title}<small>{criterion.scale_min}–{criterion.scale_max}</small></th>)}</tr></thead><tbody>{options.map((option) => <tr key={option.id}><th>{option.title}</th>{exercise.criteria.map((criterion) => <td key={criterion.id}><input aria-label={`${option.title}: ${criterion.title}`} type="number" min={criterion.scale_min} max={criterion.scale_max} step="0.1" value={scores[`${option.id}:${criterion.id}`] ?? ""} onChange={(event) => setScores((current) => ({ ...current, [`${option.id}:${criterion.id}`]: event.target.value }))} /></td>)}</tr>)}</tbody></table></div>
+            <div className="score-matrix table-wrap"><table><thead><tr><th>Option</th>{exercise.criteria.map((criterion) => <th key={criterion.id}>{criterion.title}<small>{criterion.scale_min}–{criterion.scale_max}</small></th>)}</tr></thead><tbody>{formOptions.map((option) => <tr key={option.id}><th>{option.title}</th>{exercise.criteria.map((criterion) => <td key={criterion.id}><input aria-label={`${option.title}: ${criterion.title}`} type="number" min={criterion.scale_min} max={criterion.scale_max} step="0.1" value={scores[`${option.id}:${criterion.id}`] ?? ""} onChange={(event) => setScores((current) => ({ ...current, [`${option.id}:${criterion.id}`]: event.target.value }))} /></td>)}</tr>)}</tbody></table></div>
+          ) : exercise.method === "ranked_choice" ? (
+            <div className="ballot-options">{formOptions.map((option) => <label key={option.id}><strong>{option.title}</strong><input aria-label={`Rank for ${option.title}`} type="number" min={1} max={formOptions.length} step={1} value={ranks[option.id] ?? ""} onChange={(event) => setRanks((current) => ({ ...current, [option.id]: event.target.value }))} placeholder={`1–${formOptions.length}`} /></label>)}</div>
           ) : (
-            <div className="ballot-options">{options.map((option) => <label key={option.id}><strong>{option.title}</strong><select value={votes[option.id] ?? ""} onChange={(event) => setVotes((current) => ({ ...current, [option.id]: event.target.value }))}><option value="">Not answered</option>{exercise.method === "approval" ? <><option value="approve">Approve</option><option value="abstain">Abstain</option></> : <><option value="consent">Consent</option><option value="concern">Concern</option><option value="object">Reasoned objection</option><option value="abstain">Abstain</option></>}</select></label>)}</div>
+            <div className="ballot-options">{formOptions.map((option) => <label key={option.id}><strong>{option.title}</strong><select value={votes[option.id] ?? ""} onChange={(event) => setVotes((current) => ({ ...current, [option.id]: event.target.value }))}><option value="">Not answered</option>{exercise.method === "approval" ? <><option value="approve">Approve</option><option value="abstain">Abstain</option></> : <><option value="consent">Consent</option><option value="concern">Concern</option><option value="object">Reasoned objection</option><option value="abstain">Abstain</option></>}</select></label>)}</div>
           )}
           <div className="evaluation-submission-meta"><label>Confidence: {confidence}/5<input type="range" min={1} max={5} value={confidence} onChange={(event) => setConfidence(Number(event.target.value))} /></label><label>Overall rationale<textarea rows={3} value={rationale} onChange={(event) => setRationale(event.target.value)} /></label></div>
           <button className="button button--primary" disabled={submit.isPending}>{submit.isPending ? "Submitting…" : "Submit independent judgement"}</button>
@@ -302,7 +323,43 @@ function RoundPanel({ round, exercise, options, onRefresh }: { round: Evaluation
         <div className="result-summary"><span>{round.result_summary.submission_count} submitted</span><span>{round.result_summary.eligible_count} eligible</span><span className={round.result_summary.quorum_met ? "result-ok" : "result-warning"}>{round.result_summary.quorum_met ? "Quorum met" : `Needs ${round.result_summary.quorum_count}`}</span></div>
         {round.result_summary.hidden ? <div className="sealed-results"><strong>Results sealed</strong><p>Blindness protects independent judgement and reduces anchoring while this round remains open.</p></div> : (
           <>
-            <div className="result-ranking">{options.map((option, index) => { const result = resultByOption.get(option.id); return result ? <article key={option.id}><span className="rank-number">{index + 1}</span><div><strong>{result.title}</strong>{result.weighted_score != null ? <p>{result.weighted_score.toFixed(1)} weighted score · confidence {result.confidence ?? "—"}</p> : <p>{result.approval_rate ?? 0}% approval · {result.objection_rate ?? 0}% objections{result.dissent_rate != null ? ` · ${result.dissent_rate}% dissent` : ""}</p>}<DisagreementBadge result={result} /></div>{result.passes_threshold != null ? <span className={result.passes_threshold ? "role-badge" : "status-badge"}>{result.passes_threshold ? "Passes" : "Below threshold"}</span> : null}</article> : null; })}</div>
+            {exercise.method === "ranked_choice" ? (
+              <div className="result-ranking">
+                {round.result_summary.options.map((result) => (
+                  <article key={result.option_id}>
+                    <span className="rank-number">{result.final_rank}</span>
+                    <div>
+                      <strong>{result.title}</strong>
+                      <p>
+                        {result.first_round_votes ?? 0} first-preference vote{result.first_round_votes === 1 ? "" : "s"}
+                        {result.eliminated_in_round != null ? ` · eliminated in round ${result.eliminated_in_round}` : " · winner by instant runoff"}
+                      </p>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <div className="result-ranking">{options.map((option, index) => { const result = resultByOption.get(option.id); return result ? <article key={option.id}><span className="rank-number">{index + 1}</span><div><strong>{result.title}</strong>{result.weighted_score != null ? <p>{result.weighted_score.toFixed(1)} weighted score · confidence {result.confidence ?? "—"}</p> : <p>{result.approval_rate ?? 0}% approval · {result.objection_rate ?? 0}% objections{result.dissent_rate != null ? ` · ${result.dissent_rate}% dissent` : ""}</p>}<DisagreementBadge result={result} /></div>{result.passes_threshold != null ? <span className={result.passes_threshold ? "role-badge" : "status-badge"}>{result.passes_threshold ? "Passes" : "Below threshold"}</span> : null}</article> : null; })}</div>
+            )}
+            {exercise.method === "ranked_choice" && round.result_summary.ranked_choice_rounds.length ? (
+              <div className="table-wrap ranked-choice-rounds">
+                <table>
+                  <thead><tr><th>Round</th>{round.result_summary.options.map((option) => <th key={option.option_id}>{option.title}</th>)}<th>Eliminated</th></tr></thead>
+                  <tbody>
+                    {round.result_summary.ranked_choice_rounds.map((tallyRound) => {
+                      const eliminatedTitle = round.result_summary.options.find((o) => o.option_id === tallyRound.eliminated_option_id)?.title;
+                      return (
+                        <tr key={tallyRound.round_number}>
+                          <th>{tallyRound.round_number}</th>
+                          {round.result_summary.options.map((option) => <td key={option.option_id}>{tallyRound.tallies[option.option_id] ?? "—"}</td>)}
+                          <td>{eliminatedTitle ?? "—"}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
             {round.result_summary.uncertainty_narrative ? <p className="uncertainty-narrative">{round.result_summary.uncertainty_narrative}</p> : null}
             {(() => {
               const tornado = round.result_summary.tornado;

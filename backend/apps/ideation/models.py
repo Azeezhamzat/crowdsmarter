@@ -92,6 +92,14 @@ class SessionParticipant(UUIDTimeStampedModel):
     name = models.CharField(max_length=200)
     email = models.EmailField()
     token_digest = models.CharField(max_length=64, unique=True)
+    account = models.ForeignKey(
+        "applicants.ApplicantAccount",
+        on_delete=models.SET_NULL,
+        related_name="session_participations",
+        null=True,
+        blank=True,
+        help_text="Linked once this email matches a verified persistent applicant account.",
+    )
 
     class Meta:
         ordering = ["created_at", "id"]

@@ -321,6 +321,35 @@ def test_delivery_sends_acceptance_link_without_persisting_token(
 
 
 @pytest.mark.django_db
+@override_settings(
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    FRONTEND_BASE_URL="http://localhost:5173",
+    DEBUG=True,
+)
+def test_delivery_translates_subject_and_body_under_active_locale(
+    mailoutbox,
+    user_factory,
+    organisation_factory,
+):  # type: ignore[no-untyped-def]
+    from django.utils import translation
+
+    owner = user_factory()
+    organisation = organisation_factory(owner=owner)
+    invitation, raw_token = create_invitation(
+        actor=owner,
+        organisation=organisation,
+        email="person@example.com",
+        role=Membership.Role.CONTRIBUTOR,
+    )
+
+    with translation.override("fr"):
+        deliver_invitation(invitation=invitation, raw_token=raw_token, actor=owner)
+
+    assert "Invitation à rejoindre" in mailoutbox[0].subject
+    assert "Acceptez l'invitation" in mailoutbox[0].body
+
+
+@pytest.mark.django_db
 def test_invitation_loses_authority_when_issuer_is_no_longer_a_manager(
     user_factory,
     organisation_factory,

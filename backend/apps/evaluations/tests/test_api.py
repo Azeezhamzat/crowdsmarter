@@ -56,3 +56,44 @@ def test_prioritisation_api_creates_portfolio(
     )
     assert response.status_code == 201
     assert response.json()["recommendation"]["warning"].startswith("This is an explainable")
+
+
+@pytest.mark.django_db
+def test_scoring_options_endpoint_blinds_titles_for_non_managers(
+    api_client, organisation_factory, decision_factory, user_factory
+):  # type: ignore[no-untyped-def]
+    from apps.decision_options.services import create_option
+    from apps.evaluations.services import create_exercise
+    from apps.organisations.models import Membership
+    from apps.participants.models import Participant
+
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    reviewer = user_factory(email="scoring-reviewer@example.com")
+    Membership.objects.create(
+        organisation=organisation, user=reviewer, role=Membership.Role.CONTRIBUTOR, status=Membership.Status.ACTIVE,
+    )
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    Participant.objects.create(
+        organisation=organisation, decision=decision, user=reviewer, role=Participant.Role.CONTRIBUTOR, added_by=owner,
+    )
+    create_option(actor=owner, decision=decision, title="Named Applicant Org", description="d")
+    exercise = create_exercise(
+        actor=owner, decision=decision, owner_id=owner.id, title="Blind scorecard", purpose="p",
+        method="scorecard", blind_applicant_identity=True, quorum_count=1,
+    )
+
+    api_client.force_authenticate(reviewer)
+    response = api_client.get(
+        reverse("evaluations:evaluation-scoring-options", kwargs={"exercise_id": exercise.id})
+    )
+    assert response.status_code == 200
+    assert response.json()[0]["title"] == "Application A"
+    assert response.json()[0]["blinded"] is True
+
+    api_client.force_authenticate(owner)
+    manager_response = api_client.get(
+        reverse("evaluations:evaluation-scoring-options", kwargs={"exercise_id": exercise.id})
+    )
+    assert manager_response.json()[0]["title"] == "Named Applicant Org"
+    assert manager_response.json()[0]["blinded"] is False

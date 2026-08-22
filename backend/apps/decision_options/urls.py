@@ -5,6 +5,7 @@ from .views import (
     DecisionOptionEligibilityView,
     DecisionOptionListCreateView,
     DecisionOptionOutcomeView,
+    OrganisationBudgetRollupView,
 )
 
 app_name = "decision_options"
@@ -29,5 +30,10 @@ urlpatterns = [
         "decision-options/<uuid:option_id>/outcome/",
         DecisionOptionOutcomeView.as_view(),
         name="outcome",
+    ),
+    path(
+        "organisations/<uuid:organisation_id>/budget-rollup/",
+        OrganisationBudgetRollupView.as_view(),
+        name="budget-rollup",
     ),
 ]

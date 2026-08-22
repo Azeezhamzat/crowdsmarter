@@ -130,22 +130,37 @@ def close_session(*, actor: User, session: OpenSession) -> OpenSession:
 
 @transaction.atomic
 def identify_participant(*, session: OpenSession, name: str, email: str) -> tuple[SessionParticipant, str]:
-    """Get-or-create a lightweight identity for this session by email, returning a fresh bearer token."""
+    """Get-or-create a lightweight identity for this session by email, returning a fresh bearer token.
+
+    When the email matches a verified ApplicantAccount, the participant record is
+    linked to it automatically, which is what lets that person's applications
+    surface together on the cross-round "My applications" portal.
+    """
     normalised_email = email.strip().lower()
     raw_token = generate_token()
+
+    from apps.applicants.models import ApplicantAccount
+
+    linked_account = ApplicantAccount.objects.filter(
+        email=normalised_email, email_verified_at__isnull=False
+    ).first()
+
     try:
         participant = SessionParticipant.objects.get(session=session, email=normalised_email)
         participant.token_digest = digest_token(raw_token)
         if name.strip():
             participant.name = name
+        if linked_account is not None:
+            participant.account = linked_account
         participant.full_clean(validate_unique=False, validate_constraints=False)
-        participant.save(update_fields=["name", "token_digest", "updated_at"])
+        participant.save(update_fields=["name", "token_digest", "account", "updated_at"])
     except SessionParticipant.DoesNotExist:
         participant = SessionParticipant(
             session=session,
             name=name,
             email=normalised_email,
             token_digest=digest_token(raw_token),
+            account=linked_account,
         )
         participant.full_clean(validate_unique=False, validate_constraints=False)
         try:

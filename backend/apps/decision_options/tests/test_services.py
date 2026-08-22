@@ -7,6 +7,7 @@ from apps.decision_options.services import (
     DecisionOptionServiceError,
     budget_summary,
     create_option,
+    organisation_budget_rollup,
     set_eligibility,
     set_outcome,
     update_option,
@@ -349,3 +350,40 @@ def test_budget_summary_totals_active_options(decision_factory):  # type: ignore
     assert summary["funded_count"] == 1
     assert summary["declined_count"] == 1
     assert summary["pending_outcome_count"] == 1
+
+
+@pytest.mark.django_db
+def test_organisation_budget_rollup_aggregates_across_grant_rounds(decision_factory):  # type: ignore[no-untyped-def]
+    round_one = decision_factory(status=Decision.Status.UNDER_REVIEW, source_template_key="grant_round")
+    round_two = decision_factory(
+        workspace=round_one.workspace, status=Decision.Status.UNDER_REVIEW, source_template_key="grant_round",
+    )
+    non_grant_decision = decision_factory(workspace=round_one.workspace, status=Decision.Status.UNDER_REVIEW)
+
+    funded_one = create_option(
+        actor=round_one.owner, decision=round_one, title="Well project", description="d", estimated_cost="1000.00",
+    )
+    set_outcome(actor=round_one.owner, option=funded_one, outcome_status=DecisionOption.OutcomeStatus.FUNDED, awarded_amount="800.00")
+    funded_two = create_option(
+        actor=round_two.owner, decision=round_two, title="School project", description="d", estimated_cost="2000.00",
+    )
+    set_outcome(actor=round_two.owner, option=funded_two, outcome_status=DecisionOption.OutcomeStatus.FUNDED, awarded_amount="1500.00")
+    declined = create_option(
+        actor=round_two.owner, decision=round_two, title="Declined project", description="d", estimated_cost="500.00",
+    )
+    set_outcome(actor=round_two.owner, option=declined, outcome_status=DecisionOption.OutcomeStatus.DECLINED)
+    # An option on a non-grant-round decision must not be counted.
+    other_option = create_option(
+        actor=non_grant_decision.owner, decision=non_grant_decision, title="Unrelated", description="d", estimated_cost="9999.00",
+    )
+    set_outcome(actor=non_grant_decision.owner, option=other_option, outcome_status=DecisionOption.OutcomeStatus.FUNDED, awarded_amount="9999.00")
+
+    rollup = organisation_budget_rollup(organisation=round_one.organisation)
+
+    assert rollup["round_count"] == 2
+    assert rollup["requested_total"] == pytest.approx(3500.00)
+    assert rollup["awarded_total"] == pytest.approx(2300.00)
+    assert rollup["funded_count"] == 2
+    assert rollup["declined_count"] == 1
+    assert len(rollup["monthly_trend"]) == 6
+    assert sum(month["awarded_total"] for month in rollup["monthly_trend"]) == pytest.approx(2300.00)

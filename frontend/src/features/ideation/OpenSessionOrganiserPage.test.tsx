@@ -4,10 +4,12 @@ import { MemoryRouter, Route, Routes } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 
 import { getOrganisationPortfolio } from "../portfolio/api";
+import { lookupOrganisation } from "../org-enrichment/api";
 import { archiveIdea, getOrganiserSession, promoteIdea, setSessionState, shortlistIdea } from "./api";
 import { OpenSessionOrganiserPage } from "./OpenSessionOrganiserPage";
 
 vi.mock("../portfolio/api", () => ({ getOrganisationPortfolio: vi.fn() }));
+vi.mock("../org-enrichment/api", () => ({ lookupOrganisation: vi.fn() }));
 vi.mock("./api", () => ({
   getOrganiserSession: vi.fn(),
   setSessionState: vi.fn(),
@@ -78,6 +80,28 @@ describe("OpenSessionOrganiserPage", () => {
 
     await waitFor(() => expect(promoteIdea).toHaveBeenCalledWith(sessionId, "idea-1", "d1"));
     expect(await screen.findByText(/ada · promoted/i)).toBeInTheDocument();
+  });
+
+  it("looks up an applicant organisation on demand", async () => {
+    vi.mocked(getOrganiserSession).mockResolvedValue(baseSession);
+    vi.mocked(getOrganisationPortfolio).mockResolvedValue({
+      organisation: { id: organisationId } as never,
+      summary: { total: 0, active: 0, overdue: 0, unresolved_discussion: 0, status_counts: {} },
+      decisions: [],
+      watchlist: {} as never,
+    });
+    vi.mocked(lookupOrganisation).mockResolvedValue({
+      ok: true, found: true, legal_name: "Ada Cooperative", ein_or_charity_number: "12-3456789",
+      financial_summary: "", standing: "501(c)(3)", detail: "Retrieved from Candid.",
+    });
+
+    renderPage();
+    expect(await screen.findByText("Promising idea")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /verify organisation/i }));
+
+    await waitFor(() => expect(lookupOrganisation).toHaveBeenCalledWith(organisationId, "Ada"));
+    expect(await screen.findByText(/ada cooperative/i)).toBeInTheDocument();
   });
 
   it("uses grant-round terminology and shows the requested amount when linked to a grant round", async () => {

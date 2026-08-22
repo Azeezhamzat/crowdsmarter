@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+from collections import Counter
 from typing import Any
 
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import IntegrityError, transaction
+from django.utils import timezone
 
+from datetime import timedelta
 from decimal import Decimal
 
 from django.db.models import Count, Q, Sum
@@ -284,4 +287,60 @@ def budget_summary(*, decision: Decision) -> dict[str, Any]:
         "eligible_count": totals["eligible_count"],
         "ineligible_count": totals["ineligible_count"],
         "pending_eligibility_count": totals["pending_eligibility_count"],
+    }
+
+
+def organisation_budget_rollup(*, organisation, months: int = 6) -> dict[str, Any]:
+    """Aggregate requested/awarded totals and a monthly awarded trend across every grant round.
+
+    Scoped to every decision created from the "grant_round" template in this
+    organisation - the cross-round view a funder or board needs without a
+    general BI engine, reusing the same fields as the single-round
+    budget_summary() above.
+    """
+    decisions = Decision.objects.filter(organisation=organisation, source_template_key="grant_round")
+    active_options = DecisionOption.objects.filter(
+        decision__in=decisions, status=DecisionOption.Status.ACTIVE
+    )
+    totals = active_options.aggregate(
+        requested_total=Sum("estimated_cost"),
+        awarded_total=Sum("awarded_amount", filter=Q(outcome_status=DecisionOption.OutcomeStatus.FUNDED)),
+        funded_count=Count("id", filter=Q(outcome_status=DecisionOption.OutcomeStatus.FUNDED)),
+        declined_count=Count("id", filter=Q(outcome_status=DecisionOption.OutcomeStatus.DECLINED)),
+        pending_outcome_count=Count("id", filter=Q(outcome_status=DecisionOption.OutcomeStatus.PENDING)),
+    )
+
+    today = timezone.now().date()
+    month_cursors: list[Any] = []
+    cursor = today.replace(day=1)
+    for _ in range(months):
+        month_cursors.append(cursor)
+        cursor = (cursor.replace(day=1) - timedelta(days=1)).replace(day=1)
+    month_cursors.reverse()
+
+    funded_options = active_options.filter(
+        outcome_status=DecisionOption.OutcomeStatus.FUNDED, outcome_decided_at__isnull=False
+    ).values("outcome_decided_at", "awarded_amount")
+    awarded_by_month: Counter = Counter()
+    for row in funded_options:
+        month_key = row["outcome_decided_at"].date().replace(day=1)
+        awarded_by_month[month_key] += row["awarded_amount"] or Decimal("0")
+
+    monthly_trend = [
+        {
+            "month": month.isoformat(),
+            "label": month.strftime("%b %Y"),
+            "awarded_total": awarded_by_month.get(month, Decimal("0")),
+        }
+        for month in month_cursors
+    ]
+
+    return {
+        "round_count": decisions.count(),
+        "requested_total": totals["requested_total"] or Decimal("0"),
+        "awarded_total": totals["awarded_total"] or Decimal("0"),
+        "funded_count": totals["funded_count"],
+        "declined_count": totals["declined_count"],
+        "pending_outcome_count": totals["pending_outcome_count"],
+        "monthly_trend": monthly_trend,
     }

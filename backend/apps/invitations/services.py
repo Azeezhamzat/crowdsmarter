@@ -13,6 +13,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.mail import send_mail
 from django.db import IntegrityError, models, transaction
 from django.utils import timezone
+from django.utils.translation import gettext as _
 
 from apps.accounts.models import User
 from apps.audit.services import record_event
@@ -249,15 +250,21 @@ def deliver_invitation(
 ) -> InvitationDelivery:
     """Send an invitation without making email availability a write dependency."""
     acceptance_url = build_acceptance_url(raw_token)
-    subject = f"Invitation to join {invitation.organisation.name} on The CrowdSmarter"
-    body = (
-        f"You have been invited to join {invitation.organisation.name} as "
-        f"{invitation.get_role_display()}.\n\n"
+    subject = _("Invitation to join %(organisation)s on CrowdSmarter") % {
+        "organisation": invitation.organisation.name
+    }
+    body = _(
+        "You have been invited to join %(organisation)s as %(role)s.\n\n"
         "Accept the invitation and create or connect your account here:\n"
-        f"{acceptance_url}\n\n"
-        f"This link expires at {invitation.expires_at.isoformat()}.\n"
+        "%(url)s\n\n"
+        "This link expires at %(expires)s.\n"
         "If you were not expecting this invitation, you can ignore this email."
-    )
+    ) % {
+        "organisation": invitation.organisation.name,
+        "role": invitation.get_role_display(),
+        "url": acceptance_url,
+        "expires": invitation.expires_at.isoformat(),
+    }
     try:
         delivered = send_mail(
             subject=subject,

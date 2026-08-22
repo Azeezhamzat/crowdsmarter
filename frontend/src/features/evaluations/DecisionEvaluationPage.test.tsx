@@ -16,6 +16,7 @@ vi.mock("./api", () => ({
   createEvaluationRound: vi.fn(),
   createMinorityReport: vi.fn(),
   getEvaluation: vi.fn(),
+  getScoringOptions: vi.fn(),
   listEvaluations: vi.fn(),
   saveEvaluationSubmission: vi.fn(),
   transitionEvaluationRound: vi.fn(),
@@ -48,6 +49,8 @@ describe("DecisionEvaluationPage", () => {
     expect(screen.getByText("Approval voting")).toBeInTheDocument();
     expect(screen.getByText("Consent and objections")).toBeInTheDocument();
     expect(screen.getByText("Delphi rounds")).toBeInTheDocument();
+    expect(screen.getByText("Ranked-choice (instant runoff)")).toBeInTheDocument();
     expect(screen.getByText("Anonymous to peers")).toBeInTheDocument();
+    expect(screen.getByText(/hide applicant names from reviewers/i)).toBeInTheDocument();
   });
 });

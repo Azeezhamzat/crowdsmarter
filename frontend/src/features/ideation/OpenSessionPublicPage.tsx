@@ -6,9 +6,12 @@ import { Link, useParams } from "react-router";
 import { z } from "zod";
 
 import { FieldError } from "../../components/FieldError";
+import { LanguageSwitcher } from "../../components/LanguageSwitcher";
 import { LogoMark } from "../../components/Logo";
 import { StatusMessage } from "../../components/StatusMessage";
 import { ApiError } from "../../lib/api";
+import { openSessionCatalog } from "../../lib/catalogs/openSession";
+import { useTranslations } from "../../lib/i18n";
 import { getTerminology } from "../../lib/terminology";
 import type { Idea } from "../../lib/types";
 import {
@@ -191,6 +194,7 @@ export function OpenSessionPublicPage() {
 
   const terms = getTerminology(session.data?.decision_template_key);
   const isGrantRound = session.data?.decision_template_key === "grant_round";
+  const t = useTranslations(openSessionCatalog);
 
   const joinForm = useForm<JoinForm>({ resolver: zodResolver(joinSchema), defaultValues: { name: "", email: "" } });
   const join = useMutation({
@@ -234,6 +238,7 @@ export function OpenSessionPublicPage() {
           <LogoMark size={38} />
           <span><strong>CrowdSmarter</strong><small>Foresight. Collective intelligence. Decisions.</small></span>
         </Link>
+        <LanguageSwitcher />
       </header>
 
       {session.isPending ? <p>Loading this session…</p> : null}
@@ -265,22 +270,22 @@ export function OpenSessionPublicPage() {
 
           {!hasToken && session.data.status === "open" ? (
             <section className="open-session-join" aria-label="Join this session">
-              <h2>Join to submit an idea and vote</h2>
-              <p className="muted">Just your name and email — no account or password needed.</p>
+              <h2>{t.joinHeading}</h2>
+              <p className="muted">{t.joinDescription}</p>
               {join.isError ? (
                 <StatusMessage kind="error">
                   {join.error instanceof ApiError ? join.error.message : "Could not join this session."}
                 </StatusMessage>
               ) : null}
               <form onSubmit={joinForm.handleSubmit((values) => join.mutate(values))} noValidate>
-                <label htmlFor="join-name">Name</label>
+                <label htmlFor="join-name">{t.nameLabel}</label>
                 <input id="join-name" autoComplete="name" {...joinForm.register("name")} />
                 <FieldError message={joinForm.formState.errors.name?.message} />
-                <label htmlFor="join-email">Email</label>
+                <label htmlFor="join-email">{t.emailLabel}</label>
                 <input id="join-email" type="email" autoComplete="email" {...joinForm.register("email")} />
                 <FieldError message={joinForm.formState.errors.email?.message} />
                 <button className="button button--primary" type="submit" disabled={join.isPending}>
-                  {join.isPending ? "Joining…" : "Join session"}
+                  {join.isPending ? t.joiningButton : t.joinButton}
                 </button>
               </form>
             </section>
