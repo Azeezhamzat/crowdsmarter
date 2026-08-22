@@ -11,10 +11,12 @@ from .permissions import CanEditDecisionOption
 from .selectors import option_for_user, options_for_decision
 from .serializers import (
     DecisionOptionCreateSerializer,
+    DecisionOptionEligibilitySerializer,
+    DecisionOptionOutcomeSerializer,
     DecisionOptionSerializer,
     DecisionOptionUpdateSerializer,
 )
-from .services import create_option, update_option
+from .services import create_option, set_eligibility, set_outcome, update_option
 
 
 class DecisionOptionListCreateView(APIView):
@@ -58,4 +60,26 @@ class DecisionOptionDetailView(APIView):
             option=option,
             fields=dict(serializer.validated_data),
         )
+        return Response(DecisionOptionSerializer(option, context={"request": request}).data)
+
+
+class DecisionOptionEligibilityView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, option_id):  # type: ignore[no-untyped-def]
+        option = option_for_user(user=request.user, option_id=option_id)
+        serializer = DecisionOptionEligibilitySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        option = set_eligibility(actor=request.user, option=option, **serializer.validated_data)
+        return Response(DecisionOptionSerializer(option, context={"request": request}).data)
+
+
+class DecisionOptionOutcomeView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, option_id):  # type: ignore[no-untyped-def]
+        option = option_for_user(user=request.user, option_id=option_id)
+        serializer = DecisionOptionOutcomeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        option = set_outcome(actor=request.user, option=option, **serializer.validated_data)
         return Response(DecisionOptionSerializer(option, context={"request": request}).data)

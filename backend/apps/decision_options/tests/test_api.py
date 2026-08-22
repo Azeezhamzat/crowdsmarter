@@ -101,3 +101,57 @@ def test_option_endpoint_is_tenant_isolated(
     )
 
     assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_eligibility_and_outcome_endpoints(
+    api_client,
+    decision_factory,
+):  # type: ignore[no-untyped-def]
+    decision = decision_factory(status=Decision.Status.UNDER_REVIEW)
+    api_client.force_authenticate(decision.owner)
+    collection = reverse("decision_options:list-create", kwargs={"decision_id": decision.id})
+    option_id = api_client.post(
+        collection,
+        {"title": "Grant application", "description": "Reduces post-harvest loss.", "estimated_cost": "3000.00"},
+        format="json",
+    ).json()["id"]
+
+    eligibility = api_client.post(
+        reverse("decision_options:eligibility", kwargs={"option_id": option_id}),
+        {"eligibility_status": "eligible", "eligibility_note": "Meets criteria."},
+        format="json",
+    )
+    assert eligibility.status_code == 200
+    assert eligibility.json()["eligibility_status"] == "eligible"
+
+    outcome = api_client.post(
+        reverse("decision_options:outcome", kwargs={"option_id": option_id}),
+        {"outcome_status": "funded", "awarded_amount": "2500.00"},
+        format="json",
+    )
+    assert outcome.status_code == 200
+    assert outcome.json()["outcome_status"] == "funded"
+    assert outcome.json()["awarded_amount"] == "2500.00"
+
+
+@pytest.mark.django_db
+def test_funded_outcome_without_amount_is_rejected(
+    api_client,
+    decision_factory,
+):  # type: ignore[no-untyped-def]
+    decision = decision_factory(status=Decision.Status.UNDER_REVIEW)
+    api_client.force_authenticate(decision.owner)
+    collection = reverse("decision_options:list-create", kwargs={"decision_id": decision.id})
+    option_id = api_client.post(
+        collection, {"title": "App", "description": "Desc."}, format="json",
+    ).json()["id"]
+
+    response = api_client.post(
+        reverse("decision_options:outcome", kwargs={"option_id": option_id}),
+        {"outcome_status": "funded"},
+        format="json",
+    )
+
+    assert response.status_code == 400
+    assert "awarded_amount" in response.json()

@@ -3,9 +3,11 @@ import type {
   Assumption,
   Criterion,
   DecisionOption,
+  EligibilityStatus,
   EvidenceItem,
   EvidenceSourceType,
   OptionReversibility,
+  OutcomeStatus,
   Risk,
 } from "../../lib/types";
 
@@ -46,6 +48,26 @@ export function updateOption(
 ): Promise<DecisionOption> {
   return apiRequest<DecisionOption>(`/decision-options/${optionId}/`, {
     method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export function setOptionEligibility(
+  optionId: string,
+  input: { eligibility_status: EligibilityStatus; eligibility_note?: string },
+): Promise<DecisionOption> {
+  return apiRequest<DecisionOption>(`/decision-options/${optionId}/eligibility/`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function setOptionOutcome(
+  optionId: string,
+  input: { outcome_status: OutcomeStatus; awarded_amount?: number | null; outcome_note?: string },
+): Promise<DecisionOption> {
+  return apiRequest<DecisionOption>(`/decision-options/${optionId}/outcome/`, {
+    method: "POST",
     body: JSON.stringify(input),
   });
 }

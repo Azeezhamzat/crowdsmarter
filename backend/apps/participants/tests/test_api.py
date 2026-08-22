@@ -155,3 +155,42 @@ def test_under_review_decision_rejects_participant_changes(
     )
 
     assert response.status_code == 403
+
+
+@pytest.mark.django_db
+def test_reviewer_declares_and_withdraws_conflict_via_api(
+    api_client, user_factory, decision_factory,
+):  # type: ignore[no-untyped-def]
+    from apps.decision_options.services import create_option
+
+    decision = decision_factory()
+    option = create_option(actor=decision.owner, decision=decision, title="App", description="Desc.")
+    reviewer = user_factory()
+    Membership.objects.create(
+        organisation=decision.organisation, user=reviewer, role=Membership.Role.CONTRIBUTOR,
+        status=Membership.Status.ACTIVE,
+    )
+    participant = Participant.objects.create(
+        organisation=decision.organisation, decision=decision, user=reviewer,
+        role=Participant.Role.REVIEWER, added_by=decision.owner,
+    )
+    api_client.force_authenticate(reviewer)
+
+    create_response = api_client.post(
+        reverse("participants:conflict-list-create", kwargs={"participant_id": participant.id}),
+        {"scope": "option", "option_id": str(option.id), "reason": "I sit on their board."},
+        format="json",
+    )
+    assert create_response.status_code == 201
+    conflict_id = create_response.json()["id"]
+
+    list_response = api_client.get(
+        reverse("participants:conflict-list-create", kwargs={"participant_id": participant.id})
+    )
+    assert len(list_response.json()) == 1
+
+    withdraw_response = api_client.post(
+        reverse("participants:conflict-withdraw", kwargs={"conflict_id": conflict_id})
+    )
+    assert withdraw_response.status_code == 200
+    assert withdraw_response.json()["withdrawn_at"] is not None

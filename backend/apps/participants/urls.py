@@ -2,7 +2,12 @@
 
 from django.urls import path
 
-from .views import ParticipantDetailView, ParticipantListCreateView
+from .views import (
+    ConflictWithdrawView,
+    ParticipantConflictListCreateView,
+    ParticipantDetailView,
+    ParticipantListCreateView,
+)
 
 app_name = "participants"
 
@@ -16,5 +21,15 @@ urlpatterns = [
         "participants/<uuid:participant_id>/",
         ParticipantDetailView.as_view(),
         name="detail",
+    ),
+    path(
+        "participants/<uuid:participant_id>/conflicts/",
+        ParticipantConflictListCreateView.as_view(),
+        name="conflict-list-create",
+    ),
+    path(
+        "conflicts/<uuid:conflict_id>/withdraw/",
+        ConflictWithdrawView.as_view(),
+        name="conflict-withdraw",
     ),
 ]

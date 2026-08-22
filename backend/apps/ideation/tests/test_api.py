@@ -387,3 +387,138 @@ def test_only_creator_roles_can_create_a_session(organisation_factory, user_fact
     )
     with pytest.raises(Exception):
         services.create_session(actor=viewer, organisation=organisation, title="S", prompt="P")
+
+
+@pytest.mark.django_db
+def test_idea_submission_carries_category(organisation_factory):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    session = services.create_session(actor=owner, organisation=organisation, title="S", prompt="P")
+    services.open_session(actor=owner, session=session)
+
+    client, csrf_token = _csrf_client()
+    join = client.post(
+        reverse("ideation:public-join", kwargs={"public_slug": session.public_slug}),
+        {"name": "Ada", "email": "ada@example.com"},
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+    token = join.json()["participant_token"]
+
+    submit = client.post(
+        reverse("ideation:public-idea-create", kwargs={"public_slug": session.public_slug}),
+        {"title": "Solar cold storage", "category": "Infrastructure"},
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+        HTTP_X_PARTICIPANT_TOKEN=token,
+    )
+    assert submit.status_code == 200
+    assert submit.json()["ideas"][0]["category"] == "Infrastructure"
+
+
+@pytest.mark.django_db
+def test_public_comment_thread_on_an_idea(organisation_factory):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    session = services.create_session(actor=owner, organisation=organisation, title="S", prompt="P")
+    services.open_session(actor=owner, session=session)
+    participant, _ = services.identify_participant(session=session, name="Ada", email="ada@example.com")
+    idea = services.submit_idea(session=session, participant=participant, title="Idea one")
+
+    client, csrf_token = _csrf_client()
+    join = client.post(
+        reverse("ideation:public-join", kwargs={"public_slug": session.public_slug}),
+        {"name": "Bayo", "email": "bayo@example.com"},
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+    token = join.json()["participant_token"]
+
+    comment = client.post(
+        reverse("ideation:public-idea-comment", kwargs={"public_slug": session.public_slug, "idea_id": idea.id}),
+        {"body": "This overlaps with last year's pilot, worth linking up."},
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+        HTTP_X_PARTICIPANT_TOKEN=token,
+    )
+    assert comment.status_code == 200
+    comments = comment.json()["ideas"][0]["comments"]
+    assert len(comments) == 1
+    assert comments[0]["submitted_by_participant"]["name"] == "Bayo"
+
+
+@pytest.mark.django_db
+def test_organiser_archives_and_unarchives_an_idea(api_client, organisation_factory):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    session = services.create_session(actor=owner, organisation=organisation, title="S", prompt="P")
+    services.open_session(actor=owner, session=session)
+    participant, _ = services.identify_participant(session=session, name="Ada", email="ada@example.com")
+    idea = services.submit_idea(session=session, participant=participant, title="Off-topic idea")
+
+    api_client.force_authenticate(owner)
+    archive = api_client.post(
+        reverse("ideation:idea-archive", kwargs={"session_id": session.id, "idea_id": idea.id}),
+        {"archived": True},
+        format="json",
+    )
+    assert archive.status_code == 200
+    assert archive.json()["ideas"][0]["status"] == "archived"
+
+    unarchive = api_client.post(
+        reverse("ideation:idea-archive", kwargs={"session_id": session.id, "idea_id": idea.id}),
+        {"archived": False},
+        format="json",
+    )
+    assert unarchive.status_code == 200
+    assert unarchive.json()["ideas"][0]["status"] == "submitted"
+
+
+@pytest.mark.django_db
+def test_promote_without_decision_auto_creates_a_grant_round(
+    api_client, organisation_factory,
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    session = services.create_session(
+        actor=owner, organisation=organisation, title="Open ideathon", prompt="Ideas?",
+    )
+    services.open_session(actor=owner, session=session)
+    participant, _ = services.identify_participant(session=session, name="Ada", email="ada@example.com")
+    idea = services.submit_idea(
+        session=session, participant=participant, title="Solar cold storage co-op",
+        description="Shared cold storage for smallholders.", requested_amount="8000.00",
+    )
+
+    api_client.force_authenticate(owner)
+    promote = api_client.post(
+        reverse("ideation:idea-promote", kwargs={"session_id": session.id, "idea_id": idea.id}),
+        {},
+        format="json",
+    )
+
+    assert promote.status_code == 200
+    idea.refresh_from_db()
+    option = DecisionOption.objects.get(id=idea.promoted_to_option_id)
+    assert option.title == "Solar cold storage co-op"
+    assert option.decision.source_template_key == "grant_round"
+    assert option.decision.workspace == organisation.workspaces.get(is_default=True)
+
+
+@pytest.mark.django_db
+def test_promote_without_decision_fails_without_default_workspace(
+    api_client, organisation_factory,
+):  # type: ignore[no-untyped-def]
+    from apps.workspaces.models import Workspace
+
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    Workspace.objects.filter(organisation=organisation).update(is_default=False)
+    session = services.create_session(actor=owner, organisation=organisation, title="S", prompt="P")
+    assert session.default_workspace_id is None
+    services.open_session(actor=owner, session=session)
+    participant, _ = services.identify_participant(session=session, name="Ada", email="ada@example.com")
+    idea = services.submit_idea(session=session, participant=participant, title="Idea")
+
+    with pytest.raises(Exception):
+        services.promote_idea_to_decision(actor=owner, idea=idea, decision=None)

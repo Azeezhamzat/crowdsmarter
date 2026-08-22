@@ -1,5 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -7,13 +8,125 @@ import { FieldError } from "../../components/FieldError";
 import { StatusMessage } from "../../components/StatusMessage";
 import { ApiError } from "../../lib/api";
 import { getTerminology } from "../../lib/terminology";
-import type { ParticipantRole } from "../../lib/types";
+import type { ConflictOfInterest, ConflictOfInterestScope, DecisionOption, Participant, ParticipantRole } from "../../lib/types";
+import { fetchCurrentUser } from "../auth/api";
+import { listOptions } from "../reasoning/api";
 import {
   addParticipant,
   changeParticipantRole,
+  declareConflict,
+  listConflicts,
   listParticipants,
   removeParticipant,
+  withdrawConflict,
 } from "./api";
+
+function ConflictControl({
+  decisionId,
+  participant,
+  conflicts,
+  canDeclare,
+  canManage,
+}: {
+  decisionId: string;
+  participant: Participant;
+  conflicts: ConflictOfInterest[];
+  canDeclare: boolean;
+  canManage: boolean;
+}) {
+  const queryClient = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [scope, setScope] = useState<ConflictOfInterestScope>("option");
+  const [optionId, setOptionId] = useState("");
+  const [reason, setReason] = useState("");
+
+  const options = useQuery({
+    queryKey: ["decisions", decisionId, "options"],
+    queryFn: () => listOptions(decisionId),
+    enabled: open,
+  });
+
+  const refresh = () =>
+    queryClient.invalidateQueries({ queryKey: ["decisions", decisionId, "conflicts"] });
+
+  const declare = useMutation({
+    mutationFn: () =>
+      declareConflict(participant.id, {
+        scope,
+        option_id: scope === "option" ? optionId || null : null,
+        reason,
+      }),
+    onSuccess: async () => {
+      setOpen(false);
+      setReason("");
+      setOptionId("");
+      await refresh();
+    },
+  });
+  const withdraw = useMutation({
+    mutationFn: (conflictId: string) => withdrawConflict(conflictId),
+    onSuccess: refresh,
+  });
+
+  const ownConflicts = conflicts.filter((item) => item.participant_id === participant.id);
+
+  return (
+    <div className="participant-conflicts">
+      {ownConflicts.map((conflict) => (
+        <div key={conflict.id} className="inline-badges">
+          <span className="role-badge">
+            Conflict: {conflict.scope === "option" ? conflict.option_title ?? "an option" : "entire round"}
+          </span>
+          {canManage || canDeclare ? (
+            <button
+              className="button button--quiet button--compact"
+              type="button"
+              disabled={withdraw.isPending}
+              onClick={() => withdraw.mutate(conflict.id)}
+            >
+              Withdraw
+            </button>
+          ) : null}
+        </div>
+      ))}
+      {(canDeclare || canManage) && !open ? (
+        <button className="button button--quiet button--compact" type="button" onClick={() => setOpen(true)}>
+          Declare a conflict
+        </button>
+      ) : null}
+      {open ? (
+        <div className="participant-conflict-form">
+          <select value={scope} onChange={(event) => setScope(event.target.value as ConflictOfInterestScope)}>
+            <option value="option">On one application</option>
+            <option value="decision">On the entire round</option>
+          </select>
+          {scope === "option" ? (
+            <select value={optionId} onChange={(event) => setOptionId(event.target.value)}>
+              <option value="">Select an application…</option>
+              {(options.data ?? []).map((item: DecisionOption) => (
+                <option key={item.id} value={item.id}>{item.title}</option>
+              ))}
+            </select>
+          ) : null}
+          <input placeholder="Reason (optional)" value={reason} onChange={(event) => setReason(event.target.value)} />
+          <div className="button-row">
+            <button
+              className="button button--primary button--compact"
+              type="button"
+              disabled={declare.isPending || (scope === "option" && !optionId)}
+              onClick={() => declare.mutate()}
+            >
+              {declare.isPending ? "Saving…" : "Save"}
+            </button>
+            <button className="button button--quiet button--compact" type="button" onClick={() => setOpen(false)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 const assignableRoles = ["decision_maker", "contributor", "reviewer", "observer"] as const;
 
@@ -41,6 +154,13 @@ export function ParticipantsPanel({
   const participants = useQuery({
     queryKey: ["decisions", decisionId, "participants"],
     queryFn: () => listParticipants(decisionId),
+  });
+  const currentUser = useQuery({ queryKey: ["current-user"], queryFn: fetchCurrentUser });
+  const myParticipant = participants.data?.find((item) => item.user.id === currentUser.data?.id);
+  const conflicts = useQuery({
+    queryKey: ["decisions", decisionId, "conflicts"],
+    queryFn: () => listConflicts(myParticipant!.id),
+    enabled: Boolean(myParticipant),
   });
   const form = useForm<ParticipantInput>({
     resolver: zodResolver(participantSchema),
@@ -134,6 +254,15 @@ export function ParticipantsPanel({
                   Remove
                 </button>
               </div>
+            )}
+            {participant.role === "decision_owner" ? null : (
+              <ConflictControl
+                decisionId={decisionId}
+                participant={participant}
+                conflicts={conflicts.data ?? []}
+                canDeclare={participant.user.id === currentUser.data?.id}
+                canManage={canManage}
+              />
             )}
           </div>
         ))}

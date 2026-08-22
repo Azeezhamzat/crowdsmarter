@@ -10,7 +10,7 @@ from django.shortcuts import get_object_or_404
 from apps.accounts.models import User
 from apps.decisions.selectors import decision_for_user
 
-from .models import Participant
+from .models import ConflictOfInterest, Participant
 
 
 def participants_for_decision(
@@ -40,3 +40,13 @@ def user_organisations(user: User):  # type: ignore[no-untyped-def]
     from apps.organisations.models import Organisation
 
     return Organisation.objects.for_user(user)
+
+
+def conflict_for_user(*, user: User, conflict_id: UUID) -> ConflictOfInterest:
+    """Fetch a conflict declaration without revealing another tenant's records."""
+    return get_object_or_404(
+        ConflictOfInterest.objects.select_related(
+            "participant__decision", "participant__decision__organisation", "participant__user", "option"
+        ).filter(organisation__in=user_organisations(user)),
+        id=conflict_id,
+    )

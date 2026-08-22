@@ -17,6 +17,8 @@ from apps.decision_options.models import DecisionOption
 from apps.organisations.models import Membership
 from apps.notifications.models import Notification
 from apps.notifications.services import notify_users
+from apps.participants.models import ConflictOfInterest
+from apps.participants.services import conflicts_for_decision
 
 from .models import (EvaluationCriterion, EvaluationExercise, EvaluationResponse, EvaluationRound, EvaluationSubmission, MinorityReport, PortfolioAssessment, PortfolioCandidate, PortfolioCriterion, PortfolioSelection, PrioritisationPortfolio)
 from .policies import can_assess_portfolio, can_manage_exercise, can_manage_portfolio, can_submit_evaluation
@@ -270,6 +272,14 @@ def evaluation_results(*, round, viewer):
     base = {"hidden": hidden, "round_id": str(round.id), "submission_count": len(submitted), "eligible_count": eligible, "quorum_count": exercise.quorum_count, "quorum_met": len(submitted) >= exercise.quorum_count, "method": exercise.method, "options": [], "criterion_sensitivity": [], "tornado": None, "uncertainty_narrative": ""}
     if hidden:
         return base
+    conflicts = list(conflicts_for_decision(decision=exercise.decision))
+    decision_wide_conflicts = {c.participant.user_id for c in conflicts if c.scope == ConflictOfInterest.Scope.DECISION}
+    option_conflicts = {(c.participant.user_id, c.option_id) for c in conflicts if c.scope == ConflictOfInterest.Scope.OPTION}
+    excluded_emails_by_option = defaultdict(set)
+
+    def _is_conflicted(user_id, option_id):
+        return user_id in decision_wide_conflicts or (user_id, option_id) in option_conflicts
+
     if exercise.method in {EvaluationExercise.Method.SCORECARD, EvaluationExercise.Method.DELPHI}:
         criteria = list(exercise.criteria.all())
         total_weight = sum((c.weight for c in criteria), Decimal("0")) or Decimal("1")
@@ -280,6 +290,9 @@ def evaluation_results(*, round, viewer):
         for submission in submitted:
             for response in submission.responses.all():
                 if response.criterion_id and response.score is not None:
+                    if _is_conflicted(submission.submitted_by_id, response.option_id):
+                        excluded_emails_by_option[response.option_id].add(submission.submitted_by.email)
+                        continue
                     values[response.option_id][response.criterion_id].append(float(response.score))
                     confidences[response.option_id].append(submission.confidence)
                     option_map[response.option_id] = response.option
@@ -313,6 +326,8 @@ def evaluation_results(*, round, viewer):
                 "score_max": round_number(max(individual_scores)) if individual_scores else None,
                 "disagreement": _disagreement_label(dispersion),
                 "criteria": criterion_rows,
+                "excluded_response_count": len(excluded_emails_by_option.get(option_id, ())),
+                "conflicted_reviewer_emails": sorted(excluded_emails_by_option.get(option_id, ())),
             })
         rows.sort(key=lambda x: (x["weighted_score"] is not None, x["weighted_score"] or -1), reverse=True)
         base["options"]=rows
@@ -323,6 +338,9 @@ def evaluation_results(*, round, viewer):
         grouped=defaultdict(list); option_map={}
         for submission in submitted:
             for response in submission.responses.all():
+                if _is_conflicted(submission.submitted_by_id, response.option_id):
+                    excluded_emails_by_option[response.option_id].add(submission.submitted_by.email)
+                    continue
                 grouped[response.option_id].append(response.vote); option_map[response.option_id]=response.option
         rows=[]
         for option_id, votes in grouped.items():
@@ -337,7 +355,7 @@ def evaluation_results(*, round, viewer):
                 dissent_rate = builtins.round((len(non_abstain) - majority_count) / len(non_abstain) * 100, 2)
             else:
                 dissent_rate = 0
-            rows.append({"option_id": str(option_id), "title": option_map[option_id].title, "vote_count": len(votes), "approval_rate": builtins.round(approval_rate,2), "objection_rate": builtins.round(objection_rate,2), "dissent_rate": dissent_rate, "passes_threshold": passes, "breakdown": {choice: votes.count(choice) for choice, _ in EvaluationResponse.Vote.choices}})
+            rows.append({"option_id": str(option_id), "title": option_map[option_id].title, "vote_count": len(votes), "approval_rate": builtins.round(approval_rate,2), "objection_rate": builtins.round(objection_rate,2), "dissent_rate": dissent_rate, "passes_threshold": passes, "breakdown": {choice: votes.count(choice) for choice, _ in EvaluationResponse.Vote.choices}, "excluded_response_count": len(excluded_emails_by_option.get(option_id, ())), "conflicted_reviewer_emails": sorted(excluded_emails_by_option.get(option_id, ()))})
         rows.sort(key=lambda x: (x["passes_threshold"], x["approval_rate"], -x["objection_rate"]), reverse=True)
         base["options"]=rows
         if rows:

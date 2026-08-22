@@ -1,5 +1,5 @@
 import { apiRequest } from "../../lib/api";
-import type { Participant, ParticipantRole } from "../../lib/types";
+import type { ConflictOfInterest, ConflictOfInterestScope, Participant, ParticipantRole } from "../../lib/types";
 
 export function listParticipants(decisionId: string): Promise<Participant[]> {
   return apiRequest<Participant[]>(`/decisions/${decisionId}/participants/`);
@@ -28,5 +28,25 @@ export function changeParticipantRole(
 export function removeParticipant(participantId: string): Promise<void> {
   return apiRequest<void>(`/participants/${participantId}/`, {
     method: "DELETE",
+  });
+}
+
+export function listConflicts(participantId: string): Promise<ConflictOfInterest[]> {
+  return apiRequest<ConflictOfInterest[]>(`/participants/${participantId}/conflicts/`);
+}
+
+export function declareConflict(
+  participantId: string,
+  input: { scope: ConflictOfInterestScope; option_id?: string | null; reason?: string },
+): Promise<ConflictOfInterest> {
+  return apiRequest<ConflictOfInterest>(`/participants/${participantId}/conflicts/`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function withdrawConflict(conflictId: string): Promise<ConflictOfInterest> {
+  return apiRequest<ConflictOfInterest>(`/conflicts/${conflictId}/withdraw/`, {
+    method: "POST",
   });
 }

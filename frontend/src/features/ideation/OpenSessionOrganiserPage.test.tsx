@@ -4,7 +4,7 @@ import { MemoryRouter, Route, Routes } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 
 import { getOrganisationPortfolio } from "../portfolio/api";
-import { getOrganiserSession, promoteIdea, setSessionState, shortlistIdea } from "./api";
+import { archiveIdea, getOrganiserSession, promoteIdea, setSessionState, shortlistIdea } from "./api";
 import { OpenSessionOrganiserPage } from "./OpenSessionOrganiserPage";
 
 vi.mock("../portfolio/api", () => ({ getOrganisationPortfolio: vi.fn() }));
@@ -12,6 +12,7 @@ vi.mock("./api", () => ({
   getOrganiserSession: vi.fn(),
   setSessionState: vi.fn(),
   shortlistIdea: vi.fn(),
+  archiveIdea: vi.fn(),
   promoteIdea: vi.fn(),
 }));
 
@@ -25,10 +26,11 @@ const baseSession = {
   idea_count: 1, created_by: { id: "u1", email: "owner@example.com", first_name: "", last_name: "" },
   created_at: "2026-08-01T10:00:00Z", description: "",
   ideas: [{
-    id: "idea-1", title: "Promising idea", description: "Worth trying.", requested_amount: null,
+    id: "idea-1", title: "Promising idea", description: "Worth trying.", category: "", requested_amount: null,
     status: "submitted" as const,
     status_label: "Submitted", submitted_by_participant: { name: "Ada" }, submitted_by_user: null,
-    vote_count: 3, voted_by_me: false, created_at: "2026-08-01T10:00:00Z",
+    vote_count: 3, voted_by_me: false, application_status: null, comments: [],
+    created_at: "2026-08-01T10:00:00Z",
   }],
 };
 

@@ -8,10 +8,10 @@ describe("LandingPage", () => {
   it("presents the foresight-to-decision proposition and demo conversion path", () => {
     render(<MemoryRouter><LandingPage /></MemoryRouter>);
 
-    expect(screen.getByRole("heading", { name: /turn uncertainty into accountable action/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /grantmaking your/i })).toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: /book a fit assessment/i })[0]).toHaveAttribute("href", "/request-demo");
     expect(screen.getAllByRole("link", { name: "Sign in" })[0]).toHaveAttribute("href", "/login");
-    expect(screen.getByText(/customer-owned records/i)).toBeInTheDocument();
+    expect(screen.getByText(/funder-owned records/i)).toBeInTheDocument();
     expect(screen.getByText(/where this comes from/i)).toBeInTheDocument();
     expect(screen.getByText(/first cohort of charter customer/i)).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /missing connection between foresight and accountable decisions/i })).toBeInTheDocument();

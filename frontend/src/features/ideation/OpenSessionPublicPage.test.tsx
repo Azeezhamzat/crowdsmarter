@@ -55,10 +55,11 @@ describe("OpenSessionPublicPage", () => {
       ...baseSession,
       ideas: [{
         id: "idea-1", title: "Solar-powered cold storage", description: "Shared cold storage.",
-        requested_amount: null,
+        category: "", requested_amount: null,
         status: "submitted", status_label: "Submitted",
         submitted_by_participant: { name: "Amaka Obi" }, submitted_by_user: null,
-        vote_count: 0, voted_by_me: false, created_at: "2026-08-01T10:00:00Z",
+        vote_count: 0, voted_by_me: false, application_status: null, comments: [],
+        created_at: "2026-08-01T10:00:00Z",
       }],
     });
 
@@ -86,20 +87,22 @@ describe("OpenSessionPublicPage", () => {
       ...baseSession,
       ideas: [{
         id: "idea-1", title: "Existing idea", description: "",
-        requested_amount: null,
+        category: "", requested_amount: null,
         status: "submitted", status_label: "Submitted",
         submitted_by_participant: { name: "Kwame" }, submitted_by_user: null,
-        vote_count: 2, voted_by_me: false, created_at: "2026-08-01T10:00:00Z",
+        vote_count: 2, voted_by_me: false, application_status: null, comments: [],
+        created_at: "2026-08-01T10:00:00Z",
       }],
     });
     vi.mocked(voteIdea).mockResolvedValue({
       ...baseSession,
       ideas: [{
         id: "idea-1", title: "Existing idea", description: "",
-        requested_amount: null,
+        category: "", requested_amount: null,
         status: "submitted", status_label: "Submitted",
         submitted_by_participant: { name: "Kwame" }, submitted_by_user: null,
-        vote_count: 3, voted_by_me: true, created_at: "2026-08-01T10:00:00Z",
+        vote_count: 3, voted_by_me: true, application_status: null, comments: [],
+        created_at: "2026-08-01T10:00:00Z",
       }],
     });
 
@@ -116,10 +119,11 @@ describe("OpenSessionPublicPage", () => {
       decision_template_key: "grant_round",
       ideas: [{
         id: "idea-1", title: "Community garden expansion", description: "",
-        requested_amount: "15000.00",
+        category: "", requested_amount: "15000.00",
         status: "submitted", status_label: "Submitted",
         submitted_by_participant: { name: "Ada" }, submitted_by_user: null,
-        vote_count: 0, voted_by_me: false, created_at: "2026-08-01T10:00:00Z",
+        vote_count: 0, voted_by_me: false, application_status: null, comments: [],
+        created_at: "2026-08-01T10:00:00Z",
       }],
     });
 

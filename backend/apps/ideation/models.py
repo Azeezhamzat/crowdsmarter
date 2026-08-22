@@ -35,6 +35,14 @@ class OpenSession(UUIDTimeStampedModel):
         null=True,
         blank=True,
     )
+    default_workspace = models.ForeignKey(
+        "workspaces.Workspace",
+        on_delete=models.PROTECT,
+        related_name="open_sessions",
+        null=True,
+        blank=True,
+        help_text="Workspace used when auto-creating a Decision from a promoted idea.",
+    )
     title = models.CharField(max_length=240)
     prompt = models.TextField()
     description = models.TextField(blank=True)
@@ -117,6 +125,7 @@ class Idea(UUIDTimeStampedModel):
     session = models.ForeignKey(OpenSession, on_delete=models.CASCADE, related_name="ideas")
     title = models.CharField(max_length=240)
     description = models.TextField(blank=True)
+    category = models.CharField(max_length=60, blank=True)
     requested_amount = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
     submitted_by_participant = models.ForeignKey(
         SessionParticipant,
@@ -165,6 +174,7 @@ class Idea(UUIDTimeStampedModel):
         super().clean()
         self.title = self.title.strip()
         self.description = self.description.strip()
+        self.category = self.category.strip()
         has_participant = self.submitted_by_participant_id is not None
         has_user = self.submitted_by_user_id is not None
         if has_participant == has_user:
@@ -180,6 +190,57 @@ class Idea(UUIDTimeStampedModel):
 
     def __str__(self) -> str:
         return f"{self.session.title}: {self.title}"
+
+
+class IdeaComment(UUIDTimeStampedModel):
+    """One deliberation message on an idea, from a participant or an org member."""
+
+    idea = models.ForeignKey(Idea, on_delete=models.CASCADE, related_name="comments")
+    body = models.TextField()
+    participant = models.ForeignKey(
+        SessionParticipant,
+        on_delete=models.PROTECT,
+        related_name="idea_comments",
+        null=True,
+        blank=True,
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="idea_comments",
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        ordering = ["created_at", "id"]
+        constraints = [
+            models.CheckConstraint(condition=~models.Q(body=""), name="idea_comment_body_not_empty"),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(participant__isnull=False, user__isnull=True)
+                    | models.Q(participant__isnull=True, user__isnull=False)
+                ),
+                name="idea_comment_exactly_one_identity",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["idea", "created_at"], name="idea_comment_idea_created_idx"),
+        ]
+
+    def clean(self) -> None:
+        super().clean()
+        self.body = self.body.strip()
+        has_participant = self.participant_id is not None
+        has_user = self.user_id is not None
+        if has_participant == has_user:
+            raise ValidationError("A comment must come from exactly one identity.")
+        if has_participant and self.participant.session_id != self.idea.session_id:
+            raise ValidationError({"participant": "The commenter must belong to this session."})
+
+    def __str__(self) -> str:
+        who = self.participant.name if self.participant_id else self.user.email  # type: ignore[union-attr]
+        return f"{who} on {self.idea.title}"
 
 
 class IdeaVote(UUIDTimeStampedModel):

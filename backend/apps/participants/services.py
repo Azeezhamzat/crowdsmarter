@@ -8,13 +8,14 @@ from django.utils import timezone
 
 from apps.accounts.models import User
 from apps.audit.services import record_event
+from apps.decision_options.models import DecisionOption
 from apps.decisions.models import Decision
 from apps.decisions.policies import can_manage_participants
 from apps.organisations.models import Membership, Organisation
 from apps.notifications.models import Notification
 from apps.notifications.services import create_notification
 
-from .models import Participant
+from .models import ConflictOfInterest, Participant
 
 
 class ParticipantServiceError(ValidationError):
@@ -350,3 +351,90 @@ def remove_non_owner_participations_for_member_departure(
             },
         )
     return len(participants)
+
+
+@transaction.atomic
+def declare_conflict(
+    *,
+    actor: User,
+    participant: Participant,
+    scope: str,
+    option: DecisionOption | None = None,
+    reason: str = "",
+) -> ConflictOfInterest:
+    """Record a reviewer's conflict of interest, self-declared or manager-recorded."""
+    participant = Participant.objects.select_for_update().select_related(
+        "decision", "decision__organisation", "user"
+    ).get(id=participant.id, status=Participant.Status.ACTIVE)
+    if participant.user_id != actor.id and not can_manage_participants(
+        actor=actor, decision=participant.decision
+    ):
+        raise PermissionDenied("You can only declare your own conflicts of interest.")
+    if scope == ConflictOfInterest.Scope.OPTION and option is None:
+        raise ParticipantServiceError({"option": "An option-scoped conflict requires an option."})
+    if scope == ConflictOfInterest.Scope.DECISION and option is not None:
+        raise ParticipantServiceError(
+            {"option": "A round-wide conflict does not reference a specific option."}
+        )
+    conflict = ConflictOfInterest(
+        organisation=participant.organisation,
+        participant=participant,
+        option=option,
+        scope=scope,
+        reason=reason,
+        declared_at=timezone.now(),
+        declared_by=actor,
+    )
+    conflict.full_clean(validate_unique=False, validate_constraints=False)
+    try:
+        conflict.save()
+    except IntegrityError as exc:
+        raise ParticipantServiceError(
+            "An active conflict declaration already covers this scope."
+        ) from exc
+    record_event(
+        action="conflict_of_interest.declared",
+        object_type="conflict_of_interest",
+        object_id=str(conflict.id),
+        actor=actor,
+        organisation=participant.organisation,
+        metadata={
+            "decision_id": str(participant.decision_id),
+            "participant_id": str(participant.id),
+            "option_id": str(option.id) if option else None,
+            "scope": scope,
+        },
+    )
+    return conflict
+
+
+@transaction.atomic
+def withdraw_conflict(*, actor: User, conflict: ConflictOfInterest) -> ConflictOfInterest:
+    """Withdraw an active conflict declaration."""
+    conflict = ConflictOfInterest.objects.select_for_update().select_related(
+        "participant", "participant__decision", "participant__user"
+    ).get(id=conflict.id, withdrawn_at__isnull=True)
+    if conflict.participant.user_id != actor.id and not can_manage_participants(
+        actor=actor, decision=conflict.participant.decision
+    ):
+        raise PermissionDenied("You cannot withdraw this conflict declaration.")
+    conflict.withdrawn_at = timezone.now()
+    conflict.withdrawn_by = actor
+    conflict.full_clean(validate_unique=False, validate_constraints=False)
+    conflict.save(update_fields=["withdrawn_at", "withdrawn_by", "updated_at"])
+    record_event(
+        action="conflict_of_interest.withdrawn",
+        object_type="conflict_of_interest",
+        object_id=str(conflict.id),
+        actor=actor,
+        organisation=conflict.organisation,
+        metadata={"decision_id": str(conflict.participant.decision_id)},
+    )
+    return conflict
+
+
+def conflicts_for_decision(*, decision: Decision):  # type: ignore[no-untyped-def]
+    """Return active conflict declarations for a decision, for results filtering and display."""
+    return ConflictOfInterest.objects.filter(
+        participant__decision=decision, withdrawn_at__isnull=True
+    ).select_related("participant__user", "option")

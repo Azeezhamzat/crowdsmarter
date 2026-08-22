@@ -75,6 +75,31 @@ def can_edit_reasoning(
     return False
 
 
+def can_manage_option_eligibility(*, actor: User, decision: Decision) -> bool:
+    """Return whether the actor may set an option's eligibility screening state."""
+    membership = active_membership(actor=actor, decision=decision)
+    if membership is None:
+        return False
+    if membership.role in MANAGER_ROLES or decision.owner_id == actor.id:
+        return decision.status in MANAGER_WRITE_STATUSES
+    if decision.status == Decision.Status.UNDER_REVIEW:
+        return _participant_role(actor=actor, decision=decision) in REVIEW_ROLES
+    return False
+
+
+def can_manage_option_outcome(*, actor: User, decision: Decision) -> bool:
+    """Return whether the actor may record an option's funding outcome.
+
+    Deliberately status-independent: funding decisions for a grant round are
+    typically recorded after DecisionFinalisation, a stage MANAGER_WRITE_STATUSES
+    excludes, and are decoupled from that single-option finalisation record.
+    """
+    membership = active_membership(actor=actor, decision=decision)
+    if membership is None:
+        return False
+    return membership.role in MANAGER_ROLES or decision.owner_id == actor.id
+
+
 def require_active_membership(*, actor: User, decision: Decision) -> Membership:
     """Return active tenant membership or fail at the service boundary."""
     membership = active_membership(actor=actor, decision=decision)

@@ -29,6 +29,7 @@ from apps.contributions.models import (
     ContributionSubmission, FacilitationSession, SessionParticipant,
 )
 from apps.decision_options.models import DecisionOption
+from apps.decision_options.services import budget_summary
 from apps.decision_analysis.models import DecisionIssue, DecisionQualityReview, ExecutiveDecisionSummary
 from apps.decisions.models import Decision, DecisionFinalisation, DecisionTransition
 from apps.evidence.models import Evidence
@@ -45,12 +46,12 @@ from apps.foresight.models import (
     ScenarioSignpost, Signpost, SignpostObservation, StrategicImplication, SystemStakeholder,
     ThreeHorizonItem, Watchlist, WatchlistSignal, WindTunnelAssessment,
 )
-from apps.ideation.models import Idea, IdeaVote, OpenSession
+from apps.ideation.models import Idea, IdeaComment, IdeaVote, OpenSession
 from apps.ideation.models import SessionParticipant as OpenSessionParticipant
 from apps.lessons.models import Lesson
 from apps.organisations.models import Membership, MembershipEvent, Organisation, OrganisationDeletionRequest
 from apps.methodology.models import DecisionMethod, DecisionMethodUsage, DecisionMethodVersion
-from apps.participants.models import Participant
+from apps.participants.models import ConflictOfInterest, Participant
 from apps.positions.models import Position
 from apps.reviews.models import DecisionReview
 from apps.risks.models import Risk
@@ -329,6 +330,8 @@ def _organisation_datasets(organisation: Organisation) -> dict[str, list[dict[st
         "open_session_participants": _records(OpenSessionParticipant.objects.filter(session__organisation=organisation)),
         "ideas": _records(Idea.objects.filter(session__organisation=organisation)),
         "idea_votes": _records(IdeaVote.objects.filter(idea__session__organisation=organisation)),
+        "idea_comments": _records(IdeaComment.objects.filter(idea__session__organisation=organisation)),
+        "conflicts_of_interest": _records(ConflictOfInterest.objects.filter(organisation=organisation)),
         "audit_events": _records(AuditEvent.objects.filter(organisation=organisation)),
     }
 
@@ -531,6 +534,8 @@ def _decision_datasets(decision: Decision) -> dict[str, list[dict[str, Any]]]:
         "open_session_participants": _records(OpenSessionParticipant.objects.filter(session__decision=decision)),
         "ideas": _records(Idea.objects.filter(session__decision=decision)),
         "idea_votes": _records(IdeaVote.objects.filter(idea__session__decision=decision)),
+        "idea_comments": _records(IdeaComment.objects.filter(idea__session__decision=decision)),
+        "conflicts_of_interest": _records(ConflictOfInterest.objects.filter(participant__decision=decision)),
     }
 
 
@@ -563,9 +568,66 @@ def _decision_summary_text(
         "Scope",
         decision.scope or "Not recorded.",
         "",
-        "Record counts",
     ]
+    if decision.source_template_key == "grant_round":
+        budget = budget_summary(decision=decision)
+        lines.extend([
+            "Grant round budget",
+            f"Total requested: {budget['requested_total']}",
+            f"Total awarded: {budget['awarded_total']}",
+            f"Funded: {budget['funded_count']} · Declined: {budget['declined_count']} "
+            f"· Pending: {budget['pending_outcome_count']}",
+            f"Eligible: {budget['eligible_count']} · Ineligible: {budget['ineligible_count']} "
+            f"· Pending screening: {budget['pending_eligibility_count']}",
+            "",
+        ])
+    lines.append("Record counts")
     lines.extend(f"- {name.replace('_', ' ').title()}: {len(records)}" for name, records in sorted(datasets.items()))
+    return "\n".join(lines) + "\n"
+
+
+def _award_letter_addressee(option: DecisionOption) -> tuple[str, str]:
+    """Resolve who a funding-outcome letter should address, and their display name.
+
+    Prefers the original applicant (via the Open Sessions idea that was
+    promoted into this option) over the org member who happened to click
+    promote, since the applicant is who the outcome actually concerns.
+    """
+    idea = Idea.objects.filter(promoted_to_option=option).select_related(
+        "submitted_by_participant", "submitted_by_user"
+    ).first()
+    if idea and idea.submitted_by_participant_id:
+        return idea.submitted_by_participant.name, idea.submitted_by_participant.email
+    if idea and idea.submitted_by_user_id:
+        user = idea.submitted_by_user
+        name = " ".join(filter(None, [user.first_name, user.last_name])) or user.email
+        return name, user.email
+    name = " ".join(filter(None, [option.proposed_by.first_name, option.proposed_by.last_name]))
+    return name or option.proposed_by.email, option.proposed_by.email
+
+
+def _award_letter_text(option: DecisionOption, decision: Decision) -> str:
+    name, email = _award_letter_addressee(option)
+    lines = [f"To: {name} <{email}>", ""]
+    if option.outcome_status == DecisionOption.OutcomeStatus.FUNDED:
+        lines += [
+            f"Dear {name},",
+            "",
+            f"Your application “{option.title}” has been funded"
+            + (f" at {option.awarded_amount}" if option.awarded_amount is not None else "")
+            + f" as part of “{decision.title}”.",
+            "",
+            option.outcome_note or "Congratulations, and thank you for applying.",
+        ]
+    else:
+        lines += [
+            f"Dear {name},",
+            "",
+            f"Your application “{option.title}” was not funded in this round of "
+            f"“{decision.title}”.",
+            "",
+            option.outcome_note or "No further feedback was recorded for this round.",
+        ]
     return "\n".join(lines) + "\n"
 
 
@@ -598,6 +660,15 @@ def build_decision_export(*, decision: Decision) -> ExportArchive:
         for name, records in sorted(datasets.items()):
             _write_dataset(archive, name, records, csv_copy=True)
         archive.writestr("xlsx/export.xlsx", _xlsx_bytes(datasets, sheet_names=sorted(datasets)))
+        if decision.source_template_key == "grant_round":
+            decided_options = DecisionOption.objects.filter(
+                decision=decision,
+                outcome_status__in=[DecisionOption.OutcomeStatus.FUNDED, DecisionOption.OutcomeStatus.DECLINED],
+            ).select_related("proposed_by")
+            for option in decided_options:
+                letter = _award_letter_text(option, decision)
+                filename = slugify(option.title)[:60] or str(option.id)
+                archive.writestr(f"letters/{filename}.txt", letter.encode("utf-8"))
         related_source_ids = [record["id"] for record in datasets.get("foresight_sources", [])]
         _write_source_attachment_files(
             archive,

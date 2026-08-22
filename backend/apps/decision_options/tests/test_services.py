@@ -5,7 +5,10 @@ from apps.audit.models import AuditEvent
 from apps.decision_options.models import DecisionOption
 from apps.decision_options.services import (
     DecisionOptionServiceError,
+    budget_summary,
     create_option,
+    set_eligibility,
+    set_outcome,
     update_option,
 )
 from apps.decisions.models import Decision
@@ -197,3 +200,152 @@ def test_option_dependency_must_belong_to_same_decision(
             option=option,
             fields={"depends_on_ids": [str(foreign_option.id)]},
         )
+
+
+@pytest.mark.django_db
+def test_manager_sets_eligibility(decision_factory):  # type: ignore[no-untyped-def]
+    decision = decision_factory(status=Decision.Status.UNDER_REVIEW)
+    option = create_option(
+        actor=decision.owner, decision=decision,
+        title="Community grant application", description="Reduces post-harvest loss.",
+    )
+
+    option = set_eligibility(
+        actor=decision.owner,
+        option=option,
+        eligibility_status=DecisionOption.EligibilityStatus.ELIGIBLE,
+        eligibility_note="Meets published criteria.",
+    )
+
+    assert option.eligibility_status == DecisionOption.EligibilityStatus.ELIGIBLE
+    assert option.eligibility_decided_at is not None
+    assert option.eligibility_decided_by == decision.owner
+    assert AuditEvent.objects.filter(action="decision_option.eligibility_set").exists()
+
+
+@pytest.mark.django_db
+def test_reviewer_can_set_eligibility_during_review(
+    user_factory, decision_factory,
+):  # type: ignore[no-untyped-def]
+    decision = decision_factory(status=Decision.Status.UNDER_REVIEW)
+    option = create_option(actor=decision.owner, decision=decision, title="App", description="Desc.")
+    reviewer = user_factory()
+    Membership.objects.create(
+        organisation=decision.organisation, user=reviewer, role=Membership.Role.CONTRIBUTOR,
+        status=Membership.Status.ACTIVE,
+    )
+    Participant.objects.create(
+        organisation=decision.organisation, decision=decision, user=reviewer,
+        role=Participant.Role.REVIEWER, added_by=decision.owner,
+    )
+
+    option = set_eligibility(
+        actor=reviewer, option=option, eligibility_status=DecisionOption.EligibilityStatus.INELIGIBLE,
+    )
+
+    assert option.eligibility_status == DecisionOption.EligibilityStatus.INELIGIBLE
+
+
+@pytest.mark.django_db
+def test_contributor_cannot_set_eligibility(user_factory, decision_factory):  # type: ignore[no-untyped-def]
+    decision = decision_factory(status=Decision.Status.UNDER_REVIEW)
+    option = create_option(actor=decision.owner, decision=decision, title="App", description="Desc.")
+    contributor = user_factory()
+    Membership.objects.create(
+        organisation=decision.organisation, user=contributor, role=Membership.Role.CONTRIBUTOR,
+        status=Membership.Status.ACTIVE,
+    )
+    Participant.objects.create(
+        organisation=decision.organisation, decision=decision, user=contributor,
+        role=Participant.Role.CONTRIBUTOR, added_by=decision.owner,
+    )
+
+    with pytest.raises(PermissionDenied):
+        set_eligibility(
+            actor=contributor, option=option, eligibility_status=DecisionOption.EligibilityStatus.ELIGIBLE,
+        )
+
+
+@pytest.mark.django_db
+def test_manager_funds_option_with_amount(decision_factory):  # type: ignore[no-untyped-def]
+    # set_outcome is deliberately status-independent (funding decisions happen
+    # after finalisation, which MANAGER_WRITE_STATUSES excludes) — options are
+    # created while under review, matching create_option's own gate.
+    decision = decision_factory(status=Decision.Status.UNDER_REVIEW)
+    option = create_option(
+        actor=decision.owner, decision=decision, title="Grant application",
+        description="Desc.", estimated_cost="5000.00",
+    )
+
+    option = set_outcome(
+        actor=decision.owner, option=option,
+        outcome_status=DecisionOption.OutcomeStatus.FUNDED, awarded_amount="4500.00",
+        outcome_note="Partially funded to spread the pool further.",
+    )
+
+    assert option.outcome_status == DecisionOption.OutcomeStatus.FUNDED
+    assert option.awarded_amount == pytest.approx(4500.00)
+    assert option.outcome_decided_by == decision.owner
+
+
+@pytest.mark.django_db
+def test_funded_outcome_requires_amount(decision_factory):  # type: ignore[no-untyped-def]
+    from django.core.exceptions import ValidationError
+
+    decision = decision_factory(status=Decision.Status.UNDER_REVIEW)
+    option = create_option(actor=decision.owner, decision=decision, title="App", description="Desc.")
+
+    with pytest.raises(ValidationError):
+        set_outcome(
+            actor=decision.owner, option=option, outcome_status=DecisionOption.OutcomeStatus.FUNDED,
+        )
+
+
+@pytest.mark.django_db
+def test_reviewer_cannot_set_outcome(user_factory, decision_factory):  # type: ignore[no-untyped-def]
+    decision = decision_factory(status=Decision.Status.UNDER_REVIEW)
+    option = create_option(actor=decision.owner, decision=decision, title="App", description="Desc.")
+    reviewer = user_factory()
+    Membership.objects.create(
+        organisation=decision.organisation, user=reviewer, role=Membership.Role.CONTRIBUTOR,
+        status=Membership.Status.ACTIVE,
+    )
+    Participant.objects.create(
+        organisation=decision.organisation, decision=decision, user=reviewer,
+        role=Participant.Role.REVIEWER, added_by=decision.owner,
+    )
+
+    with pytest.raises(PermissionDenied):
+        set_outcome(
+            actor=reviewer, option=option, outcome_status=DecisionOption.OutcomeStatus.DECLINED,
+        )
+
+
+@pytest.mark.django_db
+def test_budget_summary_totals_active_options(decision_factory):  # type: ignore[no-untyped-def]
+    decision = decision_factory(status=Decision.Status.UNDER_REVIEW)
+    funded = create_option(
+        actor=decision.owner, decision=decision, title="Funded app",
+        description="Desc.", estimated_cost="1000.00",
+    )
+    set_outcome(
+        actor=decision.owner, option=funded, outcome_status=DecisionOption.OutcomeStatus.FUNDED,
+        awarded_amount="800.00",
+    )
+    declined = create_option(
+        actor=decision.owner, decision=decision, title="Declined app",
+        description="Desc.", estimated_cost="2000.00",
+    )
+    set_outcome(actor=decision.owner, option=declined, outcome_status=DecisionOption.OutcomeStatus.DECLINED)
+    create_option(
+        actor=decision.owner, decision=decision, title="Pending app",
+        description="Desc.", estimated_cost="500.00",
+    )
+
+    summary = budget_summary(decision=decision)
+
+    assert summary["requested_total"] == pytest.approx(3500.00)
+    assert summary["awarded_total"] == pytest.approx(800.00)
+    assert summary["funded_count"] == 1
+    assert summary["declined_count"] == 1
+    assert summary["pending_outcome_count"] == 1

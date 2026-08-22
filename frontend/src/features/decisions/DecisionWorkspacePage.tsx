@@ -228,6 +228,23 @@ export function DecisionWorkspacePage() {
           ) : <p className="muted">No active options yet.</p>}
         </section>
 
+        {summary.budget ? (
+          <section className="overview-card" aria-labelledby="budget-title">
+            <div className="section-heading"><div><p className="eyebrow">Round budget</p><h2 id="budget-title">Requested vs. awarded</h2></div></div>
+            <div className="reasoning-count-grid">
+              <div><strong>{summary.budget.requested_total}</strong><span>Requested</span></div>
+              <div><strong>{summary.budget.awarded_total}</strong><span>Awarded</span></div>
+              <div><strong>{summary.budget.funded_count}</strong><span>Funded</span></div>
+              <div><strong>{summary.budget.declined_count}</strong><span>Declined</span></div>
+              <div><strong>{summary.budget.pending_outcome_count}</strong><span>Pending</span></div>
+            </div>
+            <p className="muted">
+              {summary.budget.eligible_count} eligible · {summary.budget.ineligible_count} ineligible ·{" "}
+              {summary.budget.pending_eligibility_count} awaiting screening
+            </p>
+          </section>
+        ) : null}
+
         <section className="overview-card" aria-labelledby="signals-title">
           <div className="section-heading"><div><p className="eyebrow">Foresight</p><h2 id="signals-title">Signals informing this decision</h2></div><Link className="text-link" to={`/organisations/${current.organisation_id}/foresight`}>Open radar</Link></div>
           {summary.linked_signals.length ? (

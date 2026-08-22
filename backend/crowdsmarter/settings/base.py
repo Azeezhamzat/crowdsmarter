@@ -165,6 +165,7 @@ REST_FRAMEWORK = {
         "session_join": os.getenv("API_SESSION_JOIN_THROTTLE_RATE", "20/hour"),
         "idea_submit": os.getenv("API_IDEA_SUBMIT_THROTTLE_RATE", "30/hour"),
         "idea_vote": os.getenv("API_IDEA_VOTE_THROTTLE_RATE", "120/hour"),
+        "idea_comment": os.getenv("API_IDEA_COMMENT_THROTTLE_RATE", "60/hour"),
     },
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 50,

@@ -7,11 +7,21 @@ from rest_framework import serializers
 from apps.core.serializers import StrictSerializer
 from apps.decisions.serializers import DecisionUserSerializer
 
-from .models import Idea, OpenSession
+from .models import Idea, IdeaComment, OpenSession
 
 
 class SessionParticipantSerializer(serializers.Serializer):
     name = serializers.CharField()
+
+
+class IdeaCommentSerializer(serializers.ModelSerializer):
+    submitted_by_participant = SessionParticipantSerializer(source="participant", read_only=True)
+    submitted_by_user = DecisionUserSerializer(source="user", read_only=True)
+
+    class Meta:
+        model = IdeaComment
+        fields = ["id", "body", "submitted_by_participant", "submitted_by_user", "created_at"]
+        read_only_fields = fields
 
 
 class IdeaSerializer(serializers.ModelSerializer):
@@ -20,6 +30,8 @@ class IdeaSerializer(serializers.ModelSerializer):
     status_label = serializers.CharField(source="get_status_display", read_only=True)
     vote_count = serializers.IntegerField(read_only=True)
     voted_by_me = serializers.SerializerMethodField()
+    application_status = serializers.SerializerMethodField()
+    comments = IdeaCommentSerializer(many=True, read_only=True)
 
     class Meta:
         model = Idea
@@ -27,6 +39,7 @@ class IdeaSerializer(serializers.ModelSerializer):
             "id",
             "title",
             "description",
+            "category",
             "requested_amount",
             "status",
             "status_label",
@@ -34,6 +47,8 @@ class IdeaSerializer(serializers.ModelSerializer):
             "submitted_by_user",
             "vote_count",
             "voted_by_me",
+            "application_status",
+            "comments",
             "created_at",
         ]
         read_only_fields = fields
@@ -42,13 +57,42 @@ class IdeaSerializer(serializers.ModelSerializer):
         voter_ids = self.context.get("voted_idea_ids")
         return bool(voter_ids) and obj.id in voter_ids
 
+    def get_application_status(self, obj: Idea) -> dict | None:
+        # A hand-picked allowlist of exactly what an applicant should see about
+        # their promoted application — never the raw DecisionOption (no reviewer
+        # scores, no other applicants' internals), matching the discipline in
+        # get_decision_template_key below.
+        if not obj.promoted_to_option_id:
+            return None
+        option = obj.promoted_to_option
+        return {
+            "eligibility_status": option.eligibility_status,
+            "eligibility_status_label": option.get_eligibility_status_display(),
+            "eligibility_note": option.eligibility_note,
+            "outcome_status": option.outcome_status,
+            "outcome_status_label": option.get_outcome_status_display(),
+            "awarded_amount": option.awarded_amount,
+            "outcome_note": option.outcome_note,
+        }
+
 
 class IdeaCreateSerializer(StrictSerializer):
     title = serializers.CharField(max_length=240)
     description = serializers.CharField(required=False, allow_blank=True, default="")
+    category = serializers.CharField(
+        max_length=60, trim_whitespace=True, allow_blank=True, required=False, default=""
+    )
     requested_amount = serializers.DecimalField(
         max_digits=14, decimal_places=2, required=False, allow_null=True, default=None, min_value=0
     )
+
+
+class IdeaCommentCreateSerializer(StrictSerializer):
+    body = serializers.CharField(max_length=4000, trim_whitespace=True)
+
+
+class IdeaArchiveSerializer(StrictSerializer):
+    archived = serializers.BooleanField()
 
 
 class SessionJoinSerializer(StrictSerializer):
@@ -139,5 +183,6 @@ class OpenSessionCreateSerializer(StrictSerializer):
     prompt = serializers.CharField()
     description = serializers.CharField(required=False, allow_blank=True, default="")
     decision_id = serializers.UUIDField(required=False, allow_null=True)
+    default_workspace_id = serializers.UUIDField(required=False, allow_null=True)
     voting_enabled = serializers.BooleanField(required=False, default=True)
     submission_deadline = serializers.DateTimeField(required=False, allow_null=True)

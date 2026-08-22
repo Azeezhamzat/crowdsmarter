@@ -15,10 +15,13 @@ from rest_framework.views import APIView
 from apps.core.serializers import StrictSerializer
 from apps.decisions.models import Decision
 from apps.organisations.selectors import organisation_for_user
+from apps.workspaces.selectors import workspace_for_user
 
 from . import services
 from .models import Idea, OpenSession
 from .serializers import (
+    IdeaArchiveSerializer,
+    IdeaCommentCreateSerializer,
     IdeaCreateSerializer,
     OpenSessionCreateSerializer,
     OpenSessionOrganiserSerializer,
@@ -40,6 +43,10 @@ class _IdeaSubmitThrottle(AnonRateThrottle):
 
 class _IdeaVoteThrottle(AnonRateThrottle):
     scope = "idea_vote"
+
+
+class _IdeaCommentThrottle(AnonRateThrottle):
+    scope = "idea_comment"
 
 
 def _participant_from_request(request, session: OpenSession):  # type: ignore[no-untyped-def]
@@ -141,6 +148,25 @@ class SessionIdeaVoteView(APIView):
         return _public_session_response(session, participant=participant)
 
 
+@method_decorator(ensure_csrf_cookie, name="dispatch")
+@method_decorator(csrf_protect, name="dispatch")
+class SessionIdeaCommentCreateView(APIView):
+    """Post one deliberation comment on an idea."""
+
+    permission_classes = [AllowAny]
+    authentication_classes: list[type] = []
+    throttle_classes = [_IdeaCommentThrottle]
+
+    def post(self, request, public_slug, idea_id):  # type: ignore[no-untyped-def]
+        session = services.public_session_by_slug(public_slug=public_slug)
+        participant = _participant_from_request(request, session)
+        idea = get_object_or_404(Idea, id=idea_id, session=session)
+        serializer = IdeaCommentCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        services.post_comment(idea=idea, participant=participant, **serializer.validated_data)
+        return _public_session_response(session, participant=participant)
+
+
 class OrganisationSessionListCreateView(APIView):
     """Org-authenticated: list and create open sessions for one organisation."""
 
@@ -160,8 +186,18 @@ class OrganisationSessionListCreateView(APIView):
         decision = None
         if decision_id:
             decision = get_object_or_404(Decision, id=decision_id, organisation=organisation)
+        default_workspace_id = values.pop("default_workspace_id", None)
+        default_workspace = None
+        if default_workspace_id:
+            default_workspace = workspace_for_user(
+                user=request.user, workspace_id=default_workspace_id
+            )
         session = services.create_session(
-            actor=request.user, organisation=organisation, decision=decision, **values
+            actor=request.user,
+            organisation=organisation,
+            decision=decision,
+            default_workspace=default_workspace,
+            **values,
         )
         return Response(OpenSessionSummarySerializer(session).data, status=status.HTTP_201_CREATED)
 
@@ -216,8 +252,20 @@ class IdeaShortlistView(APIView):
         return _organiser_session_response(request, session)
 
 
+class IdeaArchiveView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, session_id, idea_id):  # type: ignore[no-untyped-def]
+        session = services.session_for_organiser(actor=request.user, session_id=session_id)
+        idea = get_object_or_404(Idea, id=idea_id, session=session)
+        serializer = IdeaArchiveSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        services.archive_idea(actor=request.user, idea=idea, **serializer.validated_data)
+        return _organiser_session_response(request, session)
+
+
 class IdeaPromoteSerializer(StrictSerializer):
-    decision_id = serializers.UUIDField()
+    decision_id = serializers.UUIDField(required=False, allow_null=True)
 
 
 class IdeaPromoteView(APIView):
@@ -228,8 +276,11 @@ class IdeaPromoteView(APIView):
         idea = get_object_or_404(Idea, id=idea_id, session=session)
         serializer = IdeaPromoteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        decision = get_object_or_404(
-            Decision, id=serializer.validated_data["decision_id"], organisation=session.organisation
+        decision_id = serializer.validated_data.get("decision_id")
+        decision = (
+            get_object_or_404(Decision, id=decision_id, organisation=session.organisation)
+            if decision_id
+            else None
         )
         services.promote_idea_to_decision(actor=request.user, idea=idea, decision=decision)
         return _organiser_session_response(request, session)

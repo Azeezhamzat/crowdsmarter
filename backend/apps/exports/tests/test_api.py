@@ -378,3 +378,58 @@ def test_decision_export_scopes_open_sessions_to_that_decision(
     with zipfile.ZipFile(io.BytesIO(archive.content)) as zf:
         sessions = json.loads(zf.read("json/open_sessions.json").decode())
         assert [s["title"] for s in sessions] == [linked_session.title]
+
+
+@pytest.mark.django_db
+def test_grant_round_export_includes_budget_summary_and_award_letters(
+    decision_factory,
+):  # type: ignore[no-untyped-def]
+    from apps.decision_options.models import DecisionOption
+    from apps.decision_options.services import create_option, set_outcome
+    from apps.exports.services import build_decision_export
+    from apps.ideation import services as ideation_services
+
+    decision = decision_factory(source_template_key="grant_round", title="2026 community round")
+    owner = decision.owner
+    session = ideation_services.create_session(
+        actor=owner, organisation=decision.organisation, decision=decision,
+        title="Round intake", prompt="Applications?",
+    )
+    session = ideation_services.open_session(actor=owner, session=session)
+    participant, _token = ideation_services.identify_participant(
+        session=session, name="Ada Lovelace", email="ada@example.com",
+    )
+    idea = ideation_services.submit_idea(
+        session=session, participant=participant, title="Community garden expansion",
+        description="Expand shared plots.", requested_amount="1000.00",
+    )
+    funded_option = ideation_services.promote_idea_to_decision(actor=owner, idea=idea, decision=decision)
+    set_outcome(
+        actor=owner, option=funded_option, outcome_status=DecisionOption.OutcomeStatus.FUNDED,
+        awarded_amount="800.00", outcome_note="Congratulations.",
+    )
+    declined_option = create_option(
+        actor=owner, decision=decision, title="Directly created application", description="Desc.",
+        estimated_cost="500.00",
+    )
+    set_outcome(actor=owner, option=declined_option, outcome_status=DecisionOption.OutcomeStatus.DECLINED)
+
+    archive = build_decision_export(decision=decision)
+    with zipfile.ZipFile(io.BytesIO(archive.content)) as zf:
+        summary = zf.read("summary.txt").decode()
+        assert "Grant round budget" in summary
+        assert "Total awarded: 800.00" in summary
+
+        names = set(zf.namelist())
+        letter_names = [n for n in names if n.startswith("letters/")]
+        assert len(letter_names) == 2
+
+        funded_letter = zf.read(f"letters/{funded_option.title.lower().replace(' ', '-')}.txt").decode()
+        assert "Ada Lovelace" in funded_letter
+        assert "800.00" in funded_letter
+        assert "ada@example.com" in funded_letter
+
+        declined_letter = zf.read(
+            f"letters/{declined_option.title.lower().replace(' ', '-')}.txt"
+        ).decode()
+        assert "was not funded" in declined_letter

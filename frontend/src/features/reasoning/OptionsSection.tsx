@@ -1,5 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -7,7 +8,97 @@ import { FieldError } from "../../components/FieldError";
 import { StatusMessage } from "../../components/StatusMessage";
 import { ApiError } from "../../lib/api";
 import { getTerminology } from "../../lib/terminology";
-import { createOption, listOptions, updateOption } from "./api";
+import type { DecisionOption, EligibilityStatus, OutcomeStatus } from "../../lib/types";
+import { createOption, listOptions, setOptionEligibility, setOptionOutcome, updateOption } from "./api";
+
+function EligibilityControl({
+  option,
+  onSave,
+  isPending,
+}: {
+  option: DecisionOption;
+  onSave: (input: { eligibility_status: EligibilityStatus; eligibility_note: string }) => void;
+  isPending: boolean;
+}) {
+  const [status, setStatus] = useState<EligibilityStatus>(option.eligibility_status);
+  const [note, setNote] = useState(option.eligibility_note);
+
+  return (
+    <div className="reasoning-card__control">
+      <label>
+        Eligibility
+        <select value={status} onChange={(event) => setStatus(event.target.value as EligibilityStatus)}>
+          <option value="pending">Pending review</option>
+          <option value="eligible">Eligible</option>
+          <option value="ineligible">Ineligible</option>
+        </select>
+      </label>
+      <input placeholder="Note (optional)" value={note} onChange={(event) => setNote(event.target.value)} />
+      <button
+        className="button button--quiet button--compact"
+        type="button"
+        disabled={isPending}
+        onClick={() => onSave({ eligibility_status: status, eligibility_note: note })}
+      >
+        Save
+      </button>
+    </div>
+  );
+}
+
+function OutcomeControl({
+  option,
+  onSave,
+  isPending,
+  amountFieldLabel,
+}: {
+  option: DecisionOption;
+  onSave: (input: { outcome_status: OutcomeStatus; awarded_amount: number | null; outcome_note: string }) => void;
+  isPending: boolean;
+  amountFieldLabel: string;
+}) {
+  const [status, setStatus] = useState<OutcomeStatus>(option.outcome_status);
+  const [amount, setAmount] = useState(option.awarded_amount ?? "");
+  const [note, setNote] = useState(option.outcome_note);
+
+  return (
+    <div className="reasoning-card__control">
+      <label>
+        Funding outcome
+        <select value={status} onChange={(event) => setStatus(event.target.value as OutcomeStatus)}>
+          <option value="pending">Pending decision</option>
+          <option value="funded">Funded</option>
+          <option value="declined">Declined</option>
+        </select>
+      </label>
+      {status === "funded" ? (
+        <input
+          type="number"
+          min={0}
+          step="0.01"
+          placeholder={amountFieldLabel}
+          value={amount}
+          onChange={(event) => setAmount(event.target.value)}
+        />
+      ) : null}
+      <input placeholder="Note (optional)" value={note} onChange={(event) => setNote(event.target.value)} />
+      <button
+        className="button button--quiet button--compact"
+        type="button"
+        disabled={isPending}
+        onClick={() =>
+          onSave({
+            outcome_status: status,
+            awarded_amount: status === "funded" && amount !== "" ? Number(amount) : null,
+            outcome_note: note,
+          })
+        }
+      >
+        Save
+      </button>
+    </div>
+  );
+}
 
 const optionSchema = z
   .object({
@@ -114,6 +205,22 @@ export function OptionsSection({
     }) => updateOption(id, { status }),
     onSuccess: refresh,
   });
+  const eligibility = useMutation({
+    mutationFn: ({
+      id,
+      ...input
+    }: { id: string; eligibility_status: EligibilityStatus; eligibility_note: string }) =>
+      setOptionEligibility(id, input),
+    onSuccess: refresh,
+  });
+  const outcome = useMutation({
+    mutationFn: ({
+      id,
+      ...input
+    }: { id: string; outcome_status: OutcomeStatus; awarded_amount: number | null; outcome_note: string }) =>
+      setOptionOutcome(id, input),
+    onSuccess: refresh,
+  });
 
   const activeOptions = (query.data ?? []).filter((item) => item.status === "active");
   const titleFor = (id: string) => query.data?.find((item) => item.id === id)?.title ?? id;
@@ -153,6 +260,15 @@ export function OptionsSection({
                     {option.reversibility ? (
                       <span className="status-badge">{option.reversibility_label}</span>
                     ) : null}
+                    <span className={`status-badge status-badge--${option.eligibility_status}`}>
+                      {option.eligibility_status_label}
+                    </span>
+                    <span className={`status-badge status-badge--${option.outcome_status}`}>
+                      {option.outcome_status_label}
+                      {option.outcome_status === "funded" && option.awarded_amount
+                        ? ` · ${option.awarded_amount}`
+                        : ""}
+                    </span>
                   </div>
                 </div>
                 {option.can_edit ? (
@@ -221,6 +337,21 @@ export function OptionsSection({
               <p className="table-secondary">
                 Proposed by {option.proposed_by.email}
               </p>
+              {option.can_manage_eligibility ? (
+                <EligibilityControl
+                  option={option}
+                  isPending={eligibility.isPending}
+                  onSave={(input) => eligibility.mutate({ id: option.id, ...input })}
+                />
+              ) : null}
+              {option.can_manage_outcome ? (
+                <OutcomeControl
+                  option={option}
+                  isPending={outcome.isPending}
+                  amountFieldLabel={terms.amountFieldLabel}
+                  onSave={(input) => outcome.mutate({ id: option.id, ...input })}
+                />
+              ) : null}
             </article>
           ))}
           {query.data?.length === 0 ? (

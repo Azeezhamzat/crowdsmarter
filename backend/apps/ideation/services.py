@@ -16,8 +16,9 @@ from apps.decision_options.services import create_option
 from apps.decisions.models import Decision
 from apps.decisions.policies import CREATOR_ROLES
 from apps.organisations.models import Membership, Organisation
+from apps.workspaces.models import Workspace
 
-from .models import Idea, IdeaVote, OpenSession, SessionParticipant
+from .models import Idea, IdeaComment, IdeaVote, OpenSession, SessionParticipant
 from .tokens import digest_token, generate_public_slug, generate_token
 
 
@@ -48,6 +49,7 @@ def create_session(
     actor: User,
     organisation: Organisation,
     decision: Decision | None = None,
+    default_workspace: Workspace | None = None,
     title: str,
     prompt: str,
     description: str = "",
@@ -59,9 +61,18 @@ def create_session(
         raise PermissionDenied("Your role cannot create open sessions.")
     if decision is not None and decision.organisation_id != organisation.id:
         raise IdeationServiceError({"decision": "The decision must belong to this organisation."})
+    if default_workspace is not None and default_workspace.organisation_id != organisation.id:
+        raise IdeationServiceError(
+            {"default_workspace": "The workspace must belong to this organisation."}
+        )
+    if default_workspace is None:
+        default_workspace = Workspace.objects.filter(
+            organisation=organisation, is_default=True
+        ).first()
     session = OpenSession(
         organisation=organisation,
         decision=decision,
+        default_workspace=default_workspace,
         title=title,
         prompt=prompt,
         description=description,
@@ -159,6 +170,7 @@ def submit_idea(
     user: User | None = None,
     title: str,
     description: str = "",
+    category: str = "",
     requested_amount: Any | None = None,
 ) -> Idea:
     if session.status != OpenSession.Status.OPEN:
@@ -167,6 +179,7 @@ def submit_idea(
         session=session,
         title=title,
         description=description,
+        category=category,
         requested_amount=requested_amount,
         submitted_by_participant=participant,
         submitted_by_user=user,
@@ -221,18 +234,46 @@ def shortlist_idea(*, actor: User, idea: Idea, shortlisted: bool) -> Idea:
 
 
 @transaction.atomic
-def promote_idea_to_decision(*, actor: User, idea: Idea, decision: Decision):
+def archive_idea(*, actor: User, idea: Idea, archived: bool) -> Idea:
+    _require_organiser(actor=actor, session=idea.session)
+    if idea.status == Idea.Status.PROMOTED:
+        raise IdeationServiceError("A promoted idea cannot be archived.")
+    idea.status = Idea.Status.ARCHIVED if archived else Idea.Status.SUBMITTED
+    idea.full_clean(validate_unique=False, validate_constraints=False)
+    idea.save(update_fields=["status", "updated_at"])
+    return idea
+
+
+@transaction.atomic
+def promote_idea_to_decision(*, actor: User, idea: Idea, decision: Decision | None = None):
     """Turn a shortlisted idea into a real, accountable DecisionOption.
 
     Deliberately does not duplicate create_option's own permission check
     (apps.decisions.reasoning_policies.can_contribute_reasoning) — it already
     enforces whether this actor may add an option to this decision in its
     current state, and that failure should surface as-is, not be masked here.
+
+    When decision is None, a new grant_round-templated Decision is created in
+    the session's default_workspace instead of requiring an existing one.
     """
     _require_organiser(actor=actor, session=idea.session)
     if idea.status == Idea.Status.PROMOTED:
         raise IdeationServiceError("This idea has already been promoted.")
-    if decision.organisation_id != idea.session.organisation_id:
+    if decision is None:
+        if idea.session.default_workspace_id is None:
+            raise IdeationServiceError(
+                "This session has no default workspace to create a new grant round in."
+            )
+        from apps.decisions.services import create_decision
+
+        decision = create_decision(
+            actor=actor,
+            workspace=idea.session.default_workspace,
+            title=idea.title,
+            purpose=idea.description,
+            template_key="grant_round",
+        )
+    elif decision.organisation_id != idea.session.organisation_id:
         raise IdeationServiceError({"decision": "The decision must belong to this session's organisation."})
     option = create_option(
         actor=actor,
@@ -256,6 +297,26 @@ def promote_idea_to_decision(*, actor: User, idea: Idea, decision: Decision):
     return option
 
 
+@transaction.atomic
+def post_comment(
+    *,
+    idea: Idea,
+    body: str,
+    participant: SessionParticipant | None = None,
+    user: User | None = None,
+) -> IdeaComment:
+    if idea.session.status != OpenSession.Status.OPEN:
+        raise IdeationServiceError("This session is not currently accepting comments.")
+    comment = IdeaComment(idea=idea, body=body, participant=participant, user=user)
+    comment.full_clean(validate_unique=False, validate_constraints=False)
+    comment.save()
+    return comment
+
+
+def comments_for_idea(*, idea: Idea) -> QuerySet[IdeaComment]:
+    return IdeaComment.objects.filter(idea=idea).select_related("participant", "user")
+
+
 def list_sessions(*, actor: User, organisation: Organisation):
     _active_membership(actor=actor, organisation_id=organisation.id)
     return (
@@ -268,7 +329,8 @@ def list_sessions(*, actor: User, organisation: Organisation):
 def ideas_for_session(*, session: OpenSession) -> QuerySet[Idea]:
     return (
         Idea.objects.filter(session=session)
-        .select_related("submitted_by_participant", "submitted_by_user")
+        .select_related("submitted_by_participant", "submitted_by_user", "promoted_to_option")
+        .prefetch_related("comments__participant", "comments__user")
         .annotate(vote_count=Count("votes", distinct=True))
         .order_by("-vote_count", "-created_at")
     )

@@ -4,6 +4,7 @@ import { Link } from "react-router";
 import { Icon, type IconName } from "../../components/Icon";
 import { LogoMark } from "../../components/Logo";
 import { buildMailto, contactChannels } from "../../config/contact";
+import { HeroVideo } from "./HeroVideo";
 import { ForesightDecisionTrace, WorkflowIllustration } from "./WorkflowIllustrations";
 
 const workflow = [
@@ -188,85 +189,19 @@ export function LandingPage() {
       </header>
 
       <main id="main-content" tabIndex={-1}>
-        <section className="hero hero--executive" aria-labelledby="hero-title">
-          <div className="hero__copy hero__copy--executive">
-            <div className="public-proof-pill"><Icon name="shield" size={16} />Human judgement remains in control</div>
-            <p className="public-eyebrow">Decision intelligence for consequential work</p>
-            <h1 id="hero-title">Turn uncertainty into accountable action.</h1>
-            <p className="hero__lead">
-              CrowdSmarter helps strategy, transformation, and policy teams turn signals, evidence, and
-              diverse stakeholder judgement into traceable decisions, owned actions, and organisational learning.
-            </p>
-            <div className="hero__actions hero__actions--executive">
-              <Link className="public-button public-button--primary public-button--large" to="/request-demo">
-                Book a fit assessment <Icon name="arrow-right" size={18} />
-              </Link>
-              <a className="public-button public-button--secondary public-button--large" href="#workflow">See how the workflow works</a>
-            </div>
-            <p className="hero__microcopy">Built for serious organisational decisions—not generic task management, chat, or automated judgement.</p>
-            <div className="hero__trust-row hero__trust-row--executive">
-              <span><Icon name="check" size={16} />Customer-owned records</span>
-              <span><Icon name="check" size={16} />Visible uncertainty and dissent</span>
-              <span><Icon name="check" size={16} />Provider-independent AI</span>
-            </div>
-          </div>
-
-          <div className="executive-product-preview" aria-label="CrowdSmarter integrated decision analysis preview">
-            <div className="executive-product-preview__glow" aria-hidden="true" />
-            <div className="product-window product-window--executive">
-              <div className="product-window__chrome">
-                <span /><span /><span />
-                <strong>Integrated decision analysis</strong>
-                <small>Northstar Strategy</small>
-              </div>
-              <div className="product-window__body product-window__body--executive">
-                <aside className="product-window__sidebar" aria-hidden="true"><i /><i /><i /><i /><i /><i /></aside>
-                <div className="product-window__content product-window__content--executive">
-                  <div className="preview-heading-row">
-                    <div>
-                      <span className="preview-label">Executive decision workspace</span>
-                      <h2>How should we respond to accelerating AI adoption across our sector?</h2>
-                    </div>
-                    <span className="preview-status">Under review</span>
-                  </div>
-                  <div className="preview-readiness">
-                    <div><span>Decision readiness</span><strong>Ready with conditions</strong></div>
-                    <b>3 blockers</b>
-                  </div>
-                  <div className="preview-option-grid">
-                    <article className="preview-option preview-option--lead">
-                      <div><span>Option A</span><strong>Controlled pilot</strong></div>
-                      <div className="preview-score"><span>Robustness</span><b>8.2</b></div>
-                      <div className="preview-bars"><i /><i /><i /></div>
-                    </article>
-                    <article className="preview-option">
-                      <div><span>Option B</span><strong>Enterprise rollout</strong></div>
-                      <div className="preview-score"><span>Robustness</span><b>6.4</b></div>
-                      <div className="preview-bars"><i /><i /><i /></div>
-                    </article>
-                  </div>
-                  <div className="preview-insight-grid">
-                    <article><span><Icon name="search" size={15} />Evidence</span><strong>16 linked</strong><small>3 material gaps</small></article>
-                    <article><span><Icon name="layers" size={15} />Scenarios</span><strong>4 worlds</strong><small>2 vulnerabilities</small></article>
-                    <article><span><Icon name="users" size={15} />Collective view</span><strong>72% support</strong><small>1 minority report</small></article>
-                  </div>
-                  <div className="preview-next preview-next--executive">
-                    <span><Icon name="warning" size={16} /></span>
-                    <div><small>Next accountable action</small><strong>Resolve procurement evidence gap before finalisation</strong></div>
-                    <Icon name="arrow-right" size={17} />
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="preview-float-card preview-float-card--signal"><span>Emerging signal</span><strong>Regulatory expectations are tightening</strong><small>High relevance · Medium confidence</small></div>
-            <div className="preview-float-card preview-float-card--audit"><Icon name="shield" size={16} /><span>Every judgement remains attributable</span></div>
-          </div>
-        </section>
+        <HeroVideo
+          eyebrow="Participatory grantmaking"
+          title={<>Grantmaking your<br />community can<br /><span>actually see.</span></>}
+          lead="One traceable record from open call to award — community input, reviewer scoring, and evidence behind every decision."
+          primaryCta={{ label: "Book a fit assessment", href: "/request-demo" }}
+          secondaryCta={{ label: "See how it works", href: "#workflow" }}
+          trustItems={["Funder-owned records", "Reviewer disagreement stays visible", "Community voice, not just staff"]}
+        />
 
         <section className="proof-strip" aria-label="Product foundation">
           <p className="public-eyebrow">Where this comes from</p>
           <p>
-            Built from research in collective intelligence, strategic foresight, and accountable
+            Built from research in participatory grantmaking, collective intelligence, and accountable
             decision-making. CrowdSmarter is currently working with a first cohort of charter customer
             organisations on consequential strategy, policy, and transformation decisions.
           </p>

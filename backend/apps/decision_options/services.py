@@ -7,10 +7,19 @@ from typing import Any
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import IntegrityError, transaction
 
+from decimal import Decimal
+
+from django.db.models import Count, Q, Sum
+
 from apps.accounts.models import User
 from apps.audit.services import record_event
 from apps.decisions.models import Decision
-from apps.decisions.reasoning_policies import can_contribute_reasoning, can_edit_reasoning
+from apps.decisions.reasoning_policies import (
+    can_contribute_reasoning,
+    can_edit_reasoning,
+    can_manage_option_eligibility,
+    can_manage_option_outcome,
+)
 from apps.organisations.models import Membership
 
 from .models import DecisionOption
@@ -181,3 +190,98 @@ def update_option(
         metadata={"decision_id": str(option.decision_id), "before": before, "after": after},
     )
     return option
+
+
+@transaction.atomic
+def set_eligibility(
+    *, actor: User, option: DecisionOption, eligibility_status: str, eligibility_note: str = ""
+) -> DecisionOption:
+    """Record an eligibility screening decision for an application/option."""
+    option = DecisionOption.objects.select_for_update().select_related(
+        "decision__organisation"
+    ).get(id=option.id)
+    if not can_manage_option_eligibility(actor=actor, decision=option.decision):
+        raise PermissionDenied("You cannot screen eligibility for this option.")
+    before = option.eligibility_status
+    option.mark_eligibility(
+        eligibility_status=eligibility_status, eligibility_note=eligibility_note, actor=actor
+    )
+    option.full_clean(validate_unique=False, validate_constraints=False)
+    option.save()
+    record_event(
+        action="decision_option.eligibility_set",
+        object_type="decision_option",
+        object_id=str(option.id),
+        actor=actor,
+        organisation=option.organisation,
+        metadata={
+            "decision_id": str(option.decision_id),
+            "before": before,
+            "after": eligibility_status,
+        },
+    )
+    return option
+
+
+@transaction.atomic
+def set_outcome(
+    *,
+    actor: User,
+    option: DecisionOption,
+    outcome_status: str,
+    awarded_amount: Decimal | None = None,
+    outcome_note: str = "",
+) -> DecisionOption:
+    """Record a funding outcome for an application/option, decoupled from finalisation."""
+    option = DecisionOption.objects.select_for_update().select_related(
+        "decision__organisation"
+    ).get(id=option.id)
+    if not can_manage_option_outcome(actor=actor, decision=option.decision):
+        raise PermissionDenied("You cannot record a funding outcome for this option.")
+    before = option.outcome_status
+    option.mark_outcome(
+        outcome_status=outcome_status,
+        awarded_amount=awarded_amount,
+        outcome_note=outcome_note,
+        actor=actor,
+    )
+    option.full_clean(validate_unique=False, validate_constraints=False)
+    option.save()
+    record_event(
+        action="decision_option.outcome_set",
+        object_type="decision_option",
+        object_id=str(option.id),
+        actor=actor,
+        organisation=option.organisation,
+        metadata={
+            "decision_id": str(option.decision_id),
+            "before": before,
+            "after": outcome_status,
+        },
+    )
+    return option
+
+
+def budget_summary(*, decision: Decision) -> dict[str, Any]:
+    """Sum requested vs. awarded amounts and screening/outcome counts for a round."""
+    active = DecisionOption.objects.filter(decision=decision, status=DecisionOption.Status.ACTIVE)
+    totals = active.aggregate(
+        requested_total=Sum("estimated_cost"),
+        awarded_total=Sum("awarded_amount", filter=Q(outcome_status=DecisionOption.OutcomeStatus.FUNDED)),
+        funded_count=Count("id", filter=Q(outcome_status=DecisionOption.OutcomeStatus.FUNDED)),
+        declined_count=Count("id", filter=Q(outcome_status=DecisionOption.OutcomeStatus.DECLINED)),
+        pending_outcome_count=Count("id", filter=Q(outcome_status=DecisionOption.OutcomeStatus.PENDING)),
+        eligible_count=Count("id", filter=Q(eligibility_status=DecisionOption.EligibilityStatus.ELIGIBLE)),
+        ineligible_count=Count("id", filter=Q(eligibility_status=DecisionOption.EligibilityStatus.INELIGIBLE)),
+        pending_eligibility_count=Count("id", filter=Q(eligibility_status=DecisionOption.EligibilityStatus.PENDING)),
+    )
+    return {
+        "requested_total": totals["requested_total"] or Decimal("0"),
+        "awarded_total": totals["awarded_total"] or Decimal("0"),
+        "funded_count": totals["funded_count"],
+        "declined_count": totals["declined_count"],
+        "pending_outcome_count": totals["pending_outcome_count"],
+        "eligible_count": totals["eligible_count"],
+        "ineligible_count": totals["ineligible_count"],
+        "pending_eligibility_count": totals["pending_eligibility_count"],
+    }

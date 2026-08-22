@@ -7,7 +7,9 @@ import { ApiError } from "../../lib/api";
 import { getTerminology, type Terminology } from "../../lib/terminology";
 import type { Idea } from "../../lib/types";
 import { getOrganisationPortfolio } from "../portfolio/api";
-import { getOrganiserSession, promoteIdea, setSessionState, shortlistIdea } from "./api";
+import { archiveIdea, getOrganiserSession, promoteIdea, setSessionState, shortlistIdea } from "./api";
+
+const CREATE_NEW_DECISION_VALUE = "__new__";
 
 function submitterLabel(idea: Idea): string {
   if (idea.submitted_by_participant) return idea.submitted_by_participant.name;
@@ -37,8 +39,13 @@ function IdeaRow({
     mutationFn: (shortlisted: boolean) => shortlistIdea(sessionId, idea.id, shortlisted),
     onSuccess: (data) => queryClient.setQueryData(queryKey, data),
   });
+  const archive = useMutation({
+    mutationFn: (archived: boolean) => archiveIdea(sessionId, idea.id, archived),
+    onSuccess: (data) => queryClient.setQueryData(queryKey, data),
+  });
   const promote = useMutation({
-    mutationFn: () => promoteIdea(sessionId, idea.id, decisionId),
+    mutationFn: () =>
+      promoteIdea(sessionId, idea.id, decisionId === CREATE_NEW_DECISION_VALUE ? null : decisionId),
     onSuccess: (data) => queryClient.setQueryData(queryKey, data),
   });
 
@@ -52,7 +59,10 @@ function IdeaRow({
             <strong>{terms.amountFieldLabel}:</strong> {idea.requested_amount}
           </p>
         ) : null}
-        <small className="muted">{submitterLabel(idea)} · {idea.status_label} · {idea.vote_count} vote{idea.vote_count === 1 ? "" : "s"}</small>
+        <small className="muted">
+          {submitterLabel(idea)} · {idea.status_label} · {idea.vote_count} vote{idea.vote_count === 1 ? "" : "s"}
+          {idea.comments.length > 0 ? ` · ${idea.comments.length} comment${idea.comments.length === 1 ? "" : "s"}` : ""}
+        </small>
         {promote.isError ? (
           <StatusMessage kind="error">
             {promote.error instanceof ApiError
@@ -70,8 +80,17 @@ function IdeaRow({
             >
               {idea.status === "shortlisted" ? "Remove from shortlist" : "Shortlist"}
             </button>
+            <button
+              className="button button--secondary button--compact"
+              type="button"
+              disabled={archive.isPending}
+              onClick={() => archive.mutate(idea.status !== "archived")}
+            >
+              {idea.status === "archived" ? "Unarchive" : "Archive"}
+            </button>
             <select value={decisionId} onChange={(event) => setDecisionId(event.target.value)}>
               <option value="">Promote into…</option>
+              <option value={CREATE_NEW_DECISION_VALUE}>+ Create a new grant round from this {terms.ideaNoun.toLowerCase()}</option>
               {decisions.map((decision) => <option key={decision.id} value={decision.id}>{decision.title}</option>)}
             </select>
             <button

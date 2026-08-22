@@ -3,7 +3,8 @@ from django.core.exceptions import PermissionDenied
 
 from apps.decision_options.services import create_option
 from apps.organisations.models import Membership
-from apps.participants.models import Participant
+from apps.participants.models import ConflictOfInterest, Participant
+from apps.participants.services import declare_conflict
 
 from apps.evaluations.models import EvaluationRound, PrioritisationPortfolio
 from apps.evaluations.services import (
@@ -147,6 +148,68 @@ def test_blind_scorecard_reveals_weighted_results_and_preserves_minority_report(
     )
     assert report.author == contributor
     assert exercise.minority_reports.count() == 1
+
+
+@pytest.mark.django_db
+def test_conflicted_reviewer_response_excluded_from_scorecard_results(
+    organisation_factory, decision_factory, user_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    contributor = user_factory(email="contributor@example.com")
+    Membership.objects.create(
+        organisation=organisation, user=contributor, role=Membership.Role.CONTRIBUTOR,
+        status=Membership.Status.ACTIVE,
+    )
+    decision = decision_factory(
+        workspace=organisation.workspaces.get(is_default=True), owner=owner,
+        title="Grant round",
+    )
+    contributor_participant = Participant.objects.create(
+        organisation=organisation, decision=decision, user=contributor,
+        role=Participant.Role.CONTRIBUTOR, added_by=owner,
+    )
+    conflicted_option = create_option(
+        actor=owner, decision=decision, title="Applicant with a conflict", description="Desc.",
+    )
+    clean_option = create_option(
+        actor=owner, decision=decision, title="Applicant without a conflict", description="Desc.",
+    )
+    declare_conflict(
+        actor=contributor, participant=contributor_participant,
+        scope=ConflictOfInterest.Scope.OPTION, option=conflicted_option,
+        reason="I sit on their board.",
+    )
+    exercise = create_exercise(
+        actor=owner, decision=decision, owner_id=owner.id,
+        title="Reviewer scorecard", purpose="Score applications.", method="scorecard",
+        quorum_count=1,
+    )
+    value = create_criterion(
+        actor=owner, exercise=exercise, title="Impact", description="Expected impact.",
+        weight=1, scale_min=1, scale_max=5, higher_is_better=True, order=0,
+    )
+    round_item = create_round(actor=owner, exercise=exercise, title="Round one")
+    transition_round(actor=owner, round=round_item, status=EvaluationRound.Status.OPEN)
+
+    save_submission(
+        actor=contributor, round=round_item, confidence=4, overall_rationale="Scored both.",
+        responses=[
+            {"option_id": conflicted_option.id, "criterion_id": value.id, "score": 5},
+            {"option_id": clean_option.id, "criterion_id": value.id, "score": 3},
+        ],
+    )
+    transition_round(actor=owner, round=round_item, status=EvaluationRound.Status.CLOSED)
+    round_item.refresh_from_db()
+
+    result = evaluation_results(round=round_item, viewer=owner)
+    rows = {row["option_id"]: row for row in result["options"]}
+
+    assert str(clean_option.id) in rows
+    assert rows[str(clean_option.id)]["excluded_response_count"] == 0
+    # The conflicted reviewer's only response to conflicted_option is excluded,
+    # so it never accumulates a score and drops out of the results entirely.
+    assert str(conflicted_option.id) not in rows
 
 
 @pytest.mark.django_db

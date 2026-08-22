@@ -201,6 +201,9 @@ export type OptionReversibility =
   | "difficult_to_reverse"
   | "irreversible";
 
+export type EligibilityStatus = "pending" | "eligible" | "ineligible";
+export type OutcomeStatus = "pending" | "funded" | "declined";
+
 export type DecisionOption = {
   id: string;
   decision_id: string;
@@ -221,11 +224,48 @@ export type DecisionOption = {
   mutually_exclusive_with_ids: string[];
   status: "active" | "withdrawn";
   status_label: string;
+  eligibility_status: EligibilityStatus;
+  eligibility_status_label: string;
+  eligibility_note: string;
+  eligibility_decided_at: string | null;
+  outcome_status: OutcomeStatus;
+  outcome_status_label: string;
+  awarded_amount: string | null;
+  outcome_note: string;
+  outcome_decided_at: string | null;
   proposed_by: User;
   created_by: User;
   can_edit: boolean;
+  can_manage_eligibility: boolean;
+  can_manage_outcome: boolean;
   created_at: string;
   updated_at: string;
+};
+
+export type BudgetSummary = {
+  requested_total: string;
+  awarded_total: string;
+  funded_count: number;
+  declined_count: number;
+  pending_outcome_count: number;
+  eligible_count: number;
+  ineligible_count: number;
+  pending_eligibility_count: number;
+};
+
+export type ConflictOfInterestScope = "decision" | "option";
+
+export type ConflictOfInterest = {
+  id: string;
+  participant_id: string;
+  reviewer_email: string;
+  option_id: string | null;
+  option_title: string | null;
+  scope: ConflictOfInterestScope;
+  scope_label: string;
+  reason: string;
+  declared_at: string;
+  withdrawn_at: string | null;
 };
 
 export type EvidenceSourceType =
@@ -911,6 +951,7 @@ export type DecisionOverview = {
     }>;
   };
   discussion: { unresolved: number };
+  budget: BudgetSummary | null;
   options: Array<{
     id: string;
     title: string;
@@ -1940,10 +1981,29 @@ export type ContributionPreference = {
 export type IdeaStatus = "submitted" | "shortlisted" | "promoted" | "archived";
 export type OpenSessionStatus = "draft" | "open" | "closed" | "archived";
 
+export type IdeaApplicationStatus = {
+  eligibility_status: EligibilityStatus;
+  eligibility_status_label: string;
+  eligibility_note: string;
+  outcome_status: OutcomeStatus;
+  outcome_status_label: string;
+  awarded_amount: string | null;
+  outcome_note: string;
+};
+
+export type IdeaComment = {
+  id: string;
+  body: string;
+  submitted_by_participant: { name: string } | null;
+  submitted_by_user: User | null;
+  created_at: string;
+};
+
 export type Idea = {
   id: string;
   title: string;
   description: string;
+  category: string;
   requested_amount: string | null;
   status: IdeaStatus;
   status_label: string;
@@ -1951,6 +2011,8 @@ export type Idea = {
   submitted_by_user: User | null;
   vote_count: number;
   voted_by_me: boolean;
+  application_status: IdeaApplicationStatus | null;
+  comments: IdeaComment[];
   created_at: string;
 };
 

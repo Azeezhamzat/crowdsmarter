@@ -3,12 +3,14 @@
 from django.urls import path
 
 from .views import (
+    IdeaArchiveView,
     IdeaPromoteView,
     IdeaShortlistView,
     OpenSessionOrganiserDetailView,
     OpenSessionPublicDetailView,
     OpenSessionStateView,
     OrganisationSessionListCreateView,
+    SessionIdeaCommentCreateView,
     SessionIdeaCreateView,
     SessionIdeaVoteView,
     SessionJoinView,
@@ -25,6 +27,11 @@ urlpatterns = [
         "public/sessions/<str:public_slug>/ideas/<uuid:idea_id>/vote/",
         SessionIdeaVoteView.as_view(),
         name="public-idea-vote",
+    ),
+    path(
+        "public/sessions/<str:public_slug>/ideas/<uuid:idea_id>/comments/",
+        SessionIdeaCommentCreateView.as_view(),
+        name="public-idea-comment",
     ),
     # Org-authenticated organiser surface.
     path(
@@ -43,5 +50,10 @@ urlpatterns = [
         "sessions/<uuid:session_id>/ideas/<uuid:idea_id>/promote/",
         IdeaPromoteView.as_view(),
         name="idea-promote",
+    ),
+    path(
+        "sessions/<uuid:session_id>/ideas/<uuid:idea_id>/archive/",
+        IdeaArchiveView.as_view(),
+        name="idea-archive",
     ),
 ]

@@ -7,16 +7,30 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.decision_options.selectors import option_for_user
 from apps.decisions.selectors import decision_for_user
 
 from .permissions import CanAccessParticipant
-from .selectors import participant_for_user, participants_for_decision
+from .selectors import (
+    conflict_for_user,
+    participant_for_user,
+    participants_for_decision,
+)
 from .serializers import (
+    ConflictOfInterestCreateSerializer,
+    ConflictOfInterestSerializer,
     ParticipantCreateSerializer,
     ParticipantSerializer,
     ParticipantUpdateSerializer,
 )
-from .services import add_participant, change_participant_role, remove_participant
+from .services import (
+    add_participant,
+    change_participant_role,
+    conflicts_for_decision,
+    declare_conflict,
+    remove_participant,
+    withdraw_conflict,
+)
 
 User = get_user_model()
 
@@ -81,3 +95,41 @@ class ParticipantDetailView(APIView):
         participant = self._get_object(request, participant_id)
         remove_participant(actor=request.user, participant=participant)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ParticipantConflictListCreateView(APIView):
+    """Declare a conflict of interest, or list active ones for a decision."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, participant_id):  # type: ignore[no-untyped-def]
+        participant = participant_for_user(user=request.user, participant_id=participant_id)
+        conflicts = conflicts_for_decision(decision=participant.decision)
+        return Response(ConflictOfInterestSerializer(conflicts, many=True).data)
+
+    def post(self, request, participant_id):  # type: ignore[no-untyped-def]
+        participant = participant_for_user(user=request.user, participant_id=participant_id)
+        serializer = ConflictOfInterestCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = dict(serializer.validated_data)
+        option_id = data.pop("option_id", None)
+        option = (
+            option_for_user(user=request.user, option_id=option_id) if option_id else None
+        )
+        conflict = declare_conflict(
+            actor=request.user, participant=participant, option=option, **data
+        )
+        return Response(
+            ConflictOfInterestSerializer(conflict).data, status=status.HTTP_201_CREATED
+        )
+
+
+class ConflictWithdrawView(APIView):
+    """Withdraw one active conflict declaration."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, conflict_id):  # type: ignore[no-untyped-def]
+        conflict = conflict_for_user(user=request.user, conflict_id=conflict_id)
+        conflict = withdraw_conflict(actor=request.user, conflict=conflict)
+        return Response(ConflictOfInterestSerializer(conflict).data)

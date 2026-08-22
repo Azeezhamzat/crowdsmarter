@@ -41,12 +41,25 @@ export async function joinSession(
 
 export async function submitIdea(
   publicSlug: string,
-  input: { title: string; description?: string; requested_amount?: string },
+  input: { title: string; description?: string; category?: string; requested_amount?: string },
 ): Promise<OpenSessionPublic> {
   await ensureCsrfCookie();
   return apiRequest<OpenSessionPublic>(`/public/sessions/${publicSlug}/ideas/`, {
     method: "POST",
     body: JSON.stringify(input),
+    headers: participantHeaders(publicSlug),
+  });
+}
+
+export async function postIdeaComment(
+  publicSlug: string,
+  ideaId: string,
+  body: string,
+): Promise<OpenSessionPublic> {
+  await ensureCsrfCookie();
+  return apiRequest<OpenSessionPublic>(`/public/sessions/${publicSlug}/ideas/${ideaId}/comments/`, {
+    method: "POST",
+    body: JSON.stringify({ body }),
     headers: participantHeaders(publicSlug),
   });
 }
@@ -113,10 +126,21 @@ export function shortlistIdea(
 export function promoteIdea(
   sessionId: string,
   ideaId: string,
-  decisionId: string,
+  decisionId: string | null,
 ): Promise<OpenSessionOrganiser> {
   return apiRequest<OpenSessionOrganiser>(`/sessions/${sessionId}/ideas/${ideaId}/promote/`, {
     method: "POST",
     body: JSON.stringify({ decision_id: decisionId }),
+  });
+}
+
+export function archiveIdea(
+  sessionId: string,
+  ideaId: string,
+  archived: boolean,
+): Promise<OpenSessionOrganiser> {
+  return apiRequest<OpenSessionOrganiser>(`/sessions/${sessionId}/ideas/${ideaId}/archive/`, {
+    method: "POST",
+    body: JSON.stringify({ archived }),
   });
 }

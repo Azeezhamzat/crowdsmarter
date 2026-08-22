@@ -7,6 +7,7 @@ from django.utils import timezone
 
 from apps.collaboration.models import DiscussionEntry
 from apps.decision_options.models import DecisionOption
+from apps.decision_options.services import budget_summary
 from apps.participants.models import Participant
 from apps.foresight.models import SignalDecisionLink, StrategicImplication
 from apps.risks.models import Risk
@@ -261,6 +262,7 @@ def decision_overview(decision: Decision) -> dict:
             ],
         },
         "discussion": {"unresolved": unresolved},
+        "budget": budget_summary(decision=decision) if decision.source_template_key == "grant_round" else None,
         "options": options,
         "material_risks": risks,
         "linked_signals": linked_signals,

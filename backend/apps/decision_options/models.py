@@ -23,6 +23,16 @@ class DecisionOption(UUIDTimeStampedModel):
         DIFFICULT_TO_REVERSE = "difficult_to_reverse", "Difficult to reverse"
         IRREVERSIBLE = "irreversible", "Irreversible"
 
+    class EligibilityStatus(models.TextChoices):
+        PENDING = "pending", "Pending review"
+        ELIGIBLE = "eligible", "Eligible"
+        INELIGIBLE = "ineligible", "Ineligible"
+
+    class OutcomeStatus(models.TextChoices):
+        PENDING = "pending", "Pending decision"
+        FUNDED = "funded", "Funded"
+        DECLINED = "declined", "Declined"
+
     organisation = models.ForeignKey(
         "organisations.Organisation",
         on_delete=models.CASCADE,
@@ -86,6 +96,38 @@ class DecisionOption(UUIDTimeStampedModel):
         null=True,
         blank=True,
     )
+    eligibility_status = models.CharField(
+        max_length=20,
+        choices=EligibilityStatus.choices,
+        default=EligibilityStatus.PENDING,
+    )
+    eligibility_note = models.TextField(blank=True)
+    eligibility_decided_at = models.DateTimeField(null=True, blank=True)
+    eligibility_decided_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="eligibility_decisions",
+        null=True,
+        blank=True,
+    )
+    outcome_status = models.CharField(
+        max_length=20,
+        choices=OutcomeStatus.choices,
+        default=OutcomeStatus.PENDING,
+    )
+    awarded_amount = models.DecimalField(
+        max_digits=14, decimal_places=2, null=True, blank=True,
+        help_text="Amount funded, only meaningful once outcome_status is 'funded'.",
+    )
+    outcome_note = models.TextField(blank=True)
+    outcome_decided_at = models.DateTimeField(null=True, blank=True)
+    outcome_decided_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="outcome_decisions",
+        null=True,
+        blank=True,
+    )
 
     class Meta:
         ordering = ["-is_status_quo", "created_at", "title", "id"]
@@ -97,6 +139,14 @@ class DecisionOption(UUIDTimeStampedModel):
             models.CheckConstraint(
                 condition=models.Q(status__in=['active', 'withdrawn']),
                 name="decision_option_status_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(eligibility_status__in=['pending', 'eligible', 'ineligible']),
+                name="decision_option_eligibility_status_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(outcome_status__in=['pending', 'funded', 'declined']),
+                name="decision_option_outcome_status_valid",
             ),
             models.UniqueConstraint(
                 fields=["decision"],
@@ -139,6 +189,24 @@ class DecisionOption(UUIDTimeStampedModel):
             raise ValidationError(
                 {"experiment_notes": "Describe the bounded experiment this option represents."}
             )
+        if self.eligibility_status == self.EligibilityStatus.PENDING and (
+            self.eligibility_decided_at or self.eligibility_decided_by_id
+        ):
+            raise ValidationError("Pending eligibility cannot contain decision metadata.")
+        if self.eligibility_status != self.EligibilityStatus.PENDING and not self.eligibility_decided_at:
+            raise ValidationError("A decided eligibility status requires a decision timestamp.")
+        if self.outcome_status == self.OutcomeStatus.PENDING and (
+            self.outcome_decided_at or self.outcome_decided_by_id or self.awarded_amount is not None
+        ):
+            raise ValidationError("Pending outcome cannot contain decision metadata or an amount.")
+        if self.outcome_status != self.OutcomeStatus.PENDING and not self.outcome_decided_at:
+            raise ValidationError("A decided outcome status requires a decision timestamp.")
+        if self.outcome_status == self.OutcomeStatus.FUNDED and self.awarded_amount is None:
+            raise ValidationError(
+                {"awarded_amount": "A funded outcome requires an awarded amount."}
+            )
+        if self.awarded_amount is not None and self.awarded_amount < 0:
+            raise ValidationError({"awarded_amount": "The awarded amount cannot be negative."})
 
     def mark_status(self, *, status: str, actor) -> None:  # type: ignore[no-untyped-def]
         """Apply explicit soft-state metadata before validation."""
@@ -149,6 +217,32 @@ class DecisionOption(UUIDTimeStampedModel):
         else:
             self.withdrawn_at = None
             self.withdrawn_by = None
+
+    def mark_eligibility(self, *, eligibility_status: str, eligibility_note: str, actor) -> None:  # type: ignore[no-untyped-def]
+        """Apply explicit eligibility screening metadata before validation."""
+        self.eligibility_status = eligibility_status
+        self.eligibility_note = eligibility_note
+        if eligibility_status == self.EligibilityStatus.PENDING:
+            self.eligibility_decided_at = None
+            self.eligibility_decided_by = None
+        else:
+            self.eligibility_decided_at = timezone.now()
+            self.eligibility_decided_by = actor
+
+    def mark_outcome(
+        self, *, outcome_status: str, awarded_amount, outcome_note: str, actor
+    ) -> None:  # type: ignore[no-untyped-def]
+        """Apply explicit funding outcome metadata before validation."""
+        self.outcome_status = outcome_status
+        self.outcome_note = outcome_note
+        if outcome_status == self.OutcomeStatus.PENDING:
+            self.outcome_decided_at = None
+            self.outcome_decided_by = None
+            self.awarded_amount = None
+        else:
+            self.outcome_decided_at = timezone.now()
+            self.outcome_decided_by = actor
+            self.awarded_amount = awarded_amount if outcome_status == self.OutcomeStatus.FUNDED else None
 
     def __str__(self) -> str:
         return f"{self.decision.title}: {self.title}"

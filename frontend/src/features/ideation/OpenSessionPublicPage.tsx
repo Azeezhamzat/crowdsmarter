@@ -11,7 +11,15 @@ import { StatusMessage } from "../../components/StatusMessage";
 import { ApiError } from "../../lib/api";
 import { getTerminology } from "../../lib/terminology";
 import type { Idea } from "../../lib/types";
-import { getStoredParticipantToken, getPublicSession, joinSession, removeVote, submitIdea, voteIdea } from "./api";
+import {
+  getStoredParticipantToken,
+  getPublicSession,
+  joinSession,
+  postIdeaComment,
+  removeVote,
+  submitIdea,
+  voteIdea,
+} from "./api";
 
 const joinSchema = z.object({
   name: z.string().trim().min(2, "Enter your name.").max(200),
@@ -22,9 +30,15 @@ type JoinForm = z.infer<typeof joinSchema>;
 const ideaSchema = z.object({
   title: z.string().trim().min(3, "Give the idea a short title.").max(240),
   description: z.string().trim().max(4000),
+  category: z.string().trim().max(60),
   requested_amount: z.string().trim(),
 });
 type IdeaForm = z.infer<typeof ideaSchema>;
+
+const commentSchema = z.object({
+  body: z.string().trim().min(1, "Write a comment first.").max(4000),
+});
+type CommentForm = z.infer<typeof commentSchema>;
 
 function submitterLabel(idea: Idea): string {
   if (idea.submitted_by_participant) return idea.submitted_by_participant.name;
@@ -35,6 +49,78 @@ function submitterLabel(idea: Idea): string {
   return "Someone";
 }
 
+function commenterLabel(comment: Idea["comments"][number]): string {
+  if (comment.submitted_by_participant) return comment.submitted_by_participant.name;
+  if (comment.submitted_by_user) {
+    const name = `${comment.submitted_by_user.first_name} ${comment.submitted_by_user.last_name}`.trim();
+    return name || comment.submitted_by_user.email;
+  }
+  return "Someone";
+}
+
+function ApplicationStatusBlock({ status }: { status: NonNullable<Idea["application_status"]> }) {
+  return (
+    <div className="idea-card__status">
+      <span className={`status-badge status-badge--${status.eligibility_status}`}>
+        {status.eligibility_status_label}
+      </span>
+      <span className={`status-badge status-badge--${status.outcome_status}`}>
+        {status.outcome_status_label}
+        {status.outcome_status === "funded" && status.awarded_amount ? ` · ${status.awarded_amount}` : ""}
+      </span>
+      {status.outcome_note ? <p className="muted">{status.outcome_note}</p> : null}
+    </div>
+  );
+}
+
+function CommentThread({
+  idea,
+  canComment,
+  onComment,
+  isPending,
+}: {
+  idea: Idea;
+  canComment: boolean;
+  onComment: (body: string) => void;
+  isPending: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const form = useForm<CommentForm>({ resolver: zodResolver(commentSchema), defaultValues: { body: "" } });
+
+  return (
+    <div className="idea-card__comments">
+      <button className="button button--link button--compact" type="button" onClick={() => setOpen((value) => !value)}>
+        {idea.comments.length} comment{idea.comments.length === 1 ? "" : "s"} {open ? "▲" : "▼"}
+      </button>
+      {open ? (
+        <div className="idea-card__comment-thread">
+          {idea.comments.map((comment) => (
+            <div key={comment.id} className="idea-card__comment">
+              <strong>{commenterLabel(comment)}</strong>
+              <p>{comment.body}</p>
+            </div>
+          ))}
+          {canComment ? (
+            <form
+              onSubmit={form.handleSubmit((values) => {
+                onComment(values.body);
+                form.reset();
+              })}
+              noValidate
+            >
+              <textarea rows={2} placeholder="Add a comment…" {...form.register("body")} />
+              <FieldError message={form.formState.errors.body?.message} />
+              <button className="button button--secondary button--compact" type="submit" disabled={isPending}>
+                {isPending ? "Posting…" : "Post comment"}
+              </button>
+            </form>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function IdeaCard({
   idea,
   canVote,
@@ -42,6 +128,9 @@ function IdeaCard({
   onUnvote,
   isPending,
   amountFieldLabel,
+  canComment,
+  onComment,
+  commentPending,
 }: {
   idea: Idea;
   canVote: boolean;
@@ -49,11 +138,15 @@ function IdeaCard({
   onUnvote: () => void;
   isPending: boolean;
   amountFieldLabel: string;
+  canComment: boolean;
+  onComment: (body: string) => void;
+  commentPending: boolean;
 }) {
   return (
     <li className="idea-card">
       <div className="idea-card__body">
         <h3>{idea.title}</h3>
+        {idea.category ? <span className="idea-card__category">{idea.category}</span> : null}
         {idea.description ? <p>{idea.description}</p> : null}
         {idea.requested_amount ? (
           <p className="muted">
@@ -63,6 +156,8 @@ function IdeaCard({
         <small className="muted">
           {submitterLabel(idea)} · {idea.status_label}
         </small>
+        {idea.application_status ? <ApplicationStatusBlock status={idea.application_status} /> : null}
+        <CommentThread idea={idea} canComment={canComment} onComment={onComment} isPending={commentPending} />
       </div>
       {canVote ? (
         <button
@@ -108,7 +203,7 @@ export function OpenSessionPublicPage() {
 
   const ideaForm = useForm<IdeaForm>({
     resolver: zodResolver(ideaSchema),
-    defaultValues: { title: "", description: "", requested_amount: "" },
+    defaultValues: { title: "", description: "", category: "", requested_amount: "" },
   });
   const submit = useMutation({
     mutationFn: (values: IdeaForm) =>
@@ -125,6 +220,10 @@ export function OpenSessionPublicPage() {
   });
   const unvote = useMutation({
     mutationFn: (ideaId: string) => removeVote(publicSlug, ideaId),
+    onSuccess: (data) => queryClient.setQueryData(queryKey, data),
+  });
+  const comment = useMutation({
+    mutationFn: ({ ideaId, body }: { ideaId: string; body: string }) => postIdeaComment(publicSlug, ideaId, body),
     onSuccess: (data) => queryClient.setQueryData(queryKey, data),
   });
 
@@ -203,6 +302,8 @@ export function OpenSessionPublicPage() {
                 <FieldError message={ideaForm.formState.errors.title?.message} />
                 <label htmlFor="idea-description">Description</label>
                 <textarea id="idea-description" rows={3} {...ideaForm.register("description")} />
+                <label htmlFor="idea-category">Category (optional)</label>
+                <input id="idea-category" {...ideaForm.register("category")} />
                 {isGrantRound ? (
                   <>
                     <label htmlFor="idea-amount">{terms.amountFieldLabel}</label>
@@ -237,6 +338,9 @@ export function OpenSessionPublicPage() {
                     onVote={() => vote.mutate(idea.id)}
                     onUnvote={() => unvote.mutate(idea.id)}
                     amountFieldLabel={terms.amountFieldLabel}
+                    canComment={hasToken && session.data!.status === "open"}
+                    onComment={(body) => comment.mutate({ ideaId: idea.id, body })}
+                    commentPending={comment.isPending}
                   />
                 ))}
               </ul>
