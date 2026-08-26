@@ -182,3 +182,10 @@ For implementation detail, start with [architecture](docs/architecture.md),
 [security](docs/security.md), [testing](docs/testing.md), and
 [developer onboarding](docs/developer-onboarding.md). Release-by-release
 upgrade notes and quality gates live in `docs/`.
+
+## License
+
+All rights reserved. See [LICENSE](LICENSE). This code is not open source;
+being able to view this repository does not grant permission to use, copy,
+modify, or distribute it. Contact hello@crowdsmarter.com for licensing
+inquiries.

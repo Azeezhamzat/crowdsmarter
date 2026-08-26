@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.18.2",
   "author": "Azeez Adewale Hamzat",
+  "license": "UNLICENSED",
   "type": "module",
   "engines": {
     "node": ">=22.22"
