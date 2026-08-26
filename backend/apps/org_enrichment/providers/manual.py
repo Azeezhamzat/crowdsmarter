@@ -13,7 +13,7 @@ class ManualLookupProvider:
         return OrganisationLookupResult(
             ok=True,
             found=False,
-            detail="No lookup provider is configured — verify this organisation manually.",
+            detail="No lookup provider is configured - verify this organisation manually.",
         )
 
     def test_connection(self) -> ProviderConnectionResult:

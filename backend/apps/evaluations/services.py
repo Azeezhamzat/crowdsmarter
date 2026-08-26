@@ -235,7 +235,7 @@ def _validate_responses(*, exercise, responses):
             if rank < 1 or rank > len(active_options):
                 raise EvaluationServiceError({"responses": "Ranks must run from 1 to the number of active options, with no gaps or repeats."})
             if rank in ranks_used:
-                raise EvaluationServiceError({"responses": "Each rank may be used once — this is a strict preference order."})
+                raise EvaluationServiceError({"responses": "Each rank may be used once - this is a strict preference order."})
             ranks_used.add(rank)
             if value.get("vote"):
                 raise EvaluationServiceError({"responses": "Ranked-choice responses do not use a vote."})
@@ -632,7 +632,7 @@ def _uncertainty_narrative(*, rows, criterion_sensitivity):
     if leader_sensitivity and not leader_sensitivity["stable"]:
         sentences.append(
             f"“{leader['title']}” currently ranks first, but a ±25% change to at least one "
-            "criterion weight changes which option leads — treat this ranking as directional, "
+            "criterion weight changes which option leads - treat this ranking as directional, "
             "not final."
         )
     else:
@@ -642,8 +642,8 @@ def _uncertainty_narrative(*, rows, criterion_sensitivity):
         )
     if leader.get("disagreement") in {"moderate", "high"}:
         sentences.append(
-            f"Evaluators showed {leader['disagreement']} disagreement on this option's score "
-            "— review individual rationale before treating the ranking as consensus."
+            f"Evaluators showed {leader['disagreement']} disagreement on this option's score. "
+            "Review individual rationale before treating the ranking as consensus."
         )
     return " ".join(sentences)
 

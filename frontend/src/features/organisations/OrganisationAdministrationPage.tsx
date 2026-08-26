@@ -39,7 +39,7 @@ import {
 } from "./api";
 
 function formatDate(value: string | null): string {
-  if (!value) return "—";
+  if (!value) return "N/A";
   return new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 }
 
@@ -176,7 +176,7 @@ export function OrganisationAdministrationPage() {
 
       {canManage ? (
         <section className="card-panel">
-          <div className="section-heading"><div><p className="eyebrow">Plan and billing</p><h2>Packaging tier and usage</h2><p className="muted">CrowdSmarter does not process payments in this environment (see ADR 0031) — plan changes here are recorded immediately without any charge.</p></div></div>
+          <div className="section-heading"><div><p className="eyebrow">Plan and billing</p><h2>Packaging tier and usage</h2><p className="muted">CrowdSmarter does not process payments in this environment (see ADR 0031) - plan changes here are recorded immediately without any charge.</p></div></div>
           {subscription.isError ? <StatusMessage kind="error">Plan and billing details require an owner or administrator role.</StatusMessage> : null}
           {subscription.data ? (
             <>
@@ -184,7 +184,7 @@ export function OrganisationAdministrationPage() {
                 <article><strong>{subscription.data.plan.name}</strong><span>Current plan ({subscription.data.status_label}{subscription.data.status === "trialing" && subscription.data.trial_ends_at ? `, ends ${formatDate(subscription.data.trial_ends_at)}` : ""})</span></article>
                 <article><strong>{subscription.data.active_decision_count}{subscription.data.plan.max_active_decisions != null ? ` / ${subscription.data.plan.max_active_decisions}` : ""}</strong><span>Active decisions</span></article>
                 <article><strong>{subscription.data.active_member_count}{subscription.data.plan.max_active_members != null ? ` / ${subscription.data.plan.max_active_members}` : ""}</strong><span>Active members</span></article>
-                <article><strong>{subscription.data.billing_contact ? subscription.data.billing_contact.email : "—"}</strong><span>Billing contact</span></article>
+                <article><strong>{subscription.data.billing_contact ? subscription.data.billing_contact.email : "N/A"}</strong><span>Billing contact</span></article>
               </div>
               {isOwner ? (
                 <div className="form-grid form-grid--two">
@@ -212,12 +212,12 @@ export function OrganisationAdministrationPage() {
       <section className="card-panel">
         <div className="section-heading"><div><p className="eyebrow">Membership history</p><h2>Attributable administrative record</h2></div></div>
         {history.isError ? <StatusMessage kind="error">Membership history requires an owner or administrator role.</StatusMessage> : null}
-        {history.data?.length ? <div className="table-wrap"><table><thead><tr><th>Event</th><th>Member</th><th>Change</th><th>Note</th><th>Actor</th><th>Date</th></tr></thead><tbody>{history.data.map((item) => <tr key={item.id}><td>{item.kind_label}</td><td>{item.user.email}</td><td>{[item.previous_role, item.new_role].filter(Boolean).join(" → ") || "—"}</td><td>{item.note || "—"}</td><td>{item.actor.email}</td><td>{formatDate(item.created_at)}</td></tr>)}</tbody></table></div> : <p className="muted">No membership history is available.</p>}
+        {history.data?.length ? <div className="table-wrap"><table><thead><tr><th>Event</th><th>Member</th><th>Change</th><th>Note</th><th>Actor</th><th>Date</th></tr></thead><tbody>{history.data.map((item) => <tr key={item.id}><td>{item.kind_label}</td><td>{item.user.email}</td><td>{[item.previous_role, item.new_role].filter(Boolean).join(" → ") || "N/A"}</td><td>{item.note || "N/A"}</td><td>{item.actor.email}</td><td>{formatDate(item.created_at)}</td></tr>)}</tbody></table></div> : <p className="muted">No membership history is available.</p>}
       </section>
 
       {canManage ? (
         <section className="card-panel">
-          <div className="section-heading"><div><p className="eyebrow">Evaluation harness</p><h2>AI review quality</h2><p className="muted">How often humans confirm vs. dismiss the advisory rule engine's output — a rising dismissal rate is a signal to review the rules, not to trust them less by default.</p></div></div>
+          <div className="section-heading"><div><p className="eyebrow">Evaluation harness</p><h2>AI review quality</h2><p className="muted">How often humans confirm vs. dismiss the advisory rule engine's output - a rising dismissal rate is a signal to review the rules, not to trust them less by default.</p></div></div>
           {aiQuality.isError ? <StatusMessage kind="error">AI review quality metrics require an owner or administrator role.</StatusMessage> : null}
           {aiQuality.data ? (
             <div className="ai-quality-metrics">
@@ -225,7 +225,7 @@ export function OrganisationAdministrationPage() {
               <article><strong>{aiQuality.data.reviewed_count}</strong><span>Confirmed by a human</span></article>
               <article><strong>{aiQuality.data.dismissed_count}</strong><span>Dismissed by a human</span></article>
               <article><strong>{aiQuality.data.pending_disposition_count}</strong><span>Awaiting human disposition</span></article>
-              <article><strong>{aiQuality.data.correction_rate != null ? `${aiQuality.data.correction_rate}%` : "—"}</strong><span>Correction rate</span></article>
+              <article><strong>{aiQuality.data.correction_rate != null ? `${aiQuality.data.correction_rate}%` : "N/A"}</strong><span>Correction rate</span></article>
             </div>
           ) : <p className="muted">No completed AI reviews are recorded yet.</p>}
         </section>
@@ -233,7 +233,7 @@ export function OrganisationAdministrationPage() {
 
       {canManage ? (
         <section className="card-panel">
-          <div className="section-heading"><div><p className="eyebrow">Grant payments</p><h2>Disbursement provider</h2><p className="muted">Funded applications default to a manual ledger — mark a payment made outside the platform. Connect Stripe to issue transfers directly once you have your own account.</p></div></div>
+          <div className="section-heading"><div><p className="eyebrow">Grant payments</p><h2>Disbursement provider</h2><p className="muted">Funded applications default to a manual ledger - mark a payment made outside the platform. Connect Stripe to issue transfers directly once you have your own account.</p></div></div>
           {disbursementConfig.isError ? <StatusMessage kind="error">Disbursement configuration requires an owner or administrator role.</StatusMessage> : null}
           {disbursementConfig.data ? (
             <div className="form-grid form-grid--two">

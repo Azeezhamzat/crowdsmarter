@@ -237,7 +237,7 @@ export function CriteriaSection({
                 </select>
               </div>
               <div>
-                <label htmlFor="criterion-weight">Weight (0–100)</label>
+                <label htmlFor="criterion-weight">Weight (0-100)</label>
                 <input
                   id="criterion-weight"
                   type="number"

@@ -211,7 +211,7 @@ export function DecisionAnalysisPage() {
           collective evaluation scores side by side. <strong>Gaps and contradictions</strong>{" "}
           surfaces where evidence conflicts or coverage is thin, so it can be resolved before the
           decision is finalised. <strong>Decision quality</strong> is a structured, versioned
-          reviewer judgement on whether the reasoning behind the decision is sound — not a score
+          reviewer judgement on whether the reasoning behind the decision is sound - not a score
           on the options themselves. <strong>Executive summary</strong> is a human-approved,
           versioned synthesis for people who need the outcome and rationale without the full trace.
         </p>

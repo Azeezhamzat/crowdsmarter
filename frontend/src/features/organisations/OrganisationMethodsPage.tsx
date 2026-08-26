@@ -32,7 +32,7 @@ function lines(value: string): string[] {
 }
 
 function formatDate(value: string | null): string {
-  if (!value) return "—";
+  if (!value) return "N/A";
   return new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 }
 

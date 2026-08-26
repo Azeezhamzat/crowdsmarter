@@ -1,5 +1,5 @@
 """Plan-entitlement enforcement and subscription workflows. No payment
-processing lives here — see ADR 0031."""
+processing lives here - see ADR 0031."""
 
 from __future__ import annotations
 

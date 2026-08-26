@@ -132,7 +132,7 @@ export function ForesightImplicationsSection({
             <option value="decision_requirement">Decision requirement</option>
             <option value="policy">Policy implication</option>
           </select>
-          <label htmlFor="implication-priority">Priority (1–5)</label>
+          <label htmlFor="implication-priority">Priority (1-5)</label>
           <input
             id="implication-priority"
             max="5"

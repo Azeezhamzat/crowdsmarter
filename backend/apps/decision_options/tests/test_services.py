@@ -270,7 +270,7 @@ def test_contributor_cannot_set_eligibility(user_factory, decision_factory):  # 
 @pytest.mark.django_db
 def test_manager_funds_option_with_amount(decision_factory):  # type: ignore[no-untyped-def]
     # set_outcome is deliberately status-independent (funding decisions happen
-    # after finalisation, which MANAGER_WRITE_STATUSES excludes) — options are
+    # after finalisation, which MANAGER_WRITE_STATUSES excludes) - options are
     # created while under review, matching create_option's own gate.
     decision = decision_factory(status=Decision.Status.UNDER_REVIEW)
     option = create_option(

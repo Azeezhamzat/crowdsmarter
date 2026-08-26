@@ -68,7 +68,7 @@ from apps.reviews.models import DecisionReview
 from apps.risks.models import Risk
 from apps.workspaces.models import Workspace
 
-SIMULATION_MARKER = "[SIMULATED CLIENT — NOT A REAL ORGANISATION]"
+SIMULATION_MARKER = "[SIMULATED CLIENT - NOT A REAL ORGANISATION]"
 SIMULATED_SLUGS = (
     "northstar-grid-services-sim",
     "careweave-regional-health-sim",
@@ -129,9 +129,9 @@ CLIENTS: tuple[ClientSpec, ...] = (
         workspace_name="Energy Transition Portfolio",
         workspace_slug="energy-transition-portfolio",
         workspace_description="Strategic choices for network resilience, flexibility, and customer value.",
-        decision_title="Select the 2027–2029 flexibility investment portfolio",
+        decision_title="Select the 2027-2029 flexibility investment portfolio",
         decision_question=(
-            "Which investment portfolio should NorthStar commit to for 2027–2029 to improve network "
+            "Which investment portfolio should NorthStar commit to for 2027-2029 to improve network "
             "resilience and customer value while preserving regulatory and community trust?"
         ),
         purpose="Authorise a staged, evidence-based portfolio before the next regulatory submission.",

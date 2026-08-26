@@ -9,10 +9,10 @@ class DemoRequest(UUIDTimeStampedModel):
     """A prospective-customer request submitted through the public website."""
 
     class OrganisationSize(models.TextChoices):
-        ONE_TO_TEN = "1-10", "1–10 people"
-        ELEVEN_TO_FIFTY = "11-50", "11–50 people"
-        FIFTY_ONE_TO_TWO_HUNDRED = "51-200", "51–200 people"
-        TWO_HUNDRED_ONE_TO_THOUSAND = "201-1000", "201–1,000 people"
+        ONE_TO_TEN = "1-10", "1-10 people"
+        ELEVEN_TO_FIFTY = "11-50", "11-50 people"
+        FIFTY_ONE_TO_TWO_HUNDRED = "51-200", "51-200 people"
+        TWO_HUNDRED_ONE_TO_THOUSAND = "201-1000", "201-1,000 people"
         OVER_THOUSAND = "1000+", "More than 1,000 people"
         NOT_SURE = "not_sure", "Not sure"
 
@@ -75,4 +75,4 @@ class DemoRequest(UUIDTimeStampedModel):
         self.message = self.message.strip()
 
     def __str__(self) -> str:
-        return f"{self.full_name} — {self.organisation_name}"
+        return f"{self.full_name} - {self.organisation_name}"

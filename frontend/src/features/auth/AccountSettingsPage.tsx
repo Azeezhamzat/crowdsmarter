@@ -107,7 +107,7 @@ export function AccountSettingsPage() {
 
           {backupCodes ? (
             <div className="mfa-backup-codes">
-              <StatusMessage kind="success">Two-factor authentication is enabled. Save these backup codes now — each one only appears once, and any of them can sign you in if you lose access to your authenticator app.</StatusMessage>
+              <StatusMessage kind="success">Two-factor authentication is enabled. Save these backup codes now - each one only appears once, and any of them can sign you in if you lose access to your authenticator app.</StatusMessage>
               <ul className="mfa-backup-codes__list">{backupCodes.map((code) => <li key={code}><code>{code}</code></li>)}</ul>
               <button className="button button--secondary" type="button" onClick={() => setBackupCodes(null)}>Done</button>
             </div>
@@ -151,7 +151,7 @@ export function AccountSettingsPage() {
             <span className="account-contact-card__icon"><Icon name="shield" size={20} /></span>
             <div>
               <h2 id="system-admin-title">System administration</h2>
-              <p className="muted">Use Django administration for technical access, demo-request triage, and exceptional data correction—not normal decision work.</p>
+              <p className="muted">Use Django administration for technical access, demo-request triage, and exceptional data correction, not normal decision work.</p>
               <a href={contactChannels.adminUrl} target="_blank" rel="noreferrer">Open system administration <Icon name="external" size={15} /></a>
             </div>
           </section>

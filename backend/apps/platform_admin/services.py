@@ -606,7 +606,7 @@ def test_ai_provider_connection(*, actor: Any) -> dict[str, Any]:
     """Make the smallest possible live call to confirm the configured provider is reachable.
 
     Never raises for a provider-side failure (missing key, bad credentials, network
-    error) — those are all reported back as an ok=False result an administrator can
+    error) - those are all reported back as an ok=False result an administrator can
     read, not a 500. Only a permission failure raises.
     """
     _require_platform_administrator(actor)

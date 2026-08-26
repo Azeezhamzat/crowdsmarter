@@ -233,7 +233,7 @@ export function ForesightDriversSection({
           </select>
           <div className="form-row">
             <div>
-              <label htmlFor="driver-impact">Impact (1–5)</label>
+              <label htmlFor="driver-impact">Impact (1-5)</label>
               <input
                 id="driver-impact"
                 max="5"
@@ -246,7 +246,7 @@ export function ForesightDriversSection({
               />
             </div>
             <div>
-              <label htmlFor="driver-uncertainty">Uncertainty (1–5)</label>
+              <label htmlFor="driver-uncertainty">Uncertainty (1-5)</label>
               <input
                 id="driver-uncertainty"
                 max="5"

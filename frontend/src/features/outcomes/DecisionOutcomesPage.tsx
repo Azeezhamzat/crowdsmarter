@@ -231,7 +231,7 @@ export function DecisionOutcomesPage() {
             }}
           >
             {memberships.data?.filter((item) => item.status === "active").map((item) => (
-              <option key={item.user.id} value={item.user.id}>{displayName(item.user)} — {item.role}</option>
+              <option key={item.user.id} value={item.user.id}>{displayName(item.user)} - {item.role}</option>
             ))}
           </select>
         </section>
@@ -248,7 +248,7 @@ export function DecisionOutcomesPage() {
               <label htmlFor="implementation-owner">Implementation owner</label>
               <select id="implementation-owner" {...commitmentForm.register("implementation_owner_id")} disabled={!canCommand}>
                 <option value="">Select a member</option>
-                {memberships.data?.filter((item) => item.status === "active").map((item) => <option key={item.user.id} value={item.user.id}>{displayName(item.user)} — {item.role}</option>)}
+                {memberships.data?.filter((item) => item.status === "active").map((item) => <option key={item.user.id} value={item.user.id}>{displayName(item.user)} - {item.role}</option>)}
               </select>
               <FieldError message={commitmentForm.formState.errors.implementation_owner_id?.message} />
               <label htmlFor="commitment-statement">Commitment statement</label>

@@ -191,7 +191,7 @@ export function MyApplicationsPage() {
           ) : (
             <>
               <h2>Sign in with email</h2>
-              <p className="muted">No password — we'll email you a one-time link.</p>
+              <p className="muted">No password - we'll email you a one-time link.</p>
               {request.isError ? (
                 <StatusMessage kind="error">
                   {request.error instanceof ApiError ? request.error.message : "Could not send that link."}

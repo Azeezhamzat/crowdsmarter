@@ -654,7 +654,7 @@ def search_organisation(*, organisation: Organisation, query_text: str) -> list[
                 kind="executive decision summary",
                 object_id=str(item.id),
                 decision_id=str(item.decision_id),
-                title=f"{item.decision.title} — executive summary",
+                title=f"{item.decision.title} - executive summary",
                 snippet=_snippet([item.proposed_judgement, item.unresolved_issues, item.implementation_implications], term),
                 url=f"/decisions/{item.decision_id}/analysis",
                 rank=float(item.rank),

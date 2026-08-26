@@ -111,7 +111,7 @@ function errorMessage(error: unknown): string {
 }
 
 function score(value: number | null): string {
-  return value === null ? "—" : value.toFixed(1);
+  return value === null ? "N/A" : value.toFixed(1);
 }
 
 function quadrantKey(scenario: ForesightScenario): string {
@@ -458,7 +458,7 @@ export function ForesightScenarioSetPage() {
                   </div>
                   {scenario.implication_links.map((link) => (
                     <p className="scenario-implication-link" key={link.id}>
-                      <strong>{link.effect_label}:</strong> {link.implication_title} — {link.rationale}
+                      <strong>{link.effect_label}:</strong> {link.implication_title} - {link.rationale}
                     </p>
                   ))}
                 </article>
@@ -491,7 +491,7 @@ export function ForesightScenarioSetPage() {
             <section className="side-panel foresight-create-panel">
               <p className="eyebrow">World logic</p><h2>Set driver state</h2>
               <form onSubmit={(event) => { event.preventDefault(); setDriverState.mutate(); }}>
-                <label htmlFor="driver-state-scenario">Scenario</label><select id="driver-state-scenario" required value={driverStateForm.scenario_id} onChange={(event) => setDriverStateForm({ ...driverStateForm, scenario_id: event.target.value })}><option value="">Choose world</option>{data.scenarios.map((item) => <option key={item.id} value={item.id}>{item.code} — {item.title}</option>)}</select>
+                <label htmlFor="driver-state-scenario">Scenario</label><select id="driver-state-scenario" required value={driverStateForm.scenario_id} onChange={(event) => setDriverStateForm({ ...driverStateForm, scenario_id: event.target.value })}><option value="">Choose world</option>{data.scenarios.map((item) => <option key={item.id} value={item.id}>{item.code} - {item.title}</option>)}</select>
                 <label htmlFor="driver-state-driver">Driver</label><select id="driver-state-driver" required value={driverStateForm.driver_id} onChange={(event) => setDriverStateForm({ ...driverStateForm, driver_id: event.target.value })}><option value="">Choose driver</option>{canvasData.drivers.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select>
                 <div className="form-row"><div><label htmlFor="driver-state-value">State</label><select id="driver-state-value" value={driverStateForm.state} onChange={(event) => setDriverStateForm({ ...driverStateForm, state: event.target.value })}><option value="strengthening">Strengthening</option><option value="weakening">Weakening</option><option value="stable">Stable</option><option value="volatile">Volatile</option><option value="transformed">Transformed</option><option value="uncertain">Uncertain</option></select></div><div><label htmlFor="driver-state-salience">Salience</label><input id="driver-state-salience" min={1} max={5} type="number" value={driverStateForm.salience} onChange={(event) => setDriverStateForm({ ...driverStateForm, salience: Number(event.target.value) })} /></div></div>
                 <label htmlFor="driver-state-description">Interpretation</label><textarea id="driver-state-description" required rows={4} value={driverStateForm.description} onChange={(event) => setDriverStateForm({ ...driverStateForm, description: event.target.value })} />
@@ -502,7 +502,7 @@ export function ForesightScenarioSetPage() {
             <section className="side-panel foresight-create-panel">
               <p className="eyebrow">Traceability</p><h2>Link implication</h2>
               <form onSubmit={(event) => { event.preventDefault(); linkImplication.mutate(); }}>
-                <label htmlFor="scenario-implication-scenario">Scenario</label><select id="scenario-implication-scenario" required value={implicationForm.scenario_id} onChange={(event) => setImplicationForm({ ...implicationForm, scenario_id: event.target.value })}><option value="">Choose world</option>{data.scenarios.map((item) => <option key={item.id} value={item.id}>{item.code} — {item.title}</option>)}</select>
+                <label htmlFor="scenario-implication-scenario">Scenario</label><select id="scenario-implication-scenario" required value={implicationForm.scenario_id} onChange={(event) => setImplicationForm({ ...implicationForm, scenario_id: event.target.value })}><option value="">Choose world</option>{data.scenarios.map((item) => <option key={item.id} value={item.id}>{item.code} - {item.title}</option>)}</select>
                 <label htmlFor="scenario-implication-item">Canvas implication</label><select id="scenario-implication-item" required value={implicationForm.implication_id} onChange={(event) => setImplicationForm({ ...implicationForm, implication_id: event.target.value })}><option value="">Choose implication</option>{canvasData.implications.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select>
                 <label htmlFor="scenario-implication-effect">Effect</label><select id="scenario-implication-effect" value={implicationForm.effect} onChange={(event) => setImplicationForm({ ...implicationForm, effect: event.target.value })}><option value="amplifies">Amplifies</option><option value="reduces">Reduces</option><option value="changes">Changes</option><option value="triggers">Triggers</option></select>
                 <label htmlFor="scenario-implication-rationale">Rationale</label><textarea id="scenario-implication-rationale" required rows={4} value={implicationForm.rationale} onChange={(event) => setImplicationForm({ ...implicationForm, rationale: event.target.value })} />
@@ -526,7 +526,7 @@ export function ForesightScenarioSetPage() {
                     <span><strong>{score(scenario.review_summary.distinctiveness)}</strong>Distinctiveness</span>
                     <span><strong>{score(scenario.review_summary.usefulness)}</strong>Usefulness</span>
                     <span><strong>{score(scenario.review_summary.confidence)}</strong>Confidence</span>
-                    <span><strong>{scenario.review_summary.confidence_range ?? "—"}</strong>Confidence spread</span>
+                    <span><strong>{scenario.review_summary.confidence_range ?? "N/A"}</strong>Confidence spread</span>
                   </div>
                   {scenario.reviews.map((review) => <blockquote key={review.id}><strong>{personName(review.reviewer)}</strong><p>{review.comment || "No written comment."}</p><small>Confidence {review.confidence}/5</small></blockquote>)}
                 </article>
@@ -536,7 +536,7 @@ export function ForesightScenarioSetPage() {
           <aside className="side-panel foresight-create-panel">
             <p className="eyebrow">Collective judgement</p><h2>Review a scenario</h2>
             <form onSubmit={(event) => { event.preventDefault(); reviewScenario.mutate(); }}>
-              <label htmlFor="review-scenario">Scenario</label><select id="review-scenario" required value={reviewForm.scenario_id} onChange={(event) => setReviewForm({ ...reviewForm, scenario_id: event.target.value })}><option value="">Choose world</option>{data.scenarios.map((item) => <option key={item.id} value={item.id}>{item.code} — {item.title}</option>)}</select>
+              <label htmlFor="review-scenario">Scenario</label><select id="review-scenario" required value={reviewForm.scenario_id} onChange={(event) => setReviewForm({ ...reviewForm, scenario_id: event.target.value })}><option value="">Choose world</option>{data.scenarios.map((item) => <option key={item.id} value={item.id}>{item.code} - {item.title}</option>)}</select>
               {(["plausibility", "internal_consistency", "distinctiveness", "usefulness", "confidence"] as const).map((field) => <div className="score-input-row" key={field}><label htmlFor={`review-${field}`}>{field.replace("_", " ")}</label><input id={`review-${field}`} min={1} max={5} type="range" value={reviewForm[field]} onChange={(event) => setReviewForm({ ...reviewForm, [field]: Number(event.target.value) })} /><strong>{reviewForm[field]}/5</strong></div>)}
               <label htmlFor="review-comment">Comment</label><textarea id="review-comment" rows={5} value={reviewForm.comment} onChange={(event) => setReviewForm({ ...reviewForm, comment: event.target.value })} />
               <button className="primary-button" disabled={reviewScenario.isPending || !data.scenarios.length} type="submit">Submit or update my review</button>
@@ -559,7 +559,7 @@ export function ForesightScenarioSetPage() {
           <aside className="side-panel foresight-create-panel">
             <p className="eyebrow">Strategy stress test</p><h2>Assess an option</h2>
             <form onSubmit={(event) => { event.preventDefault(); assessOption.mutate(); }}>
-              <label htmlFor="assessment-scenario">Scenario</label><select id="assessment-scenario" required value={assessmentForm.scenario_id} onChange={(event) => setAssessmentForm({ ...assessmentForm, scenario_id: event.target.value })}><option value="">Choose world</option>{data.scenarios.map((item) => <option key={item.id} value={item.id}>{item.code} — {item.title}</option>)}</select>
+              <label htmlFor="assessment-scenario">Scenario</label><select id="assessment-scenario" required value={assessmentForm.scenario_id} onChange={(event) => setAssessmentForm({ ...assessmentForm, scenario_id: event.target.value })}><option value="">Choose world</option>{data.scenarios.map((item) => <option key={item.id} value={item.id}>{item.code} - {item.title}</option>)}</select>
               <label htmlFor="assessment-option">Decision option</label><select id="assessment-option" required value={assessmentForm.option_id} onChange={(event) => setAssessmentForm({ ...assessmentForm, option_id: event.target.value })}><option value="">Choose option</option>{data.decision_options.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select>
               <label htmlFor="assessment-verdict">Verdict</label><select id="assessment-verdict" value={assessmentForm.verdict} onChange={(event) => setAssessmentForm({ ...assessmentForm, verdict: event.target.value })}><option value="robust">Robust</option><option value="adaptable">Adaptable with conditions</option><option value="vulnerable">Vulnerable</option><option value="infeasible">Infeasible</option><option value="uncertain">Uncertain</option></select>
               {(["desirability", "feasibility", "resilience"] as const).map((field) => <div className="score-input-row" key={field}><label htmlFor={`assessment-${field}`}>{field}</label><input id={`assessment-${field}`} min={1} max={5} type="range" value={assessmentForm[field]} onChange={(event) => setAssessmentForm({ ...assessmentForm, [field]: Number(event.target.value) })} /><strong>{assessmentForm[field]}/5</strong></div>)}
@@ -590,7 +590,7 @@ export function ForesightScenarioSetPage() {
                 <label htmlFor="signpost-indicator">Observable indicator</label><input id="signpost-indicator" required value={signpostForm.indicator} onChange={(event) => setSignpostForm({ ...signpostForm, indicator: event.target.value })} />
                 <label htmlFor="signpost-threshold">Threshold or trigger</label><input id="signpost-threshold" required value={signpostForm.threshold} onChange={(event) => setSignpostForm({ ...signpostForm, threshold: event.target.value })} />
                 <div className="form-row"><div><label htmlFor="signpost-direction">Direction</label><select id="signpost-direction" value={signpostForm.direction} onChange={(event) => setSignpostForm({ ...signpostForm, direction: event.target.value })}><option value="above">Above</option><option value="below">Below</option><option value="rising">Rising</option><option value="falling">Falling</option><option value="change">Material change</option><option value="qualitative">Qualitative</option></select></div><div><label htmlFor="signpost-cadence">Review cadence</label><select id="signpost-cadence" value={signpostForm.review_cadence} onChange={(event) => setSignpostForm({ ...signpostForm, review_cadence: event.target.value })}><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="semiannual">Every six months</option><option value="annual">Annual</option><option value="event_driven">Event-driven</option></select></div></div>
-                <label htmlFor="signpost-scenario">Initial scenario link</label><select id="signpost-scenario" value={signpostForm.scenario_id} onChange={(event) => setSignpostForm({ ...signpostForm, scenario_id: event.target.value })}><option value="">No initial link</option>{data.scenarios.map((item) => <option key={item.id} value={item.id}>{item.code} — {item.title}</option>)}</select>
+                <label htmlFor="signpost-scenario">Initial scenario link</label><select id="signpost-scenario" value={signpostForm.scenario_id} onChange={(event) => setSignpostForm({ ...signpostForm, scenario_id: event.target.value })}><option value="">No initial link</option>{data.scenarios.map((item) => <option key={item.id} value={item.id}>{item.code} - {item.title}</option>)}</select>
                 {signpostForm.scenario_id ? <><label htmlFor="signpost-relationship">Relationship</label><select id="signpost-relationship" value={signpostForm.relationship} onChange={(event) => setSignpostForm({ ...signpostForm, relationship: event.target.value })}><option value="supports">Supports</option><option value="contradicts">Contradicts</option><option value="contextual">Contextual</option></select><label htmlFor="signpost-rationale">Link rationale</label><textarea id="signpost-rationale" required rows={3} value={signpostForm.rationale} onChange={(event) => setSignpostForm({ ...signpostForm, rationale: event.target.value })} /></> : null}
                 <label htmlFor="signpost-source-notes">Source notes</label><textarea id="signpost-source-notes" rows={3} value={signpostForm.source_notes} onChange={(event) => setSignpostForm({ ...signpostForm, source_notes: event.target.value })} />
                 <button className="primary-button" disabled={createSignpost.isPending} type="submit">Create signpost</button>

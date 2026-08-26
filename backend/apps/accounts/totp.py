@@ -1,5 +1,5 @@
 """RFC 6238 TOTP (and its RFC 4226 HOTP basis), implemented with the standard
-library only — no external service or dependency is needed for MFA.
+library only - no external service or dependency is needed for MFA.
 
 The HOTP truncation step is verified in tests against the official RFC 4226
 Appendix D test vectors.

@@ -260,7 +260,7 @@ def _notify_assignment(
     if preference:
         try:
             send_mail(
-                subject=f"CrowdSmarter contribution request — {request.title}",
+                subject=f"CrowdSmarter contribution request - {request.title}",
                 message=(
                     f"{actor.email} assigned a contribution on {request.decision.title}.\n\n"
                     f"{request.title}\n{request.instructions}\n\n"
@@ -716,11 +716,11 @@ def deliver_email_digests(*, now=None) -> int:
         ]
         for item in requests:
             due = item.due_at.strftime("%d %b %Y %H:%M UTC") if item.due_at else "No due date"
-            lines.append(f"- {item.title} — {item.get_status_display()} — {due}")
+            lines.append(f"- {item.title} - {item.get_status_display()} - {due}")
         lines.extend(["", f"Open CrowdSmarter: {settings.FRONTEND_BASE_URL}/contributions"])
         try:
             send_mail(
-                subject=f"CrowdSmarter contribution digest — {preference.organisation.name}",
+                subject=f"CrowdSmarter contribution digest - {preference.organisation.name}",
                 message="\n".join(lines),
                 from_email=notification_sender_email(),
                 recipient_list=[preference.user.email],

@@ -50,7 +50,7 @@ class Migration(migrations.Migration):
                 ("summary", models.TextField()),
                 ("future_implication", models.TextField()),
                 ("steep_category", models.CharField(choices=[("social", "Social"), ("technological", "Technological"), ("economic", "Economic"), ("environmental", "Environmental"), ("political", "Political"), ("legal", "Legal"), ("ethical", "Ethical")], max_length=30)),
-                ("time_horizon", models.CharField(choices=[("near", "Near term (0–2 years)"), ("medium", "Medium term (3–5 years)"), ("long", "Long term (6+ years)")], max_length=20)),
+                ("time_horizon", models.CharField(choices=[("near", "Near term (0-2 years)"), ("medium", "Medium term (3-5 years)"), ("long", "Long term (6+ years)")], max_length=20)),
                 ("maturity", models.CharField(choices=[("weak", "Weak signal"), ("emerging", "Emerging pattern"), ("established", "Established trend")], max_length=20)),
                 ("polarity", models.CharField(choices=[("opportunity", "Opportunity"), ("threat", "Threat"), ("both", "Opportunity and threat"), ("unclear", "Unclear")], default="unclear", max_length=20)),
                 ("geography", models.CharField(blank=True, max_length=160)),

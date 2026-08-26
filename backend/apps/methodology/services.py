@@ -110,7 +110,7 @@ def clone_builtin_method(*, actor, organisation: Organisation, builtin_key: str,
     return create_method(
         actor=actor,
         organisation=organisation,
-        name=name.strip() or f"{template.name} — organisation method",
+        name=name.strip() or f"{template.name} - organisation method",
         summary=template.summary,
         best_for=template.best_for,
         question_prompt=template.question_prompt,

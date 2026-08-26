@@ -61,7 +61,7 @@ function RiskHeatmap({ heatmap }: { heatmap: OrganisationPortfolio["watchlist"][
                 const cell = cellByCoordinate.get(`${likelihood}-${impact}`);
                 const count = cell?.count ?? 0;
                 const tier = riskSeverityTier(likelihood, impact);
-                const opacity = count ? 0.25 + 0.75 * (count / maxCount) : 0;
+                const opacity = count ? 0.45 + 0.55 * (count / maxCount) : 0;
                 const title = count
                   ? `Likelihood ${likelihood} × impact ${impact}: ${count} risk(s)\n${(cell?.risks ?? []).map((r) => `• ${r.title} (${r.decision_title})`).join("\n")}`
                   : `Likelihood ${likelihood} × impact ${impact}: no open risks`;
@@ -69,7 +69,7 @@ function RiskHeatmap({ heatmap }: { heatmap: OrganisationPortfolio["watchlist"][
                   <div
                     key={impact}
                     className={`risk-heatmap__cell risk-heatmap__cell--${tier}${count ? " has-risks" : ""}`}
-                    style={{ ["--cell-opacity" as string]: opacity }}
+                    style={{ ["--cell-opacity" as string]: `${opacity * 100}%` }}
                     title={title}
                   >
                     {count > 0 ? count : ""}

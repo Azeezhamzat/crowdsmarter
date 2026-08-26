@@ -39,7 +39,7 @@ class EvaluationExerciseDetailView(APIView):
 
 
 class EvaluationScoringOptionsView(APIView):
-    """Active options for the submission form — blinded to 'Application N' when the exercise asks for it."""
+    """Active options for the submission form - blinded to 'Application N' when the exercise asks for it."""
     permission_classes=[IsAuthenticated]
     def get(self,request,exercise_id):
         exercise=exercise_for_user(user=request.user,exercise_id=exercise_id)

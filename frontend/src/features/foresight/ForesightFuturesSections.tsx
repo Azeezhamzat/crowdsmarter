@@ -110,7 +110,7 @@ export function ForesightFuturesWheelSection({
               .filter((item) => item.order < 3)
               .map((item) => (
                 <option key={item.id} value={item.id}>
-                  {"—".repeat(item.order)} {item.title}
+                  {"-".repeat(item.order)} {item.title}
                 </option>
               ))}
           </select>
@@ -254,9 +254,9 @@ export function ForesightThreeHorizonsSection({
               setForm({ ...form, horizon: event.target.value })
             }
           >
-            <option value="h1">H1 — current system</option>
-            <option value="h2">H2 — transition</option>
-            <option value="h3">H3 — emerging future</option>
+            <option value="h1">H1 - current system</option>
+            <option value="h2">H2 - transition</option>
+            <option value="h3">H3 - emerging future</option>
           </select>
           <label htmlFor="horizon-title">Title</label>
           <input

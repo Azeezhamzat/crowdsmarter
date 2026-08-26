@@ -261,7 +261,7 @@ export function ForesightScenarioSetsSection({
               setForm({ ...form, linked_decision_id: event.target.value })
             }
           >
-            <option value="">Exploratory — no decision yet</option>
+            <option value="">Exploratory - no decision yet</option>
             {decisions.map((decision) => (
               <option key={decision.id} value={decision.id}>
                 {decision.title}

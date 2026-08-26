@@ -35,7 +35,7 @@ const tabs: Array<{ id: AdminTab; label: string }> = [
 ];
 
 function formatDate(value: string | null): string {
-  if (!value) return "—";
+  if (!value) return "N/A";
   return new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 }
 
@@ -86,7 +86,7 @@ function UsersPanel() {
   const [query, setQuery] = useState("");
   const [state, setState] = useState("");
   const users = useQuery({ queryKey: ["platform-admin", "users", query, state], queryFn: () => listPlatformUsers({ q: query, state }) });
-  return <section className="card-panel"><div className="section-heading"><div><p className="eyebrow">Identity administration</p><h2>User accounts and platform capability</h2><p className="muted">Django staff and superuser flags remain visible but are not the CrowdSmarter product-authority model.</p></div></div><div className="platform-filter-row"><label>Search<input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Email or name" /></label><label>State<select value={state} onChange={(event) => setState(event.target.value)}><option value="">All</option><option value="active">Active</option><option value="suspended">Suspended</option><option value="platform_admin">Platform administrators</option></select></label></div>{users.isPending ? <p>Loading users…</p> : users.isError ? <StatusMessage kind="error">The user directory could not be loaded.</StatusMessage> : <div className="table-wrap"><table><thead><tr><th>User</th><th>Tenant roles</th><th>Platform authority</th><th>Technical flags</th><th>Status</th><th /></tr></thead><tbody>{users.data?.map((user) => <tr key={user.id}><td><strong>{user.email}</strong><small className="table-subline">{[user.first_name, user.last_name].filter(Boolean).join(" ") || "No profile name"}</small></td><td>{user.organisation_count} organisations · {user.active_owned_organisation_count} owned</td><td>{user.is_platform_administrator ? <span className="status-pill status-pill--active">Platform administrator</span> : "Standard user"}</td><td>{user.is_staff ? "staff" : "—"}{user.is_superuser ? " · superuser" : ""}</td><td>{user.is_active ? "active" : "suspended"}</td><td><UserAction user={user} /></td></tr>)}</tbody></table></div>}</section>;
+  return <section className="card-panel"><div className="section-heading"><div><p className="eyebrow">Identity administration</p><h2>User accounts and platform capability</h2><p className="muted">Django staff and superuser flags remain visible but are not the CrowdSmarter product-authority model.</p></div></div><div className="platform-filter-row"><label>Search<input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Email or name" /></label><label>State<select value={state} onChange={(event) => setState(event.target.value)}><option value="">All</option><option value="active">Active</option><option value="suspended">Suspended</option><option value="platform_admin">Platform administrators</option></select></label></div>{users.isPending ? <p>Loading users…</p> : users.isError ? <StatusMessage kind="error">The user directory could not be loaded.</StatusMessage> : <div className="table-wrap"><table><thead><tr><th>User</th><th>Tenant roles</th><th>Platform authority</th><th>Technical flags</th><th>Status</th><th /></tr></thead><tbody>{users.data?.map((user) => <tr key={user.id}><td><strong>{user.email}</strong><small className="table-subline">{[user.first_name, user.last_name].filter(Boolean).join(" ") || "No profile name"}</small></td><td>{user.organisation_count} organisations · {user.active_owned_organisation_count} owned</td><td>{user.is_platform_administrator ? <span className="status-pill status-pill--active">Platform administrator</span> : "Standard user"}</td><td>{user.is_staff ? "staff" : "N/A"}{user.is_superuser ? " · superuser" : ""}</td><td>{user.is_active ? "active" : "suspended"}</td><td><UserAction user={user} /></td></tr>)}</tbody></table></div>}</section>;
 }
 
 function DemoAction({ item }: { item: PlatformDemoRequest }) {
@@ -144,7 +144,7 @@ function AIProviderPanel() {
   const selected = AI_PROVIDER_OPTIONS.find((option) => option.value === providerKey) ?? AI_PROVIDER_OPTIONS[0]!;
   const needsKey = providerKey !== "rules";
   return <section className="card-panel">
-    <div className="section-heading"><div><p className="eyebrow">Decision reviews and analytics</p><h2>AI provider</h2><p className="muted">The rule-based reviewer needs no external service or key. Choose Claude, ChatGPT, or Gemini to power decision reviews and analytics insights with a real model instead — this sends decision content to that provider and requires an API key.</p></div></div>
+    <div className="section-heading"><div><p className="eyebrow">Decision reviews and analytics</p><h2>AI provider</h2><p className="muted">The rule-based reviewer needs no external service or key. Choose Claude, ChatGPT, or Gemini to power decision reviews and analytics insights with a real model instead - this sends decision content to that provider and requires an API key.</p></div></div>
     {providerMutation.isError ? <StatusMessage kind="error">The provider choice could not be saved.</StatusMessage> : null}
     {keyMutation.isError ? <StatusMessage kind="error">The API key could not be saved.</StatusMessage> : null}
     {clearMutation.isError ? <StatusMessage kind="error">The API key could not be removed.</StatusMessage> : null}
@@ -171,7 +171,7 @@ function AIProviderPanel() {
 
     <div className="section-heading"><div><p className="eyebrow">Credential</p><h2>{needsKey ? `${selected.label} API key` : "API key"}</h2><p className="muted">Stored encrypted. It is never shown again once saved, including to other platform administrators.</p></div></div>
     <div className="form-grid form-grid--two">
-      <label>API key<input type="password" autoComplete="off" value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder={data.ai_provider_api_key_is_set ? "Already configured — enter a new key to replace it" : (selected.keyPlaceholder || "API key")} /></label>
+      <label>API key<input type="password" autoComplete="off" value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder={data.ai_provider_api_key_is_set ? "Already configured - enter a new key to replace it" : (selected.keyPlaceholder || "API key")} /></label>
       <label>Change rationale<textarea rows={2} value={keyRationale} onChange={(event) => setKeyRationale(event.target.value)} /></label>
     </div>
     <button className="button button--secondary" type="button" disabled={!apiKey.trim() || keyRationale.trim().length < 12 || keyMutation.isPending} onClick={() => keyMutation.mutate()}>{keyMutation.isPending ? "Saving…" : "Set API key"}</button>

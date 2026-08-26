@@ -75,7 +75,7 @@ class Migration(migrations.Migration):
                 ("id", models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
                 ("created_at", models.DateTimeField(auto_now_add=True, editable=False)),
                 ("updated_at", models.DateTimeField(auto_now=True)),
-                ("horizon", models.CharField(choices=[("h1", "Horizon 1 — current system"), ("h2", "Horizon 2 — transition"), ("h3", "Horizon 3 — emerging future")], max_length=10)),
+                ("horizon", models.CharField(choices=[("h1", "Horizon 1 - current system"), ("h2", "Horizon 2 - transition"), ("h3", "Horizon 3 - emerging future")], max_length=10)),
                 ("title", models.CharField(max_length=260)),
                 ("description", models.TextField()),
                 ("evidence", models.TextField(blank=True)),

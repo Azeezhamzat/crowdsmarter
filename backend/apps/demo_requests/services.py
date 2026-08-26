@@ -62,7 +62,7 @@ def _notify_demo_request(request: DemoRequest) -> None:
         return
     try:
         EmailMessage(
-            subject=f"CrowdSmarter demo request — {request.organisation_name}",
+            subject=f"CrowdSmarter demo request - {request.organisation_name}",
             body=(
                 f"Reference: {request.id}\n"
                 f"Name: {request.full_name}\n"

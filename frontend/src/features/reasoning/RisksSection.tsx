@@ -268,7 +268,7 @@ export function RisksSection({
 
             <div className="form-row">
               <div>
-                <label htmlFor="risk-likelihood">Likelihood (1–5)</label>
+                <label htmlFor="risk-likelihood">Likelihood (1-5)</label>
                 <input
                   id="risk-likelihood"
                   type="number"
@@ -278,7 +278,7 @@ export function RisksSection({
                 />
               </div>
               <div>
-                <label htmlFor="risk-impact">Impact (1–5)</label>
+                <label htmlFor="risk-impact">Impact (1-5)</label>
                 <input
                   id="risk-impact"
                   type="number"

@@ -239,12 +239,12 @@ function DisagreementBadge({ result }: { result: EvaluationOptionResult }) {
   if (result.disagreement == null) return null;
   const range =
     result.score_min != null && result.score_max != null
-      ? ` (range ${result.score_min.toFixed(0)}–${result.score_max.toFixed(0)})`
+      ? ` (range ${result.score_min.toFixed(0)}-${result.score_max.toFixed(0)})`
       : "";
   return (
     <span
       className={`disagreement-badge disagreement-badge--${result.disagreement}`}
-      title={`Evaluators' individual scores for this option, normalised to 0–100${range}`}
+      title={`Evaluators' individual scores for this option, normalised to 0-100${range}`}
     >
       {DISAGREEMENT_LABELS[result.disagreement]}
     </span>
@@ -303,12 +303,12 @@ function RoundPanel({ round, exercise, options, onRefresh }: { round: Evaluation
         <form className="evaluation-ballot" onSubmit={submitForm}>
           <div className="blind-notice"><strong>Independent contribution</strong><span>{exercise.blind_results_until_close ? "Aggregate results stay hidden until the round closes." : "Live aggregates are visible."}</span></div>
           {scoringOptions.data?.some((option) => option.blinded) ? (
-            <p className="blind-applicant-notice">Applicant names are hidden while you score — options are shown as “Application A”, “Application B”, and so on.</p>
+            <p className="blind-applicant-notice">Applicant names are hidden while you score - options are shown as “Application A”, “Application B”, and so on.</p>
           ) : null}
           {["scorecard", "delphi"].includes(exercise.method) ? (
-            <div className="score-matrix table-wrap"><table><thead><tr><th>Option</th>{exercise.criteria.map((criterion) => <th key={criterion.id}>{criterion.title}<small>{criterion.scale_min}–{criterion.scale_max}</small></th>)}</tr></thead><tbody>{formOptions.map((option) => <tr key={option.id}><th>{option.title}</th>{exercise.criteria.map((criterion) => <td key={criterion.id}><input aria-label={`${option.title}: ${criterion.title}`} type="number" min={criterion.scale_min} max={criterion.scale_max} step="0.1" value={scores[`${option.id}:${criterion.id}`] ?? ""} onChange={(event) => setScores((current) => ({ ...current, [`${option.id}:${criterion.id}`]: event.target.value }))} /></td>)}</tr>)}</tbody></table></div>
+            <div className="score-matrix table-wrap"><table><thead><tr><th>Option</th>{exercise.criteria.map((criterion) => <th key={criterion.id}>{criterion.title}<small>{criterion.scale_min}-{criterion.scale_max}</small></th>)}</tr></thead><tbody>{formOptions.map((option) => <tr key={option.id}><th>{option.title}</th>{exercise.criteria.map((criterion) => <td key={criterion.id}><input aria-label={`${option.title}: ${criterion.title}`} type="number" min={criterion.scale_min} max={criterion.scale_max} step="0.1" value={scores[`${option.id}:${criterion.id}`] ?? ""} onChange={(event) => setScores((current) => ({ ...current, [`${option.id}:${criterion.id}`]: event.target.value }))} /></td>)}</tr>)}</tbody></table></div>
           ) : exercise.method === "ranked_choice" ? (
-            <div className="ballot-options">{formOptions.map((option) => <label key={option.id}><strong>{option.title}</strong><input aria-label={`Rank for ${option.title}`} type="number" min={1} max={formOptions.length} step={1} value={ranks[option.id] ?? ""} onChange={(event) => setRanks((current) => ({ ...current, [option.id]: event.target.value }))} placeholder={`1–${formOptions.length}`} /></label>)}</div>
+            <div className="ballot-options">{formOptions.map((option) => <label key={option.id}><strong>{option.title}</strong><input aria-label={`Rank for ${option.title}`} type="number" min={1} max={formOptions.length} step={1} value={ranks[option.id] ?? ""} onChange={(event) => setRanks((current) => ({ ...current, [option.id]: event.target.value }))} placeholder={`1-${formOptions.length}`} /></label>)}</div>
           ) : (
             <div className="ballot-options">{formOptions.map((option) => <label key={option.id}><strong>{option.title}</strong><select value={votes[option.id] ?? ""} onChange={(event) => setVotes((current) => ({ ...current, [option.id]: event.target.value }))}><option value="">Not answered</option>{exercise.method === "approval" ? <><option value="approve">Approve</option><option value="abstain">Abstain</option></> : <><option value="consent">Consent</option><option value="concern">Concern</option><option value="object">Reasoned objection</option><option value="abstain">Abstain</option></>}</select></label>)}</div>
           )}
@@ -339,7 +339,7 @@ function RoundPanel({ round, exercise, options, onRefresh }: { round: Evaluation
                 ))}
               </div>
             ) : (
-              <div className="result-ranking">{options.map((option, index) => { const result = resultByOption.get(option.id); return result ? <article key={option.id}><span className="rank-number">{index + 1}</span><div><strong>{result.title}</strong>{result.weighted_score != null ? <p>{result.weighted_score.toFixed(1)} weighted score · confidence {result.confidence ?? "—"}</p> : <p>{result.approval_rate ?? 0}% approval · {result.objection_rate ?? 0}% objections{result.dissent_rate != null ? ` · ${result.dissent_rate}% dissent` : ""}</p>}<DisagreementBadge result={result} /></div>{result.passes_threshold != null ? <span className={result.passes_threshold ? "role-badge" : "status-badge"}>{result.passes_threshold ? "Passes" : "Below threshold"}</span> : null}</article> : null; })}</div>
+              <div className="result-ranking">{options.map((option, index) => { const result = resultByOption.get(option.id); return result ? <article key={option.id}><span className="rank-number">{index + 1}</span><div><strong>{result.title}</strong>{result.weighted_score != null ? <p>{result.weighted_score.toFixed(1)} weighted score · confidence {result.confidence ?? "N/A"}</p> : <p>{result.approval_rate ?? 0}% approval · {result.objection_rate ?? 0}% objections{result.dissent_rate != null ? ` · ${result.dissent_rate}% dissent` : ""}</p>}<DisagreementBadge result={result} /></div>{result.passes_threshold != null ? <span className={result.passes_threshold ? "role-badge" : "status-badge"}>{result.passes_threshold ? "Passes" : "Below threshold"}</span> : null}</article> : null; })}</div>
             )}
             {exercise.method === "ranked_choice" && round.result_summary.ranked_choice_rounds.length ? (
               <div className="table-wrap ranked-choice-rounds">
@@ -351,8 +351,8 @@ function RoundPanel({ round, exercise, options, onRefresh }: { round: Evaluation
                       return (
                         <tr key={tallyRound.round_number}>
                           <th>{tallyRound.round_number}</th>
-                          {round.result_summary.options.map((option) => <td key={option.option_id}>{tallyRound.tallies[option.option_id] ?? "—"}</td>)}
-                          <td>{eliminatedTitle ?? "—"}</td>
+                          {round.result_summary.options.map((option) => <td key={option.option_id}>{tallyRound.tallies[option.option_id] ?? "N/A"}</td>)}
+                          <td>{eliminatedTitle ?? "N/A"}</td>
                         </tr>
                       );
                     })}

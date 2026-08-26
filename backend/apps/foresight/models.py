@@ -198,8 +198,8 @@ class Signal(UUIDTimeStampedModel):
         ETHICAL = "ethical", "Ethical"
 
     class TimeHorizon(models.TextChoices):
-        NEAR = "near", "Near term (0–2 years)"
-        MEDIUM = "medium", "Medium term (3–5 years)"
+        NEAR = "near", "Near term (0-2 years)"
+        MEDIUM = "medium", "Medium term (3-5 years)"
         LONG = "long", "Long term (6+ years)"
 
     class Maturity(models.TextChoices):
@@ -780,9 +780,9 @@ class ThreeHorizonItem(UUIDTimeStampedModel):
     """A structured item in a Three Horizons transition view."""
 
     class Horizon(models.TextChoices):
-        H1 = "h1", "Horizon 1 — current system"
-        H2 = "h2", "Horizon 2 — transition"
-        H3 = "h3", "Horizon 3 — emerging future"
+        H1 = "h1", "Horizon 1 - current system"
+        H2 = "h2", "Horizon 2 - transition"
+        H3 = "h3", "Horizon 3 - emerging future"
 
     canvas = models.ForeignKey(ForesightCanvas, on_delete=models.CASCADE, related_name="horizon_items")
     horizon = models.CharField(max_length=10, choices=Horizon.choices)

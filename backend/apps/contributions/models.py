@@ -72,7 +72,7 @@ class FacilitationSession(UUIDTimeStampedModel):
             raise ValidationError({"closed_at": "Only closed sessions may contain a closure timestamp."})
 
     def __str__(self) -> str:
-        return f"{self.title} — {self.decision}"
+        return f"{self.title} - {self.decision}"
 
 
 class SessionParticipant(UUIDTimeStampedModel):
@@ -235,7 +235,7 @@ class ContributionRequest(UUIDTimeStampedModel):
         return self.status in {self.Status.ACCEPTED, self.Status.CANCELLED}
 
     def __str__(self) -> str:
-        return f"{self.title} — {self.assignee}"
+        return f"{self.title} - {self.assignee}"
 
 
 class ContributionSubmission(UUIDTimeStampedModel):

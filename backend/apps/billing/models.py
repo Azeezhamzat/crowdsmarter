@@ -1,6 +1,6 @@
 """Plan entitlements and per-organisation subscription records.
 
-No payment processing lives here — see ADR 0031. These models record which
+No payment processing lives here - see ADR 0031. These models record which
 packaging tier an organisation is on and enforce simple, self-contained
 usage limits; a real payment-provider integration would extend
 `OrganisationSubscription` with a provider reference, not replace it.

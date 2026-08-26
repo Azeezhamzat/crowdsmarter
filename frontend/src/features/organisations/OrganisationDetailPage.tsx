@@ -163,7 +163,7 @@ export function OrganisationDetailPage() {
           <p>
             {organisation.data?.name} has no recorded decisions yet. Invite the people who should
             weigh in below, then use the guided flow to state the question, choose a starting
-            pattern, and assign ownership — it takes a few minutes and every field stays editable.
+            pattern, and assign ownership - it takes a few minutes and every field stays editable.
           </p>
           <Link className="button button--primary button-link" to={`/workspaces/${defaultWorkspace.id}/decisions/new`}>
             Start a guided decision

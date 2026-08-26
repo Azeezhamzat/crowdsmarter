@@ -36,7 +36,7 @@ function PaymentControl({ option }: { option: DecisionOption }) {
               <span className={`status-badge status-badge--${item.status}`}>{item.status_label}</span>
               {item.amount} via {item.provider_key_label}
               {item.external_reference ? ` · ${item.external_reference}` : ""}
-              {item.note ? ` — ${item.note}` : ""}
+              {item.note ? ` - ${item.note}` : ""}
             </li>
           ))}
         </ul>
@@ -348,7 +348,7 @@ export function OptionsSection({
               {option.estimated_cost ? (
                 <p>
                   <strong>{terms.amountFieldLabel}:</strong> {option.estimated_cost}
-                  {option.cost_notes ? ` — ${option.cost_notes}` : ""}
+                  {option.cost_notes ? ` - ${option.cost_notes}` : ""}
                 </p>
               ) : null}
               {option.resource_notes ? (

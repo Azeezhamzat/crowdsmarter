@@ -112,7 +112,7 @@ function SignalScatterChart({
             onClick={() => onSelect(signal.title)}
             onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSelect(signal.title); } }}
           >
-            <title>{`${signal.title} — impact ${signal.impact}/5, uncertainty ${signal.uncertainty}/5`}</title>
+            <title>{`${signal.title} - impact ${signal.impact}/5, uncertainty ${signal.uncertainty}/5`}</title>
           </circle>
         ))}
       </svg>
@@ -331,16 +331,16 @@ export function OrganisationForesightPage() {
 
       <PageHelp title="How signals, sources, and watchlists fit together">
         <p>
-          A <strong>source</strong> is an attributable place a signal came from — a report, a
+          A <strong>source</strong> is an attributable place a signal came from - a report, a
           conversation, an attachment. A <strong>signal</strong> is one observed piece of change,
           classified by STEEP category (social, technological, economic, environmental, political
-          — plus legal and ethical) and scored for impact and uncertainty. The radar plots signals
+          - plus legal and ethical) and scored for impact and uncertainty. The radar plots signals
           on those two axes so the ones worth attention stand out.
         </p>
         <p>
           A <strong>watchlist</strong> groups related signals under a strategic concern you want to
-          keep monitoring over time. <strong>Systems canvases</strong> go a level deeper — mapping
-          drivers, stakeholders, and causal relationships — and are where signals connect through to
+          keep monitoring over time. <strong>Systems canvases</strong> go a level deeper - mapping
+          drivers, stakeholders, and causal relationships - and are where signals connect through to
           scenarios and, ultimately, to specific decisions.
         </p>
       </PageHelp>
@@ -349,11 +349,11 @@ export function OrganisationForesightPage() {
       {overview.isError || signals.isError || sources.isError ? <StatusMessage kind="error">Foresight records could not be loaded.</StatusMessage> : null}
 
       <section className="foresight-metrics" aria-label="Foresight overview">
-        <article><span>Signals</span><strong>{overview.data?.signal_count ?? "—"}</strong><small>active observations</small></article>
-        <article><span>Sources</span><strong>{overview.data?.source_count ?? "—"}</strong><small>attributable records</small></article>
-        <article><span>Watchlists</span><strong>{overview.data?.watchlist_count ?? "—"}</strong><small>strategic concerns</small></article>
-        <article><span>Systems canvases</span><strong>{overview.data?.canvas_count ?? "—"}</strong><small>structured inquiries</small></article>
-        <article className="foresight-metric--attention"><span>High attention</span><strong>{overview.data?.high_attention_count ?? "—"}</strong><small>high impact and uncertainty</small></article>
+        <article><span>Signals</span><strong>{overview.data?.signal_count ?? "N/A"}</strong><small>active observations</small></article>
+        <article><span>Sources</span><strong>{overview.data?.source_count ?? "N/A"}</strong><small>attributable records</small></article>
+        <article><span>Watchlists</span><strong>{overview.data?.watchlist_count ?? "N/A"}</strong><small>strategic concerns</small></article>
+        <article><span>Systems canvases</span><strong>{overview.data?.canvas_count ?? "N/A"}</strong><small>structured inquiries</small></article>
+        <article className="foresight-metric--attention"><span>High attention</span><strong>{overview.data?.high_attention_count ?? "N/A"}</strong><small>high impact and uncertainty</small></article>
       </section>
 
       <div className="foresight-tabs" role="tablist" aria-label="Foresight sections">
@@ -397,7 +397,7 @@ export function OrganisationForesightPage() {
             <h2>Strategic horizons</h2>
             {(["near", "medium", "long"] as const).map((horizon) => (
               <div className="horizon-row" key={horizon}>
-                <div><strong>{horizon === "near" ? "0–2 years" : horizon === "medium" ? "3–5 years" : "6+ years"}</strong><small>{horizon} term</small></div>
+                <div><strong>{horizon === "near" ? "0-2 years" : horizon === "medium" ? "3-5 years" : "6+ years"}</strong><small>{horizon} term</small></div>
                 <span>{overview.data?.by_horizon[horizon] ?? 0}</span>
               </div>
             ))}
@@ -449,7 +449,7 @@ export function OrganisationForesightPage() {
                 <label htmlFor="signal-summary">What is changing?</label><textarea id="signal-summary" rows={4} required value={signalForm.summary} onChange={(event) => setSignalForm({ ...signalForm, summary: event.target.value })} />
                 <label htmlFor="signal-implication">Why could it matter?</label><textarea id="signal-implication" rows={4} required value={signalForm.future_implication} onChange={(event) => setSignalForm({ ...signalForm, future_implication: event.target.value })} />
                 <label htmlFor="signal-source">Structured source</label><select id="signal-source" value={signalForm.source_id} onChange={(event) => setSignalForm({ ...signalForm, source_id: event.target.value })}><option value="">No linked source yet</option>{sources.data?.filter((item) => item.status === "active").map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select>
-                <div className="form-row"><div><label htmlFor="signal-steep">STEEP category</label><select id="signal-steep" value={signalForm.steep_category} onChange={(event) => setSignalForm({ ...signalForm, steep_category: event.target.value })}>{steepCategories.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></div><div><label htmlFor="signal-horizon">Time horizon</label><select id="signal-horizon" value={signalForm.time_horizon} onChange={(event) => setSignalForm({ ...signalForm, time_horizon: event.target.value })}><option value="near">0–2 years</option><option value="medium">3–5 years</option><option value="long">6+ years</option></select></div></div>
+                <div className="form-row"><div><label htmlFor="signal-steep">STEEP category</label><select id="signal-steep" value={signalForm.steep_category} onChange={(event) => setSignalForm({ ...signalForm, steep_category: event.target.value })}>{steepCategories.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></div><div><label htmlFor="signal-horizon">Time horizon</label><select id="signal-horizon" value={signalForm.time_horizon} onChange={(event) => setSignalForm({ ...signalForm, time_horizon: event.target.value })}><option value="near">0-2 years</option><option value="medium">3-5 years</option><option value="long">6+ years</option></select></div></div>
                 <div className="form-row"><div><label htmlFor="signal-maturity">Maturity</label><select id="signal-maturity" value={signalForm.maturity} onChange={(event) => setSignalForm({ ...signalForm, maturity: event.target.value })}><option value="weak">Weak signal</option><option value="emerging">Emerging pattern</option><option value="established">Established trend</option></select></div><div><label htmlFor="signal-polarity">Potential</label><select id="signal-polarity" value={signalForm.polarity} onChange={(event) => setSignalForm({ ...signalForm, polarity: event.target.value })}><option value="unclear">Unclear</option><option value="opportunity">Opportunity</option><option value="threat">Threat</option><option value="both">Both</option></select></div></div>
                 <div className="form-row"><div><label htmlFor="signal-impact">Impact: {signalForm.impact}/5</label><input id="signal-impact" type="range" min="1" max="5" value={signalForm.impact} onChange={(event) => setSignalForm({ ...signalForm, impact: Number(event.target.value) })} /></div><div><label htmlFor="signal-uncertainty">Uncertainty: {signalForm.uncertainty}/5</label><input id="signal-uncertainty" type="range" min="1" max="5" value={signalForm.uncertainty} onChange={(event) => setSignalForm({ ...signalForm, uncertainty: Number(event.target.value) })} /></div></div>
                 <label htmlFor="signal-domain">Domain</label><input id="signal-domain" placeholder="Agriculture, regulation, talent…" value={signalForm.domain} onChange={(event) => setSignalForm({ ...signalForm, domain: event.target.value })} />

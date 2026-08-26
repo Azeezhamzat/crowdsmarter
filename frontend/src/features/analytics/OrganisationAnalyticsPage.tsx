@@ -12,7 +12,7 @@ import {
 } from "./api";
 
 function valueOrDash(value: number | null, suffix = ""): string {
-  return value === null ? "—" : `${value}${suffix}`;
+  return value === null ? "N/A" : `${value}${suffix}`;
 }
 
 function ObservationList({ observations }: { observations: AnalyticsObservation[] }) {
@@ -114,7 +114,7 @@ function AnalyticsInsightPanel({ organisationId }: { organisationId: string }) {
       <h2>Insight narrative</h2>
       <p className="muted">
         Generated on demand from the metrics above by the platform&rsquo;s configured AI provider (transparent rules
-        by default; Claude, ChatGPT, or Gemini if an operator has selected and keyed one). Advisory only — it does
+        by default; Claude, ChatGPT, or Gemini if an operator has selected and keyed one). Advisory only - it does
         not alter any record. Every generated insight is kept as an attributable record.
       </p>
       <button className="button button--secondary" type="button" disabled={insight.isPending} onClick={() => insight.mutate()}>
@@ -143,7 +143,7 @@ export function OrganisationAnalyticsPage() {
     <div>
       <Link className="back-link" to={`/organisations/${organisationId}`}>← Organisation</Link>
       <div className="page-heading">
-        <div><p className="eyebrow">Decision system health</p><h1>{organisation.data?.name ?? "Organisation"} analytics</h1><p className="muted">A small set of explainable measures—not a leaderboard or an automated judgement of decision quality.</p></div>
+        <div><p className="eyebrow">Decision system health</p><h1>{organisation.data?.name ?? "Organisation"} analytics</h1><p className="muted">A small set of explainable measures, not a leaderboard or an automated judgement of decision quality.</p></div>
       </div>
       {analytics.isPending ? <p>Calculating decision metrics…</p> : null}
       {analytics.isError ? <StatusMessage kind="error">Analytics could not be loaded.</StatusMessage> : null}

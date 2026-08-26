@@ -95,13 +95,13 @@ export function OrganisationPrioritisationPage() {
         <p>
           A <strong>portfolio</strong> is a bounded set of candidate decisions competing for the
           same limited budget or capacity. Add criteria with weights, then invite assessors to
-          score each candidate against them — <strong>anonymous</strong> assessment hides who gave
+          score each candidate against them - <strong>anonymous</strong> assessment hides who gave
           which score to reduce anchoring and status effects, and <strong>sealing results</strong>{" "}
           keeps every score hidden from other assessors until the round closes.
         </p>
         <p>
           Once closed, the system produces a transparent, explainable recommendation given the
-          budget and capacity limits — but selecting candidates is always a separate, human,
+          budget and capacity limits - but selecting candidates is always a separate, human,
           accountable-owner action, never automatic.
         </p>
       </PageHelp>
@@ -156,7 +156,7 @@ function PortfolioWorkspace({ portfolio, decisions, onRefresh }: { portfolio: Pr
     <div className="evaluation-workspace">
       <section className="panel-card evaluation-summary">
         <div><div className="heading-badges"><span className={`status-badge status-badge--${portfolio.status}`}>{portfolio.status}</span><span className="role-badge">Budget {portfolio.budget_limit ?? "unbounded"}</span><span className="role-badge">Capacity {portfolio.capacity_limit ?? "unbounded"}</span></div><h2>{portfolio.title}</h2><p>{portfolio.purpose || "No purpose recorded."}</p></div>
-        <div className="evaluation-metrics"><div><strong>{portfolio.criteria.length}</strong><span>criteria</span></div><div><strong>{portfolio.candidates.length}</strong><span>candidates</span></div><div><strong>{portfolio.recommendation.hidden ? "—" : selectedCount}</strong><span>recommended</span></div><div><strong>{portfolio.recommendation.hidden ? "—" : portfolio.recommendation.recommended_budget}</strong><span>budget used</span></div></div>
+        <div className="evaluation-metrics"><div><strong>{portfolio.criteria.length}</strong><span>criteria</span></div><div><strong>{portfolio.candidates.length}</strong><span>candidates</span></div><div><strong>{portfolio.recommendation.hidden ? "N/A" : selectedCount}</strong><span>recommended</span></div><div><strong>{portfolio.recommendation.hidden ? "N/A" : portfolio.recommendation.recommended_budget}</strong><span>budget used</span></div></div>
       </section>
 
       {update.error || criterion.error || candidate.error ? <StatusMessage kind="error">{message(update.error ?? criterion.error ?? candidate.error)}</StatusMessage> : null}
@@ -182,7 +182,7 @@ function PortfolioWorkspace({ portfolio, decisions, onRefresh }: { portfolio: Pr
         {portfolio.recommendation.hidden ? (
           <div className="sealed-results"><strong>Independent assessments are sealed</strong><p>Aggregate scores and the constrained recommendation become visible after the portfolio closes.</p></div>
         ) : (
-          <div className="recommendation-list">{portfolio.recommendation.candidates.map((item, index) => <article className={item.recommended ? "is-recommended" : ""} key={item.candidate_id}><span className="rank-number">{index + 1}</span><div><strong>{item.title}</strong><p>Score {item.score.toFixed(1)} · {item.assessor_count} assessors · confidence {item.confidence ?? "—"}</p><small>Budget {item.budget_required} · Capacity {item.capacity_required}{item.mandatory ? " · Mandatory" : ""}</small>{item.constraint_reason ? <em>{item.constraint_reason}</em> : null}</div><span className={item.recommended ? "role-badge" : "status-badge"}>{item.recommended ? "Recommended" : "Outside envelope"}</span></article>)}</div>
+          <div className="recommendation-list">{portfolio.recommendation.candidates.map((item, index) => <article className={item.recommended ? "is-recommended" : ""} key={item.candidate_id}><span className="rank-number">{index + 1}</span><div><strong>{item.title}</strong><p>Score {item.score.toFixed(1)} · {item.assessor_count} assessors · confidence {item.confidence ?? "N/A"}</p><small>Budget {item.budget_required} · Capacity {item.capacity_required}{item.mandatory ? " · Mandatory" : ""}</small>{item.constraint_reason ? <em>{item.constraint_reason}</em> : null}</div><span className={item.recommended ? "role-badge" : "status-badge"}>{item.recommended ? "Recommended" : "Outside envelope"}</span></article>)}</div>
         )}
       </section>
     </div>
@@ -205,7 +205,7 @@ function CandidateAssessment({ candidate, criteria, canAssess, canManage, onRefr
       <header><div><strong>{candidate.decision_title}</strong><span>{candidate.decision_status.replaceAll("_", " ")}</span></div><div className="heading-badges">{candidate.mandatory ? <span className="role-badge">Mandatory</span> : null}{candidate.selection ? <span className={candidate.selection.selected ? "role-badge" : "status-badge"}>{candidate.selection.selected ? "Selected" : "Not selected"}</span> : null}</div></header>
       <div className="candidate-costs"><span>Budget <strong>{candidate.budget_required}</strong></span><span>Capacity <strong>{candidate.capacity_required}</strong></span><span>Assessments <strong>{candidate.assessments.length}</strong></span></div>
       {assess.error || select.error ? <StatusMessage kind="error">{message(assess.error ?? select.error)}</StatusMessage> : null}
-      {canAssess ? <form className="candidate-assessment-form" onSubmit={submit}><label>Criterion<select value={criterionId} onChange={(event) => setCriterionId(event.target.value)}>{criteria.map((item) => <option value={item.id} key={item.id}>{item.title}</option>)}</select></label><label>Score (0–100)<input type="number" min="0" max="100" step="0.1" value={score} onChange={(event) => setScore(event.target.value)} /></label><label>Confidence ({confidence}/5)<input type="range" min="1" max="5" value={confidence} onChange={(event) => setConfidence(Number(event.target.value))} /></label><label>Rationale<input value={rationale} onChange={(event) => setRationale(event.target.value)} /></label><button className="button button--secondary" disabled={!criterionId || assess.isPending}>Save assessment</button></form> : null}
+      {canAssess ? <form className="candidate-assessment-form" onSubmit={submit}><label>Criterion<select value={criterionId} onChange={(event) => setCriterionId(event.target.value)}>{criteria.map((item) => <option value={item.id} key={item.id}>{item.title}</option>)}</select></label><label>Score (0-100)<input type="number" min="0" max="100" step="0.1" value={score} onChange={(event) => setScore(event.target.value)} /></label><label>Confidence ({confidence}/5)<input type="range" min="1" max="5" value={confidence} onChange={(event) => setConfidence(Number(event.target.value))} /></label><label>Rationale<input value={rationale} onChange={(event) => setRationale(event.target.value)} /></label><button className="button button--secondary" disabled={!criterionId || assess.isPending}>Save assessment</button></form> : null}
       {canManage ? <div className="selection-controls"><label>Authority rationale<input value={selectionRationale} onChange={(event) => setSelectionRationale(event.target.value)} /></label><button className="button button--primary" type="button" onClick={() => select.mutate(true)}>Record selection</button><button className="button button--secondary" type="button" onClick={() => select.mutate(false)}>Record exclusion</button></div> : null}
     </article>
   );

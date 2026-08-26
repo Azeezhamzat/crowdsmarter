@@ -21,7 +21,7 @@ class Migration(migrations.Migration):
                 ("work_email", models.EmailField(max_length=254)),
                 ("organisation_name", models.CharField(max_length=200)),
                 ("job_title", models.CharField(blank=True, max_length=160)),
-                ("organisation_size", models.CharField(choices=[("1-10", "1–10 people"), ("11-50", "11–50 people"), ("51-200", "51–200 people"), ("201-1000", "201–1,000 people"), ("1000+", "More than 1,000 people"), ("not_sure", "Not sure")], default="not_sure", max_length=20)),
+                ("organisation_size", models.CharField(choices=[("1-10", "1-10 people"), ("11-50", "11-50 people"), ("51-200", "51-200 people"), ("201-1000", "201-1,000 people"), ("1000+", "More than 1,000 people"), ("not_sure", "Not sure")], default="not_sure", max_length=20)),
                 ("primary_need", models.CharField(choices=[("strategic_foresight", "Strategic foresight"), ("decision_governance", "Decision governance"), ("collective_intelligence", "Collective intelligence"), ("portfolio_prioritisation", "Portfolio prioritisation"), ("organisational_learning", "Organisational learning"), ("other", "Other")], max_length=40)),
                 ("message", models.TextField(blank=True, max_length=2000)),
                 ("consent_to_contact", models.BooleanField(default=False)),

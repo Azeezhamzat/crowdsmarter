@@ -68,7 +68,7 @@ export function RequestDemoPage() {
           <p className="public-eyebrow">Request a demonstration</p>
           <h1 id="demo-title">See how CrowdSmarter would support a real decision in your organisation.</h1>
           <p className="demo-request-intro__lead">
-            We will centre the conversation on your decision environment—not on a generic feature tour.
+            We will centre the conversation on your decision environment, not on a generic feature tour.
             Share enough context for us to prepare a relevant walkthrough.
           </p>
           <div className="demo-expectations" aria-label="What to expect">
@@ -139,10 +139,10 @@ export function RequestDemoPage() {
                     <label htmlFor="organisation_size">Organisation size *</label>
                     <select id="organisation_size" {...form.register("organisation_size")}>
                       <option value="not_sure">Not sure</option>
-                      <option value="1-10">1–10 people</option>
-                      <option value="11-50">11–50 people</option>
-                      <option value="51-200">51–200 people</option>
-                      <option value="201-1000">201–1,000 people</option>
+                      <option value="1-10">1-10 people</option>
+                      <option value="11-50">11-50 people</option>
+                      <option value="51-200">51-200 people</option>
+                      <option value="201-1000">201-1,000 people</option>
                       <option value="1000+">More than 1,000 people</option>
                     </select>
                   </div>
