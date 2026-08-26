@@ -9,6 +9,7 @@ from dataclasses import dataclass
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth.tokens import default_token_generator
 from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
@@ -16,8 +17,10 @@ from django.db import transaction
 from django.utils import timezone
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
+from django.utils.text import slugify
 
 from apps.audit.services import record_event
+from apps.organisations.models import Organisation
 from apps.platform_admin.contact import notification_sender_email
 
 from . import totp
@@ -31,6 +34,69 @@ _BACKUP_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # no 0/O/1/I ambigui
 
 class MFAServiceError(ValidationError):
     """Expected MFA workflow failure."""
+
+
+class SignupServiceError(ValidationError):
+    """Expected self-serve signup failure."""
+
+
+def _unique_organisation_slug(*, name: str) -> str:
+    base = slugify(name)[:70] or "commons"
+    candidate = base
+    suffix = 1
+    while Organisation.objects.filter(slug=candidate).exists():
+        suffix += 1
+        candidate = f"{base}-{suffix}"
+    return candidate
+
+
+@transaction.atomic
+def sign_up(
+    *,
+    email: str,
+    password: str,
+    first_name: str,
+    last_name: str,
+    organisation_name: str,
+) -> tuple[User, Organisation]:
+    """Create a new self-serve account and its first, owned commons.
+
+    This is the free, no-invitation entry point: anyone can start their own
+    commons without an existing organisation vouching for them. It reuses the
+    same ``create_organisation`` service every authenticated "new organisation"
+    action already goes through, so the new tenant gets the same default
+    workspace and subscription record as any other.
+    """
+    normalised_email = email.strip().lower()
+    if User.objects.filter(email__iexact=normalised_email).exists():
+        raise SignupServiceError(
+            {"email": "An account already exists for this email. Sign in instead."}
+        )
+    candidate = User(email=normalised_email, first_name=first_name.strip(), last_name=last_name.strip())
+    validate_password(password, user=candidate)
+    user = User.objects.create_user(
+        email=normalised_email,
+        password=password,
+        first_name=candidate.first_name,
+        last_name=candidate.last_name,
+    )
+
+    from apps.organisations.services import create_organisation
+
+    organisation = create_organisation(
+        actor=user,
+        name=organisation_name.strip(),
+        slug=_unique_organisation_slug(name=organisation_name),
+    )
+    record_event(
+        action="account.signed_up",
+        object_type="accounts.User",
+        object_id=str(user.id),
+        actor=user,
+        organisation=organisation,
+        metadata={"organisation_id": str(organisation.id)},
+    )
+    return user, organisation
 
 
 @dataclass(frozen=True)

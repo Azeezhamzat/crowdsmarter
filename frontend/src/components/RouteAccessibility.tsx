@@ -5,9 +5,10 @@ import { Outlet, useLocation } from "react-router";
 const PRODUCT_NAME = "CrowdSmarter";
 
 const routeTitles: Array<[RegExp, string]> = [
-  [/^\/$/, "Foresight-to-decision intelligence"],
+  [/^\/$/, "Free platform for group decisions and grant rounds"],
   [/^\/request-demo\/?$/, "Request a tailored demo"],
   [/^\/login\/?$/, "Sign in"],
+  [/^\/signup\/?$/, "Start your own commons"],
   [/^\/forgot-password\/?$/, "Reset your password"],
   [/^\/reset-password\/?$/, "Choose a new password"],
   [/^\/accept-invitation\/?$/, "Accept organisation invitation"],
@@ -60,7 +61,7 @@ export function RouteAccessibility() {
 
   useEffect(() => {
     const title = titleForPath(location.pathname);
-    document.title = `${title} — ${PRODUCT_NAME}`;
+    document.title = `${title} - ${PRODUCT_NAME}`;
     setAnnouncement(title);
 
     const pathChanged = previousPath.current !== location.pathname;

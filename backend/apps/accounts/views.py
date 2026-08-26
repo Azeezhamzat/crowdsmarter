@@ -29,6 +29,7 @@ from .serializers import (
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
     ProfileUpdateSerializer,
+    SignupSerializer,
 )
 from .services import (
     begin_mfa_enrollment,
@@ -37,6 +38,7 @@ from .services import (
     mfa_is_enabled,
     request_password_reset,
     set_new_password,
+    sign_up,
     update_profile,
     verify_mfa_code,
 )
@@ -46,6 +48,7 @@ from .throttles import (
     MFAVerifyThrottle,
     PasswordResetConfirmThrottle,
     PasswordResetRequestThrottle,
+    SignupThrottle,
 )
 
 User = get_user_model()
@@ -63,6 +66,39 @@ class CsrfCookieView(APIView):
 
     def get(self, request):  # type: ignore[no-untyped-def]
         return Response({"detail": "CSRF cookie set."})
+
+
+@method_decorator(csrf_protect, name="dispatch")
+class SignupView(APIView):
+    """Public, no-invitation account creation: start your own commons for free."""
+
+    permission_classes = [AllowAny]
+    authentication_classes: list[type] = []
+    throttle_classes = [SignupThrottle]
+
+    def post(self, request):  # type: ignore[no-untyped-def]
+        serializer = SignupSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        values = dict(serializer.validated_data)
+        values.pop("website", None)
+        full_name = values.pop("full_name")
+        first_name, _, last_name = full_name.partition(" ")
+        user, organisation = sign_up(
+            first_name=first_name,
+            last_name=last_name,
+            **values,
+        )
+        login(request, user)
+
+        from apps.organisations.serializers import OrganisationSerializer
+
+        return Response(
+            {
+                "user": CurrentUserSerializer(user).data,
+                "organisation": OrganisationSerializer(organisation, context={"request": request}).data,
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
 
 @method_decorator(csrf_protect, name="dispatch")

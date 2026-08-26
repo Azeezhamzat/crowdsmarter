@@ -9,6 +9,12 @@ class LoginRateThrottle(AnonRateThrottle):
     scope = "login"
 
 
+class SignupThrottle(AnonRateThrottle):
+    """Limit anonymous self-serve account creation by source address."""
+
+    scope = "signup"
+
+
 class PasswordResetRequestThrottle(AnonRateThrottle):
     """Limit anonymous password-recovery requests by source address."""
 

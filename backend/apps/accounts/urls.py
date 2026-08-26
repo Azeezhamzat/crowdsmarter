@@ -15,12 +15,14 @@ from .views import (
     PasswordResetRequestView,
     SessionLoginView,
     SessionLogoutView,
+    SignupView,
 )
 
 app_name = "accounts"
 
 urlpatterns = [
     path("csrf/", CsrfCookieView.as_view(), name="csrf"),
+    path("signup/", SignupView.as_view(), name="signup"),
     path("session/", SessionLoginView.as_view(), name="login"),
     path("session/logout/", SessionLogoutView.as_view(), name="logout"),
     path("me/", CurrentUserView.as_view(), name="me"),

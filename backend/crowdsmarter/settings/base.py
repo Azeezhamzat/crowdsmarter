@@ -161,6 +161,7 @@ REST_FRAMEWORK = {
         "anon": os.getenv("API_ANON_THROTTLE_RATE", "60/min"),
         "user": os.getenv("API_USER_THROTTLE_RATE", "600/min"),
         "login": os.getenv("API_LOGIN_THROTTLE_RATE", "10/min"),
+        "signup": os.getenv("API_SIGNUP_THROTTLE_RATE", "5/hour"),
         "password_reset_request": os.getenv("API_PASSWORD_RESET_REQUEST_THROTTLE_RATE", "5/hour"),
         "password_reset_confirm": os.getenv("API_PASSWORD_RESET_CONFIRM_THROTTLE_RATE", "20/hour"),
         "account_security": os.getenv("API_ACCOUNT_SECURITY_THROTTLE_RATE", "20/hour"),

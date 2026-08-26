@@ -192,8 +192,8 @@ export function LoginPage() {
 
           <div className="auth-access-help">
             <Icon name="users" size={18} />
-            <div><strong>Do you not have an account yet?</strong><span>Accounts are normally created through an organisation invitation.</span></div>
-            <Link to="/request-demo">Request demo</Link>
+            <div><strong>New here?</strong><span>Start your own commons for free, or ask an existing organisation to invite you.</span></div>
+            <Link to="/signup">Start a commons</Link>
           </div>
           <div className="auth-support-contact">
             <Icon name="shield" size={17} />

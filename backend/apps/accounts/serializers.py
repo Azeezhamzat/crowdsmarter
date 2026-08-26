@@ -45,6 +45,36 @@ class LoginSerializer(StrictSerializer):
         return value.strip().lower()
 
 
+class SignupSerializer(StrictSerializer):
+    """Public, no-invitation account-and-first-commons creation."""
+
+    full_name = serializers.CharField(max_length=160)
+    email = serializers.EmailField()
+    password = serializers.CharField(trim_whitespace=False, write_only=True)
+    organisation_name = serializers.CharField(max_length=200)
+    website = serializers.CharField(required=False, allow_blank=True, write_only=True)
+
+    def validate_full_name(self, value: str) -> str:
+        value = value.strip()
+        if len(value) < 2:
+            raise serializers.ValidationError("Enter your name.")
+        return value
+
+    def validate_email(self, value: str) -> str:
+        return value.strip().lower()
+
+    def validate_organisation_name(self, value: str) -> str:
+        value = value.strip()
+        if len(value) < 2:
+            raise serializers.ValidationError("Give your commons a name.")
+        return value
+
+    def validate_website(self, value: str) -> str:
+        if value.strip():
+            raise serializers.ValidationError("This request could not be accepted.")
+        return ""
+
+
 class ProfileUpdateSerializer(StrictSerializer):
     """Editable personal profile fields."""
 

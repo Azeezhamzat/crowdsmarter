@@ -9,19 +9,19 @@ import { landingCatalog } from "../../lib/catalogs/landing";
 import { HeroVideo } from "./HeroVideo";
 
 const heroTitleByLocale = {
-  en: <>Grantmaking your<br />community can<br /><span>actually see.</span></>,
-  fr: <>Un financement que<br />votre communauté<br /><span>peut vraiment voir.</span></>,
-  pt: <>Um financiamento que<br />a sua comunidade<br /><span>pode realmente ver.</span></>,
+  en: <>Decide together,<br />in a commons<br /><span>everyone can see.</span></>,
+  fr: <>Décidez ensemble,<br />dans un commun<br /><span>que chacun peut voir.</span></>,
+  pt: <>Decidam juntos,<br />num comum<br /><span>que todos podem ver.</span></>,
 };
 
 const lifecycleStages = [
   {
     label: "Anticipate",
-    description: "Define the purpose of the round, eligibility, decision criteria and participation model before applications open.",
+    description: "Define the purpose, who is included, decision criteria and participation model before contribution opens.",
   },
   {
     label: "Deliberate",
-    description: "Bring applicant evidence, community perspectives and reviewer judgement into a structured assessment process.",
+    description: "Bring evidence, member perspectives and reviewer judgement into a structured assessment process.",
   },
   {
     label: "Decide",
@@ -29,26 +29,26 @@ const lifecycleStages = [
   },
   {
     label: "Act",
-    description: "Issue awards, communicate meaningful feedback and establish the next points of accountability.",
+    description: "Communicate the outcome, follow through on commitments and establish the next points of accountability.",
   },
   {
     label: "Learn",
-    description: "Carry evidence from the completed round into the design of the next one.",
+    description: "Carry evidence from this decision into the design of the next one.",
   },
 ];
 
-const implementationJourney = [
+const freeStartJourney = [
   {
-    title: "Fit assessment",
-    description: "A short working session to understand the round, governance context, participation model, and whether CrowdSmarter is an appropriate fit.",
+    title: "Sign up free",
+    description: "Create your account and your commons in a couple of minutes. No card required.",
   },
   {
-    title: "Grant Round Sprint",
-    description: "One real round, from open call to award, with the process configured and guided end to end.",
+    title: "Bring your group",
+    description: "Share one link. Anyone can join, contribute a signal or a submission, and vote, with no account needed on their side.",
   },
   {
-    title: "Adoption",
-    description: "Retain the round structure, decision record, and reusable template so your team can run future rounds with less external support.",
+    title: "Decide, together",
+    description: "Move from open contribution to a recorded, accountable decision, then carry what you learned into the next one.",
   },
 ];
 
@@ -63,22 +63,22 @@ const outcomes = [
   {
     icon: "layers" as IconName,
     title: "Documented decision history",
-    description: "Assessments, evidence, disagreement, and final rationale remain available as a coherent history of the round.",
+    description: "Assessments, evidence, disagreement, and final rationale remain available as a coherent history of the decision.",
   },
   {
     icon: "analytics" as IconName,
     title: "Defensible comparison",
-    description: "Show how funded applications compared with the wider field, and what evidence informed the judgement.",
+    description: "Show how the chosen response compared with the alternatives, and what evidence informed the judgement.",
   },
   {
     icon: "check" as IconName,
-    title: "Meaningful applicant feedback",
-    description: "Applicants receive a reasoned explanation grounded in the assessment process, not a generic form rejection.",
+    title: "Meaningful feedback to contributors",
+    description: "Contributors receive a reasoned explanation grounded in the assessment process, not a generic form rejection.",
   },
   {
     icon: "external" as IconName,
-    title: "A reusable round template",
-    description: "Eligibility, criteria, participation, and workflow carry into the next round without rebuilding from zero.",
+    title: "A reusable decision template",
+    description: "Eligibility, criteria, participation, and workflow carry into the next decision without rebuilding from zero.",
   },
 ];
 
@@ -86,17 +86,17 @@ const foundations = [
   {
     icon: "layers" as IconName,
     title: "Systems thinking",
-    description: "Treat each grant round as part of a learning system. Outcomes inform how eligibility, criteria, and participation are designed next time.",
+    description: "Treat each decision as part of a learning system. Outcomes inform how eligibility, criteria, and participation are designed next time.",
   },
   {
     icon: "search" as IconName,
     title: "Futures thinking",
-    description: "Design criteria around emerging needs and plausible change, rather than assuming past funding patterns are still the right guide.",
+    description: "Design criteria around emerging needs and plausible change, rather than assuming past patterns are still the right guide.",
   },
   {
     icon: "users" as IconName,
     title: "Collective intelligence",
-    description: "Structure community perspectives and reviewer judgement to inform a decision, without forcing disagreement into artificial consensus.",
+    description: "Structure member perspectives and reviewer judgement to inform a decision, without forcing disagreement into artificial consensus.",
   },
 ];
 
@@ -104,7 +104,7 @@ const trustPoints = [
   {
     icon: "shield" as IconName,
     title: "Human decision authority",
-    description: "Final funding decisions remain with authorised people. CrowdSmarter structures evidence and deliberation; it does not replace accountable judgement.",
+    description: "Final decisions remain with authorised people. CrowdSmarter structures evidence and deliberation; it does not replace accountable judgement.",
   },
   {
     icon: "layers" as IconName,
@@ -118,8 +118,8 @@ const trustPoints = [
   },
   {
     icon: "external" as IconName,
-    title: "Organisational control",
-    description: "Your organisation retains control of its round records and can export a documented history of the process at any time.",
+    title: "Your control",
+    description: "Your commons or organisation retains control of its decision records and can export a documented history of the process at any time.",
   },
 ];
 
@@ -142,7 +142,8 @@ export function LandingPage() {
         <div className="public-header__actions">
           <LanguageSwitcher />
           <Link className="public-nav__signin" to="/login">{t.signIn}</Link>
-          <Link className="public-button public-button--primary public-header__demo" to="/request-demo">{t.bookAssessment}</Link>
+          <Link className="public-button public-button--secondary" to="/request-demo">{t.bookAssessment}</Link>
+          <Link className="public-button public-button--primary public-header__demo" to="/signup">{t.startFreeCta}</Link>
         </div>
       </header>
 
@@ -151,7 +152,7 @@ export function LandingPage() {
           eyebrow={t.heroEyebrow}
           title={heroTitleByLocale[locale]}
           lead={t.heroLead}
-          primaryCta={{ label: t.bookAssessment, href: "/request-demo" }}
+          primaryCta={{ label: t.startFreeCta, href: "/signup" }}
           secondaryCta={{ label: t.heroSecondaryCta, href: "#how-it-works" }}
           trustItems={[t.trustItem1, t.trustItem2, t.trustItem3]}
         />
@@ -163,10 +164,10 @@ export function LandingPage() {
 
         <section className="public-section public-section--platform" id="platform" aria-labelledby="platform-title">
           <div className="section-intro section-intro--split section-intro--executive">
-            <div><p className="public-eyebrow">The process</p><h2 id="platform-title">A grant round as a connected decision system.</h2></div>
+            <div><p className="public-eyebrow">The process</p><h2 id="platform-title">Any group's decision, as a connected system.</h2></div>
             <p>
-              Each stage carries evidence forward. The aim is not simply to move applications through a workflow,
-              but to keep participation, assessment, judgement, and learning connected from one round to the next.
+              Each stage carries evidence forward. The aim is not simply to move a decision through a workflow,
+              but to keep participation, assessment, judgement, and learning connected from one decision to the next.
             </p>
           </div>
           <div className="continuity-grid continuity-grid--five">
@@ -182,14 +183,14 @@ export function LandingPage() {
 
         <section className="public-section public-section--dark" id="how-it-works" aria-labelledby="how-it-works-title">
           <div className="section-intro section-intro--split section-intro--executive">
-            <div><p className="public-eyebrow">Implementation</p><h2 id="how-it-works-title">Learn the approach by running one real round.</h2></div>
+            <div><p className="public-eyebrow">Getting started</p><h2 id="how-it-works-title">Free to start, no institution required.</h2></div>
             <p>
-              The process is learned through delivery, not introduced as an abstract methodology. The first
-              engagement creates a controlled route from fit assessment to an independently reusable process.
+              Most groups start on their own, with no sales conversation. The three steps below are the
+              whole process.
             </p>
           </div>
           <div className="commercial-journey">
-            {implementationJourney.map((step, index) => (
+            {freeStartJourney.map((step, index) => (
               <article className="commercial-journey__step" key={step.title}>
                 <span>{index + 1}</span>
                 <div><h3>{step.title}</h3><p>{step.description}</p></div>
@@ -198,9 +199,9 @@ export function LandingPage() {
           </div>
           <div className="pilot-panel">
             <div className="pilot-panel__copy">
-              <p className="public-eyebrow">Charter grant programme</p>
-              <h3>Start with one real, funded round.</h3>
-              <p>Charter programmes provide a bounded setting to run the method, refine the platform, and leave your organisation with a completed round and a reusable process.</p>
+              <p className="public-eyebrow">For funders and institutions</p>
+              <h3>Prefer a guided rollout? Run a charter grant round.</h3>
+              <p>Charter programmes provide a bounded setting to run the method, refine the platform, and leave your organisation with a completed round and a reusable process. This is the path for an institution running a funded grant round, not a requirement for starting a commons.</p>
             </div>
             <div className="pilot-stats">
               {charterStats.map(([label, value]) => <div key={label}><small>{label}</small><strong>{value}</strong></div>)}
@@ -214,13 +215,13 @@ export function LandingPage() {
             <div><p className="public-eyebrow">Connected reasoning</p><h2 id="difference-title">The distinction is continuity, not more software.</h2></div>
             <p>
               Forms, spreadsheets, and separate review tools can all be practical. The difficulty appears when
-              evidence, discussion, decision rationale, and applicant feedback become separated across them.
+              evidence, discussion, decision rationale, and feedback become separated across them.
             </p>
           </div>
           <div className="difference-layout">
             <div className="difference-statement">
               <span>When the process is fragmented</span>
-              <p>Applications, assessments, discussion, and final decisions sit in separate tools. The path to a decision becomes difficult to inspect—and difficult to explain consistently to applicants, communities, or boards.</p>
+              <p>Contributions, assessments, discussion, and final decisions sit in separate tools. The path to a decision becomes difficult to inspect, and difficult to explain consistently to members, communities, or boards.</p>
             </div>
             <div className="difference-connector" aria-hidden="true"><Icon name="arrow-right" size={25} /></div>
             <div className="difference-statement difference-statement--positive">
@@ -232,7 +233,7 @@ export function LandingPage() {
 
         <section className="public-section public-section--dark outcome-section" aria-labelledby="outcomes-title">
           <div className="section-intro section-intro--split section-intro--executive">
-            <div><p className="public-eyebrow">Engagement outputs</p><h2 id="outcomes-title">A funded round—and capability that remains.</h2></div>
+            <div><p className="public-eyebrow">What stays with you</p><h2 id="outcomes-title">A decision, and capability that remains.</h2></div>
           </div>
           <div className="public-outcome-grid">
             {outcomes.map((outcome, index) => (
@@ -248,8 +249,8 @@ export function LandingPage() {
 
         <section className="public-section use-case-section" id="why-us" aria-labelledby="why-us-title">
           <div className="section-intro section-intro--split section-intro--executive">
-            <div><p className="public-eyebrow">Methodological foundations</p><h2 id="why-us-title">Three disciplines shape how the round is designed.</h2></div>
-            <p>CrowdSmarter is not grant-management software. It is informed by systems thinking, futures thinking, and collective intelligence—each changes how evidence, participation, and judgement are handled in practice.</p>
+            <div><p className="public-eyebrow">Methodological foundations</p><h2 id="why-us-title">Three disciplines shape how the decision is designed.</h2></div>
+            <p>CrowdSmarter is not grant-management software. It is informed by systems thinking, futures thinking, and collective intelligence, each of which changes how evidence, participation, and judgement are handled in practice.</p>
           </div>
           <div className="use-case-grid">
             {foundations.map((item) => (
@@ -267,7 +268,7 @@ export function LandingPage() {
             <div className="trust-panel__copy">
               <p className="public-eyebrow">Governance and trust</p>
               <h2 id="trust-title">Designed to support scrutiny, not obscure it.</h2>
-              <p>Institutional confidence depends on understanding who decided, what evidence was considered, and what remained under organisational control.</p>
+              <p>Confidence, whether from a neighbourhood commons or an institution, depends on understanding who decided, what evidence was considered, and what remained under your own control.</p>
               <Link className="public-text-link" to="/trust">Read our full trust and security posture <Icon name="arrow-right" size={16} /></Link>
               <div className="trust-contact-links" aria-label="Governance contact channels">
                 <a href={buildMailto(contactChannels.privacy, "CrowdSmarter privacy enquiry")}>Privacy enquiries</a>
@@ -284,13 +285,13 @@ export function LandingPage() {
 
         <section className="public-cta public-cta--executive" aria-labelledby="cta-title">
           <div>
-            <p className="public-eyebrow">Bring a real round</p>
-            <h2 id="cta-title">See whether CrowdSmarter fits your next round.</h2>
-            <p>We'll shape the demo around a real round and give you a direct answer.</p>
+            <p className="public-eyebrow">Two ways in</p>
+            <h2 id="cta-title">Start free, or bring us a real round.</h2>
+            <p>Start your own commons for free, or talk to us about a guided, funded grant round for your institution.</p>
           </div>
           <div className="public-cta__actions">
-            <Link className="public-button public-button--light public-button--large" to="/request-demo">Book a fit assessment <Icon name="arrow-right" size={18} /></Link>
-            <Link className="public-cta__signin" to="/login">Existing user? Sign in</Link>
+            <Link className="public-button public-button--light public-button--large" to="/signup">{t.startFreeCta} <Icon name="arrow-right" size={18} /></Link>
+            <Link className="public-cta__signin" to="/request-demo">{t.bookAssessment}</Link>
           </div>
         </section>
       </main>
@@ -301,7 +302,16 @@ export function LandingPage() {
           <span>General enquiries and partnerships</span>
           <a href={buildMailto(contactChannels.general, "CrowdSmarter enquiry")}>{contactChannels.general}</a>
         </div>
-        <div className="public-footer__links"><Link to="/request-demo">{t.bookAssessment}</Link><Link to="/login">{t.signIn}</Link><Link to="/my-applications">{t.footerApplicant}</Link><span>{t.footerHumanAuthority}</span><span>{t.footerRegions}</span></div>
+        <nav className="public-footer__nav" aria-label="Footer navigation">
+          <a href="#platform">{t.navPlatform}</a>
+          <a href="#how-it-works">{t.navHowItWorks}</a>
+          <a href="#why-us">{t.navWhyUs}</a>
+          <a href="#trust">{t.navTrust}</a>
+        </nav>
+        <div className="public-footer__bottom">
+          <span>© {new Date().getFullYear()} CrowdSmarter</span>
+          <div className="public-footer__links"><Link to="/signup">{t.startFreeCta}</Link><Link to="/request-demo">{t.bookAssessment}</Link><Link to="/login">{t.signIn}</Link><Link to="/my-applications">{t.footerApplicant}</Link><Link to="/trust">{t.footerTrust}</Link><span>{t.footerHumanAuthority}</span></div>
+        </div>
       </footer>
     </div>
   );

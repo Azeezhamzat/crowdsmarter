@@ -11,6 +11,7 @@ import { OrganisationAnalyticsPage } from "./features/analytics/OrganisationAnal
 import { AccountSettingsPage } from "./features/auth/AccountSettingsPage";
 import { ForgotPasswordPage } from "./features/auth/ForgotPasswordPage";
 import { LoginPage } from "./features/auth/LoginPage";
+import { SignupPage } from "./features/auth/SignupPage";
 import { ResetPasswordPage } from "./features/auth/ResetPasswordPage";
 import { ProtectedRoute } from "./features/auth/ProtectedRoute";
 import { DecisionWorkspacePage } from "./features/decisions/DecisionWorkspacePage";
@@ -53,6 +54,7 @@ export const router = createBrowserRouter([
     children: [
       { path: "/", element: <LandingPage /> },
   { path: "/login", element: <LoginPage /> },
+  { path: "/signup", element: <SignupPage /> },
   { path: "/request-demo", element: <RequestDemoPage /> },
   { path: "/forgot-password", element: <ForgotPasswordPage /> },
   { path: "/reset-password", element: <ResetPasswordPage /> },

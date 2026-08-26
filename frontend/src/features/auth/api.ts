@@ -1,5 +1,5 @@
 import { apiRequest, ensureCsrfCookie } from "../../lib/api";
-import type { LoginResult, MFAEnrollment, MFAStatus, User } from "../../lib/types";
+import type { LoginResult, MFAEnrollment, MFAStatus, Organisation, User } from "../../lib/types";
 
 export async function fetchCurrentUser(): Promise<User> {
   return apiRequest<User>("/auth/me/");
@@ -22,6 +22,24 @@ export async function loginWithPassword(input: {
     body: JSON.stringify({
       email: input.email.trim().toLowerCase(),
       password: input.password,
+    }),
+  });
+}
+
+export async function signUp(input: {
+  full_name: string;
+  email: string;
+  password: string;
+  organisation_name: string;
+}): Promise<{ user: User; organisation: Organisation }> {
+  await ensureCsrfCookie();
+  return apiRequest<{ user: User; organisation: Organisation }>("/auth/signup/", {
+    method: "POST",
+    body: JSON.stringify({
+      full_name: input.full_name.trim(),
+      email: input.email.trim().toLowerCase(),
+      password: input.password,
+      organisation_name: input.organisation_name.trim(),
     }),
   });
 }

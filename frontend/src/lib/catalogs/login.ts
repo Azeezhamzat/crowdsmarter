@@ -7,7 +7,7 @@ import { defineCatalog } from "../i18n";
 export const loginCatalog = defineCatalog({
   en: {
     welcomeEyebrow: "Welcome back",
-    heading: "Continue the reasoning—not just the record.",
+    heading: "Continue the reasoning, not just the record.",
     signInHeading: "Sign in to CrowdSmarter",
     signInHint: "Use the email address associated with your organisation invitation.",
     emailLabel: "Email address",
@@ -31,7 +31,7 @@ export const loginCatalog = defineCatalog({
   },
   pt: {
     welcomeEyebrow: "Bem-vindo de volta",
-    heading: "Continue o raciocínio — não apenas o registo.",
+    heading: "Continue o raciocínio - não apenas o registo.",
     signInHeading: "Entrar no CrowdSmarter",
     signInHint: "Utilize o endereço de e-mail associado ao convite da sua organização.",
     emailLabel: "Endereço de e-mail",

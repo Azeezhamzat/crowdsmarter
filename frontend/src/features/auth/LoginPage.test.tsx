@@ -32,7 +32,7 @@ describe("LoginPage", () => {
     expect(await screen.findByText("Enter a valid email address.")).toBeInTheDocument();
     expect(await screen.findByText("Enter your password.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Forgot password?" })).toHaveAttribute("href", "/forgot-password");
-    expect(screen.getByRole("link", { name: "Request demo" })).toHaveAttribute("href", "/request-demo");
+    expect(screen.getByRole("link", { name: "Start a commons" })).toHaveAttribute("href", "/signup");
     expect(screen.getByRole("link", { name: "hello@crowdsmarter.com" })).toHaveAttribute("href", expect.stringContaining("mailto:hello@crowdsmarter.com"));
   });
 
