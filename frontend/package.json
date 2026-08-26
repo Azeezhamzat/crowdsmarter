@@ -2,6 +2,7 @@
   "name": "crowdsmarter-frontend",
   "private": true,
   "version": "0.18.2",
+  "author": "Azeez Adewale Hamzat",
   "type": "module",
   "engines": {
     "node": ">=22.22"

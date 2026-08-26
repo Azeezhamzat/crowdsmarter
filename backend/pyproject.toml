@@ -6,6 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "crowdsmarter-backend"
 version = "0.18.2"
 description = "The CrowdSmarter modular-monolith backend"
+authors = [{ name = "Azeez Adewale Hamzat" }]
 requires-python = ">=3.12,<3.15"
 dependencies = [
   "Django>=5.2,<5.3",

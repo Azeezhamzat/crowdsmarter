@@ -1,5 +1,7 @@
 # CrowdSmarter
 
+Created by Azeez Adewale Hamzat.
+
 CrowdSmarter is a free platform for a group to make decisions together in the
 open: gather evidence, weigh options, and keep a record of who decided what
 and why. Anyone can start a commons in minutes, with no invitation, no card,
