@@ -1,90 +1,118 @@
-# The CrowdSmarter
+# CrowdSmarter
 
-> **Tenant-governance release:** Phase 18B adds an explicit product-level platform-administrator capability, a protected `/platform-admin` workspace, audited and expiring tenant support access, ownership and account safeguards, service-wide audit and demo-request operations, and configurable official contact channels. It includes database migrations while preserving all existing tenant data and memberships.
+CrowdSmarter is a free platform for a group to make decisions together in the
+open: gather evidence, weigh options, and keep a record of who decided what
+and why. Anyone can start a commons in minutes, with no invitation, no card,
+and no sales call. The same platform runs participatory, evidence-linked
+grant rounds for funders, from open call through judged review to a recorded
+funding decision.
 
-> **Accessibility release:** Phase 18A establishes route announcements and page titles, one-main-landmark discipline, reliable skip navigation, stronger focus visibility, an accessible command palette, keyboard-complete workflow tabs, reduced-motion and forced-colours support, and a clear not-found recovery page. It remains frontend-only and does not touch PostgreSQL.
+The approach draws on commons governance, participatory grantmaking, and
+collective-intelligence research. AI assistance is optional, provider-neutral,
+reviewable, and never makes the decision itself; a human always does.
 
-> **Readability release:** Phase 17.3 improves public-site typography, contrast, section-anchor behaviour, workflow-tab keyboard navigation, and diagram legibility without changing backend or database behaviour.
+## Two ways in
 
-The CrowdSmarter is a foresight-to-decision-to-learning platform for organisations facing uncertainty. The product is the governed workflow; foresight broadens attention, collective intelligence strengthens reasoning, and AI remains optional, replaceable, reviewable, and unable to make organisational decisions.
+- **Start a commons, free.** Sign up, invite your group with one link, and
+  run a decision from open contribution through to a recorded outcome. No
+  institution or sales conversation required.
+- **Run a guided grant round.** Funders and institutions can bring a funded
+  round to run as a charter programme: eligibility, judged or blind review,
+  disbursement, and a reusable template for the next round.
 
-This repository contains the Phase 1 foundation, Phase 2 decision workflow, Phase 3 structured reasoning, Phase 3.1 invitation onboarding, Phase 4 human finalisation, Phase 5 outcomes and learning, Phase 6 advisory intelligence, Phase 7 portfolio and collaboration, Phase 8 guided product-experience, Phase 9 professional-interface, Phase 10 account-trust and data-ownership, Phase 11 evidence-source and signal-intelligence, Phase 12 systems-foresight, Phase 13 scenario-intelligence, and Phase 14 collective-evaluation and prioritisation, Phase 15 integrated decision-analysis and executive-synthesis, Phase 15.1 public-experience and access-reliability, Phase 16 contribution-orchestration, and Phase 17 organisation-methodology and administration vertical slices. It also contains the integrated public CrowdSmarter landing site, so the product and its public presence ship as one provider-neutral application.
+## What it does
 
-> **Corrective release:** Phase 17.1 supersedes the original Phase 17 package. It repairs frontend strict-mode/test regressions and a rollback controller that could continue after failure and print a false success message.
+- Guided decision templates (general decisions, grant rounds, idea
+  competitions and hackathons, and open-ended "anticipatory commons" rounds),
+  each with framing, ownership, scope, and participant roles set up front.
+- Public Open Sessions where anyone can submit an idea, vote, and track their
+  own application across rounds, without needing an account.
+- Structured contribution: evidence, assumptions, risks, and immutable
+  versioned stakeholder positions.
+- Independent, optionally blind or anonymous evaluation rounds (scorecards,
+  Delphi, approval, consent, ranked-choice), with minority reports preserved
+  and reviewer conflicts of interest excluded transparently.
+- Human-authorised final decisions: the platform structures evidence and
+  deliberation, but never automates the judgement itself.
+- Implementation tracking, outcome review, and reusable lessons feeding into
+  the next decision.
+- Systems and futures foresight: sourced signals, watchlists, systems
+  canvases, scenario worlds, and adaptive signposts linked to real decisions.
+- Grant-round specifics: eligibility screening, applicant-blind review,
+  conflict-of-interest exclusion, budget rollups, disbursement (manual by
+  default, Stripe-ready), and organisation verification (manual by default,
+  Candid-ready).
+- A personal work dashboard, an organisation decision portfolio, in-app
+  notifications, and a small set of explainable decision-flow analytics.
+- Organisation administration: invitations, membership history, ownership
+  transfer, governed decision methods, and platform-wide tenant support.
+- Available in English, French, and Portuguese.
 
-> **Stabilisation release:** Phase 17.2 replaces unfinished public-site placeholders with meaningful SVG diagrams, corrects workflow text contrast, and installs through a database-independent atomic frontend upgrade.
+Every material lifecycle action is attributable, transactionally validated,
+recorded in immutable history, and appended to the tenant audit log.
 
+## Domains
 
-## Implemented customer workflow
-
-1. Visit the professional public site at `/`, request a tailored demonstration at `/request-demo`, or sign in at `/login`.
-2. Create an organisation and use its default Decisions workspace.
-3. Invite people through secure, expiring, revocable links.
-4. Start from a guided, human-editable decision template and frame clear ownership, scope, purpose, dates, and participant roles.
-5. Compare options and record evidence, assumptions, and risks.
-6. Collect immutable, versioned stakeholder positions.
-7. Have an authorised human select the final option, explain the judgement, and address dissent.
-8. Record the implementation commitment, accountable owner, success measures, and review date.
-9. Document implementation and assess the actual outcome against evidence.
-10. Capture reusable lessons, archive the completed learning cycle, and retrieve organisational knowledge through PostgreSQL full-text search.
-11. Use attributable advisory reviews to challenge gaps without changing records, receive in-app workflow notifications, and examine a small set of explainable decision-system metrics.
-12. Work from a personal accountability dashboard, manage the organisation decision portfolio, and preserve questions, concerns, notes, replies, resolutions, and decision activity.
-13. Use the coherent decision overview to see the next required action, framing gaps, stakeholder coverage, alternatives, material risks, deadlines, and readiness without losing access to the full record.
-14. Work through a professional application shell with quick navigation, focused dashboards, responsive portfolio controls, and a consistent public and authenticated product identity.
-15. Maintain profile and password security, recover account access, and download customer-owned organisation archives or portable decision dossiers.
-16. Capture attributable sources and private attachments, interpret them as STEEP signals, organise strategic watchlists, monitor horizons and uncertainty, and link emerging change explicitly to decisions.
-17. Build structured systems canvases with drivers, stakeholders, causal relationships, feedback loops, Futures Wheels, Three Horizons, and strategic implications linked to decisions.
-18. Construct governed scenario worlds from critical uncertainties, collect structured reviews, wind-tunnel live decision options, and monitor adaptive signposts with sourced observations.
-19. Run independent blind evaluation rounds, preserve minority reports, and prioritise candidate decisions transparently under budget and capacity constraints.
-20. Compare each option through one traceable analysis workspace, govern contradictions and gaps, publish decision-quality reviews, and approve versioned executive summaries without automating the final judgement.
-21. Convert prospective-customer interest through a privacy-conscious demo-request workflow and recover local access without introducing a production default credential.
-22. Orchestrate named contribution requests, private drafts, immutable submissions, explicit review, facilitated sessions, reminders, digests, and participation coverage across distributed teams.
-23. Govern organisation-owned decision methods, preserve exact version usage, administer tenant identity and invitation policy, transfer ownership, and use controlled deactivation and deletion safeguards.
-24. Operate CrowdSmarter through an explicit platform-administration workspace with global service oversight, reasoned and expiring tenant support access, and no hidden client membership.
-
-Every material lifecycle command is attributable, transactionally validated, protected against stale pages, represented in immutable history, and appended to the tenant audit log.
-
-## Implemented domains
-
-- `accounts`: human identity, explicit case-insensitive email authentication, profile self-service, password changes, secure recovery, and debug-only local access repair;
-- `organisations`: tenant boundary, profile and branding, invitation policy, memberships, append-only membership history, ownership transfer, deactivation, deletion safeguards, and safe offboarding;
-- `invitations`: organisation-controlled onboarding, token rotation, expiry, revocation, and acceptance;
+- `accounts`: identity, authentication, MFA, profile self-service, and
+  self-serve signup;
+- `organisations`: tenant boundary, invitations, memberships, ownership, and
+  deactivation/deletion safeguards;
+- `invitations`: organisation-controlled onboarding with expiring, revocable
+  links;
 - `workspaces`: organisation-owned decision areas;
-- `decisions`: guided templates, framing, overview read models, lifecycle policy, readiness, finalisation, and immutable transitions;
-- `participants`: stakeholder roles with preserved history;
-- `positions`: immutable, versioned stakeholder recommendations;
-- `decision_options`: alternatives, benefits, trade-offs, and withdrawal;
-- `foresight`: source intelligence, private attachments, safe RSS/Atom imports, STEEP signals, watchlists, systems canvases, drivers, stakeholders, causal relationships, feedback loops, Futures Wheels, Three Horizons, strategic implications, governed scenarios, wind-tunnel assessments, adaptive signposts, and decision links;
-- `evaluations`: blind and optionally peer-anonymous decision evaluation, Delphi rounds, weighted criteria, minority reports, constrained portfolio assessment, recommendations, and authority selections;
-- `decision_analysis`: option-centred read models, governed contradiction and gap registers, versioned decision-quality reviews, and human-approved executive synthesis;
-- `contributions`: named decision contributions, private drafts, immutable submissions, append-only reviews, facilitation sessions, personal work, reminders, digests, and participation coverage;
-- `methodology`: organisation-owned decision methods, governed versions, approval and retirement, and immutable decision usage provenance;
-- `evidence`: attributable evidence linked to structured sources, stance, and strength;
-- `assumptions`: confidence, verification state, ownership, and retirement;
-- `risks`: likelihood, impact, response, mitigation, ownership, and status;
-- `reviews`: commitment, implementation, outcome assessment, evidence, and accountability;
-- `lessons`: reusable organisational learning and archival gate;
-- `search`: tenant-safe PostgreSQL full-text search across decision knowledge;
-- `notifications`: private in-app assignments, lifecycle changes, due reviews, and advisory-review updates;
-- `ai_assistance`: provider-neutral, attributable, reviewable, and dismissible advisory reviews;
-- `analytics`: small, explainable organisational decision-flow and learning metrics;
-- `collaboration`: append-only decision discussion, mentions, replies, and explicit resolution;
-- `portfolio`: personal work and organisation decision-portfolio read models;
-- `exports`: versioned organisation archives and portable decision dossiers;
-- `demo_requests`: rate-limited public demonstration requests, official-inbox notification with prospect reply-to, optional acknowledgement, and administrative review;
+- `decisions`: guided templates, framing, lifecycle policy, and immutable
+  transitions;
+- `criteria`: standalone decision criteria, weighting, and rationale;
+- `participants` / `positions`: stakeholder roles and immutable, versioned
+  recommendations;
+- `decision_options`: alternatives, eligibility, outcomes, and budget;
+- `ideation`: public Open Sessions for idea submission, voting, and
+  competition/hackathon entries, including guardian consent and team
+  submissions;
+- `applicants`: a persistent, passwordless identity for people applying
+  across multiple rounds, and their cross-round application history;
+- `foresight`: sources, STEEP signals, watchlists, systems canvases,
+  scenarios, and adaptive signposts;
+- `evaluations`: blind and peer-anonymous evaluation, Delphi rounds,
+  ranked-choice voting, and constrained portfolio assessment;
+- `decision_analysis`: comparative read models, contradiction and gap
+  registers, and human-approved executive synthesis;
+- `contributions`: named contributions, private drafts, review, and
+  facilitation;
+- `disbursements`: pluggable payout providers for funded grant options;
+- `org_enrichment`: pluggable organisation lookup and verification;
+- `billing`: packaging tiers and per-organisation subscription limits;
+- `methodology`: organisation-owned decision methods and version provenance;
+- `evidence` / `assumptions` / `risks`: attributable supporting material;
+- `reviews` / `lessons`: implementation, outcome assessment, and reusable
+  learning;
+- `search`: tenant-safe PostgreSQL full-text search;
+- `notifications`: private in-app assignments and lifecycle updates;
+- `ai_assistance`: provider-neutral, dismissible advisory reviews;
+- `analytics`: explainable decision-flow and learning metrics;
+- `collaboration`: append-only discussion, mentions, and resolution;
+- `portfolio`: personal work and organisation portfolio read models;
+- `exports`: organisation archives and portable decision dossiers;
+- `demo_requests`: rate-limited demonstration requests for funders and
+  institutions;
 - `audit`: append-only material-change records;
-- `platform_admin`: explicit service-wide authority, governed tenant support access, global operations, and official contact policy;
+- `platform_admin`: service-wide oversight and governed tenant support;
 - `core`: shared infrastructure and API exception translation.
 
 ## One integrated product and public site
 
 The React application serves both surfaces:
 
-- `/` — public CrowdSmarter landing page;
-- `/app` — authenticated organisation list;
-- authenticated foresight, portfolio, decision, collaboration, governance, outcomes, search, notifications, analytics, advisory review, export, and audit routes.
+- `/` - public CrowdSmarter landing page, with self-serve signup;
+- `/app` - authenticated organisation list;
+- authenticated foresight, portfolio, decision, collaboration, governance,
+  outcomes, search, notifications, analytics, advisory review, export, and
+  audit routes.
 
-The same build, Nginx container, domain, security headers, and deployment configuration serve both. No separate website, CMS, repository, or hosting account is required. Public content remains deliberately static and dependency-free until a demonstrated need justifies content management.
+The same build, container, domain, and security headers serve both. A
+separate static marketing site also lives in this repository, at
+`standalone-site/`, for deployments that want the public page decoupled from
+the application build.
 
 ## Zero-cost local operation
 
@@ -127,18 +155,28 @@ make lint
 ## Repository layout
 
 ```text
-backend/      Django modular monolith and REST API
-frontend/     Integrated public site and authenticated React application
-docs/         Architecture, permissions, workflow, API, security, and ADRs
-.github/      Continuous integration and dependency updates
+backend/          Django modular monolith and REST API
+frontend/         Integrated public site and authenticated React application
+standalone-site/  Decoupled static marketing page (no build step)
+docs/             Architecture, permissions, workflow, API, security, and ADRs
+.github/          Continuous integration and dependency updates
 ```
 
 ## Production path
 
-The backend and frontend are provider-neutral OCI containers. PostgreSQL, SMTP, Redis, and S3-compatible object storage are configured through environment variables. Moving from a free or self-hosted server to managed infrastructure changes deployment configuration rather than domain code.
+The backend and frontend are provider-neutral OCI containers. PostgreSQL,
+SMTP, Redis, and S3-compatible object storage are configured through
+environment variables. Moving from a free or self-hosted server to managed
+infrastructure changes deployment configuration rather than domain code.
 
-Upgrading to the platform-governance release is documented in [the Phase 18B upgrade guide](docs/upgrading-phase-18a-to-phase-18b.md). Earlier upgrade paths remain in `docs/`. The remaining product-maturity gates are explicit in [the product maturity roadmap](docs/product-maturity-roadmap.md).
+New to the product itself, not the code? Read the
+[master manual](docs/master-manual.md) first - it walks through using
+CrowdSmarter as an organisation member and as a platform administrator, in
+plain language.
 
-New to the product itself (not the code)? Read the [master manual](docs/master-manual.md) first — it walks through using CrowdSmarter as an organisation member and as a platform administrator, in plain language.
-
-For implementation detail, start with [architecture](docs/architecture.md), [domain model](docs/domain-model.md), [permissions](docs/permissions.md), [decision workflow](docs/decision-workflow.md), [API](docs/api.md), [security](docs/security.md), [testing](docs/testing.md), and [developer onboarding](docs/developer-onboarding.md).
+For implementation detail, start with [architecture](docs/architecture.md),
+[domain model](docs/domain-model.md), [permissions](docs/permissions.md),
+[decision workflow](docs/decision-workflow.md), [API](docs/api.md),
+[security](docs/security.md), [testing](docs/testing.md), and
+[developer onboarding](docs/developer-onboarding.md). Release-by-release
+upgrade notes and quality gates live in `docs/`.
