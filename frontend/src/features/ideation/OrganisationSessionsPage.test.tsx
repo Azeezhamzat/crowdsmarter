@@ -44,6 +44,7 @@ describe("OrganisationSessionsPage", () => {
         id: "s1", title: "Q3 ideathon", prompt: "How do we cut onboarding time in half?", status: "open",
         status_label: "Open", public_slug: "abc123", decision_id: null, decision_title: null,
         decision_template_key: null,
+        requires_guardian_consent: false, team_submissions_enabled: false,
         voting_enabled: true, idea_count: 4, created_by: { id: "u1", email: "owner@example.com", first_name: "", last_name: "" },
         created_at: "2026-08-01T10:00:00Z",
       },
@@ -51,6 +52,7 @@ describe("OrganisationSessionsPage", () => {
     vi.mocked(createOrganisationSession).mockResolvedValue({
       id: "s2", title: "New session", prompt: "What should we try?", status: "draft", status_label: "Draft",
       public_slug: "xyz789", decision_id: null, decision_title: null, decision_template_key: null,
+      requires_guardian_consent: false, team_submissions_enabled: false,
       voting_enabled: true, idea_count: 0,
       created_by: { id: "u1", email: "owner@example.com", first_name: "", last_name: "" }, created_at: "2026-08-02T10:00:00Z",
     });
@@ -69,6 +71,46 @@ describe("OrganisationSessionsPage", () => {
       expect(createOrganisationSession).toHaveBeenCalledWith(
         organisationId,
         expect.objectContaining({ title: "New session", prompt: "What should we try?" }),
+      ),
+    );
+  });
+
+  it("creates a session with student safeguards turned on", async () => {
+    vi.mocked(getOrganisation).mockResolvedValue({
+      id: organisationId, name: "AgriNova", slug: "agrinova", description: "", website_url: "", brand_name: "",
+      primary_colour: "#244A5A", invitation_policy: "owners_and_admins", default_invitation_role: "contributor",
+      retention_days: null, status: "active", deactivated_at: null, current_user_role: "owner",
+      created_at: "2026-07-20T10:00:00Z", updated_at: "2026-07-20T10:00:00Z",
+    });
+    vi.mocked(getOrganisationPortfolio).mockResolvedValue({
+      organisation: { id: organisationId } as never,
+      summary: { total: 0, active: 0, overdue: 0, unresolved_discussion: 0, status_counts: {} },
+      decisions: [],
+      watchlist: {} as never,
+    });
+    vi.mocked(listOrganisationSessions).mockResolvedValue([]);
+    vi.mocked(createOrganisationSession).mockResolvedValue({
+      id: "s3", title: "State science fair", prompt: "Present a project.", status: "draft", status_label: "Draft",
+      public_slug: "sci123", decision_id: null, decision_title: null, decision_template_key: null,
+      requires_guardian_consent: true, team_submissions_enabled: true,
+      voting_enabled: true, idea_count: 0,
+      created_by: { id: "u1", email: "owner@example.com", first_name: "", last_name: "" }, created_at: "2026-08-02T10:00:00Z",
+    });
+
+    renderPage();
+    expect(await screen.findByRole("heading", { name: /agrinova open sessions/i })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /new session/i }));
+    fireEvent.change(screen.getByLabelText("Title"), { target: { value: "State science fair" } });
+    fireEvent.change(screen.getByLabelText("Prompt"), { target: { value: "Present a project." } });
+    fireEvent.click(screen.getByLabelText(/team submissions/i));
+    fireEvent.click(screen.getByLabelText(/requires parent or guardian consent/i));
+    fireEvent.click(screen.getByRole("button", { name: /^create session$/i }));
+
+    await waitFor(() =>
+      expect(createOrganisationSession).toHaveBeenCalledWith(
+        organisationId,
+        expect.objectContaining({ requires_guardian_consent: true, team_submissions_enabled: true }),
       ),
     );
   });

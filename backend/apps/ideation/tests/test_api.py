@@ -522,3 +522,262 @@ def test_promote_without_decision_fails_without_default_workspace(
 
     with pytest.raises(Exception):
         services.promote_idea_to_decision(actor=owner, idea=idea, decision=None)
+
+
+@pytest.mark.django_db
+def test_idea_competition_template_is_registered():  # type: ignore[no-untyped-def]
+    from apps.decisions.templates import template_for_key
+
+    template = template_for_key("idea_competition")
+    assert template is not None
+    assert template.name == "Idea competition or hackathon"
+
+
+@pytest.mark.django_db
+def test_guardian_consent_required_for_declared_minor_when_session_requires_it(
+    organisation_factory,
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    session = services.create_session(
+        actor=owner,
+        organisation=organisation,
+        title="Regional student hackathon",
+        prompt="Build something that helps your community.",
+        requires_guardian_consent=True,
+    )
+    services.open_session(actor=owner, session=session)
+
+    with pytest.raises(ValidationError):
+        services.identify_participant(
+            session=session,
+            name="Tomiwa",
+            email="tomiwa@example.com",
+            age_bracket=SessionParticipant.AgeBracket.AGE_13_17,
+        )
+
+    with pytest.raises(ValidationError):
+        services.identify_participant(
+            session=session,
+            name="Tomiwa",
+            email="tomiwa@example.com",
+            age_bracket=SessionParticipant.AgeBracket.AGE_13_17,
+            guardian_name="Bisi Adewale",
+            guardian_email="bisi@example.com",
+            guardian_consent_given=False,
+        )
+
+    participant, _ = services.identify_participant(
+        session=session,
+        name="Tomiwa",
+        email="tomiwa@example.com",
+        age_bracket=SessionParticipant.AgeBracket.AGE_13_17,
+        guardian_name="Bisi Adewale",
+        guardian_email="bisi@example.com",
+        guardian_consent_given=True,
+    )
+    assert participant.guardian_consent_given is True
+    assert participant.guardian_consent_given_at is not None
+
+    # An 18+ participant never needs guardian consent, even on a session that requires it.
+    adult, _ = services.identify_participant(
+        session=session,
+        name="Kunle",
+        email="kunle@example.com",
+        age_bracket=SessionParticipant.AgeBracket.AGE_18_PLUS,
+    )
+    assert adult.guardian_consent_given is False
+
+
+@pytest.mark.django_db
+def test_guardian_consent_not_required_when_session_does_not_request_it(
+    organisation_factory,
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    session = services.create_session(
+        actor=organisation.created_by, organisation=organisation, title="Open ideathon", prompt="Ideas?",
+    )
+    participant, _ = services.identify_participant(
+        session=session,
+        name="Chika",
+        email="chika@example.com",
+        age_bracket=SessionParticipant.AgeBracket.UNDER_13,
+    )
+    assert participant.is_declared_minor is True
+    assert participant.guardian_consent_given is False
+
+
+@pytest.mark.django_db
+def test_public_join_endpoint_enforces_guardian_consent(organisation_factory):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    session = services.create_session(
+        actor=owner,
+        organisation=organisation,
+        title="High school app challenge",
+        prompt="What would make school life easier?",
+        requires_guardian_consent=True,
+    )
+    services.open_session(actor=owner, session=session)
+
+    client, csrf_token = _csrf_client()
+    rejected = client.post(
+        reverse("ideation:public-join", kwargs={"public_slug": session.public_slug}),
+        {"name": "Ngozi", "email": "ngozi@example.com", "age_bracket": "age_13_17"},
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+    assert rejected.status_code == 400
+
+    accepted = client.post(
+        reverse("ideation:public-join", kwargs={"public_slug": session.public_slug}),
+        {
+            "name": "Ngozi",
+            "email": "ngozi@example.com",
+            "school_name": "Lagos Community High",
+            "age_bracket": "age_13_17",
+            "guardian_name": "Uche Eze",
+            "guardian_email": "uche@example.com",
+            "guardian_consent_given": True,
+        },
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+    assert accepted.status_code == 201
+    participant = SessionParticipant.objects.get(session=session, email="ngozi@example.com")
+    assert participant.school_name == "Lagos Community High"
+    assert participant.guardian_consent_given is True
+
+
+@pytest.mark.django_db
+def test_team_submission_carries_roster_and_is_public_safe(organisation_factory):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    session = services.create_session(
+        actor=owner,
+        organisation=organisation,
+        title="Campus hackathon",
+        prompt="Build a tool that helps students collaborate.",
+        team_submissions_enabled=True,
+    )
+    services.open_session(actor=owner, session=session)
+
+    client, csrf_token = _csrf_client()
+    join = client.post(
+        reverse("ideation:public-join", kwargs={"public_slug": session.public_slug}),
+        {"name": "Femi", "email": "femi@example.com"},
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+    token = join.json()["participant_token"]
+
+    submit = client.post(
+        reverse("ideation:public-idea-create", kwargs={"public_slug": session.public_slug}),
+        {
+            "title": "StudyBuddy matcher",
+            "team_name": "The Night Owls",
+            "team_members": [{"name": "Femi", "role": "Team lead"}, {"name": "Aisha", "role": "Designer"}],
+        },
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+        HTTP_X_PARTICIPANT_TOKEN=token,
+    )
+    assert submit.status_code == 200
+    idea = submit.json()["ideas"][0]
+    assert idea["team_name"] == "The Night Owls"
+    assert [member["name"] for member in idea["team_members"]] == ["Femi", "Aisha"]
+    assert idea["team_members"][0]["role"] == "Team lead"
+    # Public payload never carries an email for a roster entry.
+    assert "email" not in idea["team_members"][0]
+
+
+@pytest.mark.django_db
+def test_team_roster_is_capped_at_twelve_members(organisation_factory):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    session = services.create_session(
+        actor=owner, organisation=organisation, title="S", prompt="P", team_submissions_enabled=True,
+    )
+    services.open_session(actor=owner, session=session)
+
+    client, csrf_token = _csrf_client()
+    join = client.post(
+        reverse("ideation:public-join", kwargs={"public_slug": session.public_slug}),
+        {"name": "Femi", "email": "femi@example.com"},
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+    token = join.json()["participant_token"]
+
+    too_many = client.post(
+        reverse("ideation:public-idea-create", kwargs={"public_slug": session.public_slug}),
+        {"title": "Too big a team", "team_members": [{"name": f"Person {i}"} for i in range(13)]},
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+        HTTP_X_PARTICIPANT_TOKEN=token,
+    )
+    assert too_many.status_code == 400
+
+
+@pytest.mark.django_db
+def test_organiser_view_shows_safeguarding_fields_public_view_does_not(
+    api_client, organisation_factory,
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    session = services.create_session(
+        actor=owner,
+        organisation=organisation,
+        title="Middle school robotics challenge",
+        prompt="Design a robot that solves a real problem.",
+        requires_guardian_consent=True,
+    )
+    services.open_session(actor=owner, session=session)
+    participant, _ = services.identify_participant(
+        session=session,
+        name="Zainab",
+        email="zainab@example.com",
+        school_name="Riverside Middle School",
+        age_bracket=SessionParticipant.AgeBracket.UNDER_13,
+        guardian_name="Amina Bello",
+        guardian_email="amina@example.com",
+        guardian_consent_given=True,
+    )
+    services.submit_idea(session=session, participant=participant, title="Recycling sorter bot")
+
+    client, _ = _csrf_client()
+    public_detail = client.get(reverse("ideation:public-detail", kwargs={"public_slug": session.public_slug}))
+    public_idea = public_detail.json()["ideas"][0]
+    assert "submitter_school" not in public_idea
+    assert "submitter_guardian_consent_given" not in public_idea
+
+    api_client.force_authenticate(owner)
+    organiser_detail = api_client.get(reverse("ideation:organiser-detail", kwargs={"session_id": session.id}))
+    organiser_idea = organiser_detail.json()["ideas"][0]
+    assert organiser_idea["submitter_school"] == "Riverside Middle School"
+    assert organiser_idea["submitter_age_bracket"] == "under_13"
+    assert organiser_idea["submitter_guardian_consent_given"] is True
+
+
+@pytest.mark.django_db
+def test_organiser_can_create_session_with_student_safeguards(
+    api_client, organisation_factory,
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    api_client.force_authenticate(owner)
+
+    create = api_client.post(
+        reverse("ideation:organisation-list-create", kwargs={"organisation_id": organisation.id}),
+        {
+            "title": "State science fair",
+            "prompt": "Present a project that addresses a real community need.",
+            "requires_guardian_consent": True,
+            "team_submissions_enabled": True,
+        },
+        format="json",
+    )
+    assert create.status_code == 201
+    session = OpenSession.objects.get(id=create.json()["id"])
+    assert session.requires_guardian_consent is True
+    assert session.team_submissions_enabled is True

@@ -20,6 +20,8 @@ export function OrganisationSessionsPage() {
   const [description, setDescription] = useState("");
   const [decisionId, setDecisionId] = useState("");
   const [votingEnabled, setVotingEnabled] = useState(true);
+  const [requiresGuardianConsent, setRequiresGuardianConsent] = useState(false);
+  const [teamSubmissionsEnabled, setTeamSubmissionsEnabled] = useState(false);
 
   const organisation = useQuery({
     queryKey: ["organisations", organisationId],
@@ -45,6 +47,8 @@ export function OrganisationSessionsPage() {
         description,
         decision_id: decisionId || null,
         voting_enabled: votingEnabled,
+        requires_guardian_consent: requiresGuardianConsent,
+        team_submissions_enabled: teamSubmissionsEnabled,
       }),
     onSuccess: async () => {
       setTitle("");
@@ -52,6 +56,8 @@ export function OrganisationSessionsPage() {
       setDescription("");
       setDecisionId("");
       setVotingEnabled(true);
+      setRequiresGuardianConsent(false);
+      setTeamSubmissionsEnabled(false);
       setFormOpen(false);
       await queryClient.invalidateQueries({ queryKey: ["organisations", organisationId, "sessions"] });
     },
@@ -65,7 +71,7 @@ export function OrganisationSessionsPage() {
           <p className="eyebrow">Open sessions</p>
           <h1>{organisation.data?.name ?? "Organisation"} open sessions</h1>
           <p className="muted">
-            Collect and vote on ideas from anyone with the link — no invitation or account required. Shortlisted
+            Collect and vote on ideas from anyone with the link - no invitation or account required. Shortlisted
             ideas can be promoted into a real decision option.
           </p>
         </div>
@@ -95,6 +101,22 @@ export function OrganisationSessionsPage() {
             <label className="record-grid__wide">Prompt<textarea rows={2} value={prompt} onChange={(event) => setPrompt(event.target.value)} placeholder="What question should submissions answer?" /></label>
             <label className="record-grid__wide">Description<textarea rows={2} value={description} onChange={(event) => setDescription(event.target.value)} /></label>
             <label className="checkbox-label"><input type="checkbox" checked={votingEnabled} onChange={(event) => setVotingEnabled(event.target.checked)} />Allow voting</label>
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={teamSubmissionsEnabled}
+                onChange={(event) => setTeamSubmissionsEnabled(event.target.checked)}
+              />
+              Team submissions (hackathon / idea competition - submitters can name a team and list teammates)
+            </label>
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={requiresGuardianConsent}
+                onChange={(event) => setRequiresGuardianConsent(event.target.checked)}
+              />
+              Requires parent or guardian consent for participants under 18
+            </label>
           </div>
           <button
             className="button button--primary"

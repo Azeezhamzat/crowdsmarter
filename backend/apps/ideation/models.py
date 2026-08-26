@@ -50,6 +50,14 @@ class OpenSession(UUIDTimeStampedModel):
     public_slug = models.CharField(max_length=32, unique=True)
     voting_enabled = models.BooleanField(default=True)
     submission_deadline = models.DateTimeField(null=True, blank=True)
+    requires_guardian_consent = models.BooleanField(
+        default=False,
+        help_text="When on, a participant self-declaring as under 18 must record guardian consent to submit.",
+    )
+    team_submissions_enabled = models.BooleanField(
+        default=False,
+        help_text="When on, submitters may name a team and list teammates alongside their entry.",
+    )
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
@@ -88,6 +96,15 @@ class OpenSession(UUIDTimeStampedModel):
 class SessionParticipant(UUIDTimeStampedModel):
     """A lightweight, name-and-email identity for someone outside org membership."""
 
+    class AgeBracket(models.TextChoices):
+        UNDER_13 = "under_13", "Under 13"
+        AGE_13_17 = "age_13_17", "13-17"
+        AGE_18_PLUS = "age_18_plus", "18 or older"
+
+    #: Age brackets that trigger a guardian-consent requirement on sessions
+    #: where the organiser has turned that requirement on.
+    MINOR_AGE_BRACKETS = {AgeBracket.UNDER_13, AgeBracket.AGE_13_17}
+
     session = models.ForeignKey(OpenSession, on_delete=models.CASCADE, related_name="participants")
     name = models.CharField(max_length=200)
     email = models.EmailField()
@@ -100,6 +117,11 @@ class SessionParticipant(UUIDTimeStampedModel):
         blank=True,
         help_text="Linked once this email matches a verified persistent applicant account.",
     )
+    school_name = models.CharField(max_length=200, blank=True)
+    age_bracket = models.CharField(max_length=20, choices=AgeBracket.choices, blank=True)
+    guardian_name = models.CharField(max_length=200, blank=True)
+    guardian_email = models.EmailField(blank=True)
+    guardian_consent_given_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ["created_at", "id"]
@@ -116,6 +138,17 @@ class SessionParticipant(UUIDTimeStampedModel):
         super().clean()
         self.name = self.name.strip()
         self.email = self.email.strip().lower()
+        self.school_name = self.school_name.strip()
+        self.guardian_name = self.guardian_name.strip()
+        self.guardian_email = self.guardian_email.strip().lower()
+
+    @property
+    def is_declared_minor(self) -> bool:
+        return self.age_bracket in self.MINOR_AGE_BRACKETS
+
+    @property
+    def guardian_consent_given(self) -> bool:
+        return self.guardian_consent_given_at is not None
 
     def __str__(self) -> str:
         return f"{self.name} <{self.email}> in {self.session.title}"
@@ -135,6 +168,7 @@ class Idea(UUIDTimeStampedModel):
     description = models.TextField(blank=True)
     category = models.CharField(max_length=60, blank=True)
     requested_amount = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    team_name = models.CharField(max_length=200, blank=True)
     submitted_by_participant = models.ForeignKey(
         SessionParticipant,
         on_delete=models.PROTECT,
@@ -183,6 +217,7 @@ class Idea(UUIDTimeStampedModel):
         self.title = self.title.strip()
         self.description = self.description.strip()
         self.category = self.category.strip()
+        self.team_name = self.team_name.strip()
         has_participant = self.submitted_by_participant_id is not None
         has_user = self.submitted_by_user_id is not None
         if has_participant == has_user:
@@ -198,6 +233,33 @@ class Idea(UUIDTimeStampedModel):
 
     def __str__(self) -> str:
         return f"{self.session.title}: {self.title}"
+
+
+class IdeaTeamMember(UUIDTimeStampedModel):
+    """One named teammate credited alongside a team submission.
+
+    Purely a roster entry, not a login identity - only the submitter (an
+    ``Idea.submitted_by_participant``) authenticates and can edit the entry,
+    so this deliberately carries no email or contact field.
+    """
+
+    idea = models.ForeignKey(Idea, on_delete=models.CASCADE, related_name="team_members")
+    name = models.CharField(max_length=200)
+    role = models.CharField(max_length=60, blank=True)
+
+    class Meta:
+        ordering = ["created_at", "id"]
+        constraints = [
+            models.CheckConstraint(condition=~models.Q(name=""), name="idea_team_member_name_not_empty"),
+        ]
+
+    def clean(self) -> None:
+        super().clean()
+        self.name = self.name.strip()
+        self.role = self.role.strip()
+
+    def __str__(self) -> str:
+        return f"{self.name} on {self.idea.title}"
 
 
 class IdeaComment(UUIDTimeStampedModel):

@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import type { Idea } from "../../lib/types";
 import { getPublicSession, getStoredParticipantToken, joinSession, submitIdea, voteIdea } from "./api";
 import { OpenSessionPublicPage } from "./OpenSessionPublicPage";
 
@@ -40,9 +41,33 @@ const baseSession = {
   status_label: "Open",
   voting_enabled: true,
   submission_deadline: null,
+  requires_guardian_consent: false,
+  team_submissions_enabled: false,
   decision_template_key: null,
   ideas: [],
 };
+
+function baseIdea(overrides: Partial<Idea> = {}): Idea {
+  return {
+    id: "idea-1",
+    title: "Existing idea",
+    description: "",
+    category: "",
+    requested_amount: null,
+    team_name: "",
+    team_members: [],
+    status: "submitted",
+    status_label: "Submitted",
+    submitted_by_participant: { name: "Kwame" },
+    submitted_by_user: null,
+    vote_count: 0,
+    voted_by_me: false,
+    application_status: null,
+    comments: [],
+    created_at: "2026-08-01T10:00:00Z",
+    ...overrides,
+  };
+}
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -53,14 +78,10 @@ describe("OpenSessionPublicPage", () => {
     vi.mocked(joinSession).mockResolvedValue({ participant_token: "tok-1", name: "Amaka Obi" });
     vi.mocked(submitIdea).mockResolvedValue({
       ...baseSession,
-      ideas: [{
-        id: "idea-1", title: "Solar-powered cold storage", description: "Shared cold storage.",
-        category: "", requested_amount: null,
-        status: "submitted", status_label: "Submitted",
-        submitted_by_participant: { name: "Amaka Obi" }, submitted_by_user: null,
-        vote_count: 0, voted_by_me: false, application_status: null, comments: [],
-        created_at: "2026-08-01T10:00:00Z",
-      }],
+      ideas: [baseIdea({
+        title: "Solar-powered cold storage", description: "Shared cold storage.",
+        submitted_by_participant: { name: "Amaka Obi" },
+      })],
     });
 
     renderPage();
@@ -85,25 +106,11 @@ describe("OpenSessionPublicPage", () => {
     vi.mocked(getStoredParticipantToken).mockReturnValue("existing-token");
     vi.mocked(getPublicSession).mockResolvedValue({
       ...baseSession,
-      ideas: [{
-        id: "idea-1", title: "Existing idea", description: "",
-        category: "", requested_amount: null,
-        status: "submitted", status_label: "Submitted",
-        submitted_by_participant: { name: "Kwame" }, submitted_by_user: null,
-        vote_count: 2, voted_by_me: false, application_status: null, comments: [],
-        created_at: "2026-08-01T10:00:00Z",
-      }],
+      ideas: [baseIdea({ vote_count: 2 })],
     });
     vi.mocked(voteIdea).mockResolvedValue({
       ...baseSession,
-      ideas: [{
-        id: "idea-1", title: "Existing idea", description: "",
-        category: "", requested_amount: null,
-        status: "submitted", status_label: "Submitted",
-        submitted_by_participant: { name: "Kwame" }, submitted_by_user: null,
-        vote_count: 3, voted_by_me: true, application_status: null, comments: [],
-        created_at: "2026-08-01T10:00:00Z",
-      }],
+      ideas: [baseIdea({ vote_count: 3, voted_by_me: true })],
     });
 
     renderPage();
@@ -117,14 +124,10 @@ describe("OpenSessionPublicPage", () => {
     vi.mocked(getPublicSession).mockResolvedValue({
       ...baseSession,
       decision_template_key: "grant_round",
-      ideas: [{
-        id: "idea-1", title: "Community garden expansion", description: "",
-        category: "", requested_amount: "15000.00",
-        status: "submitted", status_label: "Submitted",
-        submitted_by_participant: { name: "Ada" }, submitted_by_user: null,
-        vote_count: 0, voted_by_me: false, application_status: null, comments: [],
-        created_at: "2026-08-01T10:00:00Z",
-      }],
+      ideas: [baseIdea({
+        title: "Community garden expansion", requested_amount: "15000.00",
+        submitted_by_participant: { name: "Ada" },
+      })],
     });
 
     renderPage();
@@ -142,5 +145,74 @@ describe("OpenSessionPublicPage", () => {
 
     renderPage();
     expect(await screen.findByText(/invalid, or the session hasn't opened yet/i)).toBeInTheDocument();
+  });
+
+  it("requires guardian consent before a declared minor can join a session that requests it", async () => {
+    vi.mocked(getStoredParticipantToken).mockReturnValue(null);
+    vi.mocked(getPublicSession).mockResolvedValue({ ...baseSession, requires_guardian_consent: true });
+    vi.mocked(joinSession).mockResolvedValue({ participant_token: "tok-1", name: "Ngozi" });
+
+    renderPage();
+    expect(await screen.findByRole("heading", { name: "Farm resilience ideathon" })).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Ngozi" } });
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "ngozi@example.com" } });
+    fireEvent.change(screen.getByLabelText("Age"), { target: { value: "age_13_17" } });
+
+    expect(await screen.findByText(/parent or guardian consent/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /join session/i }));
+
+    // Guardian fields are required for a declared minor, so submission is blocked with a validation error.
+    expect(await screen.findByText(/enter a parent or guardian's name/i)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Parent or guardian name"), { target: { value: "Uche Eze" } });
+    fireEvent.change(screen.getByLabelText("Parent or guardian email"), { target: { value: "uche@example.com" } });
+    fireEvent.click(screen.getByLabelText(/i am this participant's parent or guardian/i));
+    fireEvent.click(screen.getByRole("button", { name: /join session/i }));
+
+    await waitFor(() => expect(joinSession).toHaveBeenLastCalledWith(
+      "abc123",
+      expect.objectContaining({
+        name: "Ngozi",
+        email: "ngozi@example.com",
+        guardian_consent_given: true,
+        age_bracket: "age_13_17",
+        guardian_name: "Uche Eze",
+        guardian_email: "uche@example.com",
+      }),
+    ));
+  });
+
+  it("lets a submitter name a team and roster when team submissions are enabled", async () => {
+    vi.mocked(getStoredParticipantToken).mockReturnValue("existing-token");
+    vi.mocked(getPublicSession).mockResolvedValue({ ...baseSession, team_submissions_enabled: true, ideas: [] });
+    vi.mocked(submitIdea).mockResolvedValue({
+      ...baseSession,
+      team_submissions_enabled: true,
+      ideas: [baseIdea({
+        title: "StudyBuddy matcher",
+        team_name: "The Night Owls",
+        team_members: [{ id: "m1", name: "Femi", role: "Team lead" }, { id: "m2", name: "Aisha", role: "" }],
+        submitted_by_participant: { name: "Femi" },
+      })],
+    });
+
+    renderPage();
+    expect(await screen.findByLabelText("Team name (optional)")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Title"), { target: { value: "StudyBuddy matcher" } });
+    fireEvent.change(screen.getByLabelText("Team name (optional)"), { target: { value: "The Night Owls" } });
+    fireEvent.click(screen.getByRole("button", { name: /add teammate/i }));
+    fireEvent.change(screen.getByLabelText("Teammate name"), { target: { value: "Aisha" } });
+    fireEvent.click(screen.getByRole("button", { name: /submit idea/i }));
+
+    await waitFor(() => expect(submitIdea).toHaveBeenCalledWith(
+      "abc123",
+      expect.objectContaining({
+        team_name: "The Night Owls",
+        team_members: [{ name: "Aisha", role: undefined }],
+      }),
+    ));
+    expect(await screen.findByText(/the night owls/i)).toBeInTheDocument();
   });
 });

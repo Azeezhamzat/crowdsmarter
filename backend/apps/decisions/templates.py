@@ -305,6 +305,75 @@ TEMPLATES: tuple[DecisionTemplate, ...] = (
             "Rejected-applicant feedback plan",
         ),
     ),
+    DecisionTemplate(
+        key="idea_competition",
+        name="Idea competition or hackathon",
+        summary=(
+            "Run a public challenge from open submissions through judged results."
+        ),
+        best_for=(
+            "Hackathons, idea competitions, and challenge prompts for students or the public."
+        ),
+        question_prompt=(
+            "Which submissions should advance, place, or win, and on what published criteria?"
+        ),
+        purpose_prompt=(
+            "State the challenge prompt and what a winning entry should demonstrate."
+        ),
+        context_prompt=(
+            "Describe who this is open to, the event or submission window, and why it is "
+            "running now."
+        ),
+        scope_prompt=(
+            "Define eligibility (age, grade level, institution, team size), the submission "
+            "window, and what is out of scope."
+        ),
+        contribution_prompt=(
+            "Request judge scoring, mentor feedback, and any conflicts of interest to disclose."
+        ),
+        checklist=(
+            "Published judging criteria",
+            "Student safeguarding: age and guardian-consent capture where required",
+            "Results and recognition plan",
+        ),
+    ),
+    DecisionTemplate(
+        key="anticipatory_commons",
+        name="Anticipatory commons",
+        summary=(
+            "Run an open, governed space where a self-organising group tracks emerging "
+            "signals and decides together, in public view."
+        ),
+        best_for=(
+            "Community groups, mutual-aid networks, neighbourhood or watershed initiatives, "
+            "and any self-organising group deciding together without an institution behind them."
+        ),
+        question_prompt=(
+            "Given what the group is watching, what should we do next, and who is "
+            "accountable for it?"
+        ),
+        purpose_prompt=(
+            "Explain what the group is trying to anticipate, and why deciding this "
+            "together, rather than one person deciding alone, matters here."
+        ),
+        context_prompt=(
+            "Describe what signals, events, or changes prompted this, and what the "
+            "group already knows or has tried."
+        ),
+        scope_prompt=(
+            "Define who is part of this commons, what this decision covers, and what "
+            "it explicitly leaves for a future round."
+        ),
+        contribution_prompt=(
+            "Invite the signals, local knowledge, and concerns members should bring, "
+            "and note any conflicts of interest to disclose."
+        ),
+        checklist=(
+            "A named accountable person or small group, not just \"the commons\"",
+            "At least one real signal or observation behind the question",
+            "A plan for what happens after this decision: who acts, and when the group revisits it",
+        ),
+    ),
 )
 
 TEMPLATE_BY_KEY = {template.key: template for template in TEMPLATES}

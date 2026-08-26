@@ -66,6 +66,26 @@ function IdeaRow({
             <strong>{terms.amountFieldLabel}:</strong> {idea.requested_amount}
           </p>
         ) : null}
+        {idea.team_name ? (
+          <p className="muted">
+            <strong>Team:</strong> {idea.team_name}
+            {idea.team_members.length > 0
+              ? ` - ${idea.team_members.map((member) => (member.role ? `${member.name} (${member.role})` : member.name)).join(", ")}`
+              : ""}
+          </p>
+        ) : null}
+        {idea.submitter_school || idea.submitter_age_bracket_label ? (
+          <p className="muted">
+            {idea.submitter_school ? <>{idea.submitter_school}</> : null}
+            {idea.submitter_school && idea.submitter_age_bracket_label ? " · " : ""}
+            {idea.submitter_age_bracket_label ?? ""}
+            {idea.submitter_guardian_consent_given !== null && idea.submitter_guardian_consent_given !== undefined ? (
+              <span className={`status-badge status-badge--${idea.submitter_guardian_consent_given ? "open" : "blocked"}`}>
+                {idea.submitter_guardian_consent_given ? "Guardian consent recorded" : "Guardian consent missing"}
+              </span>
+            ) : null}
+          </p>
+        ) : null}
         <small className="muted">
           {submitterLabel(idea)} · {idea.status_label} · {idea.vote_count} vote{idea.vote_count === 1 ? "" : "s"}
           {idea.comments.length > 0 ? ` · ${idea.comments.length} comment${idea.comments.length === 1 ? "" : "s"}` : ""}

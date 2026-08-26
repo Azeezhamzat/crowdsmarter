@@ -25,10 +25,12 @@ const baseSession = {
   id: sessionId, title: "Q3 ideathon", prompt: "How do we cut onboarding time in half?", status: "open" as const,
   status_label: "Open", public_slug: "abc123", decision_id: null, decision_title: null,
   decision_template_key: null, voting_enabled: true,
+  requires_guardian_consent: false, team_submissions_enabled: false,
   idea_count: 1, created_by: { id: "u1", email: "owner@example.com", first_name: "", last_name: "" },
   created_at: "2026-08-01T10:00:00Z", description: "",
   ideas: [{
     id: "idea-1", title: "Promising idea", description: "Worth trying.", category: "", requested_amount: null,
+    team_name: "", team_members: [],
     status: "submitted" as const,
     status_label: "Submitted", submitted_by_participant: { name: "Ada" }, submitted_by_user: null,
     vote_count: 3, voted_by_me: false, application_status: null, comments: [],
@@ -139,5 +141,37 @@ describe("OpenSessionOrganiserPage", () => {
     fireEvent.click(closeBtn);
     await waitFor(() => expect(setSessionState).toHaveBeenCalledWith(sessionId, "close"));
     expect(await screen.findByRole("button", { name: /reopen session/i })).toBeInTheDocument();
+  });
+
+  it("shows team roster and safeguarding fields the organiser can see", async () => {
+    vi.mocked(getOrganiserSession).mockResolvedValue({
+      ...baseSession,
+      requires_guardian_consent: true,
+      team_submissions_enabled: true,
+      ideas: [{
+        ...baseSession.ideas[0]!,
+        title: "Recycling sorter bot",
+        team_name: "The Night Owls",
+        team_members: [{ id: "m1", name: "Femi", role: "Team lead" }],
+        submitter_school: "Riverside Middle School",
+        submitter_age_bracket: "under_13",
+        submitter_age_bracket_label: "Under 13",
+        submitter_guardian_consent_given: true,
+      }],
+    });
+    vi.mocked(getOrganisationPortfolio).mockResolvedValue({
+      organisation: { id: organisationId } as never,
+      summary: { total: 0, active: 0, overdue: 0, unresolved_discussion: 0, status_counts: {} },
+      decisions: [],
+      watchlist: {} as never,
+    });
+
+    renderPage();
+    expect(await screen.findByText("Recycling sorter bot")).toBeInTheDocument();
+    expect(screen.getByText(/the night owls/i)).toBeInTheDocument();
+    expect(screen.getByText(/femi \(team lead\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/riverside middle school/i)).toBeInTheDocument();
+    expect(screen.getByText(/under 13/i)).toBeInTheDocument();
+    expect(screen.getByText(/guardian consent recorded/i)).toBeInTheDocument();
   });
 });

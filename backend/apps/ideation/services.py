@@ -9,6 +9,7 @@ from django.db import IntegrityError, transaction
 from django.db.models import Count, QuerySet
 from django.http import Http404
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 
 from apps.accounts.models import User
 from apps.audit.services import record_event
@@ -18,8 +19,10 @@ from apps.decisions.policies import CREATOR_ROLES
 from apps.organisations.models import Membership, Organisation
 from apps.workspaces.models import Workspace
 
-from .models import Idea, IdeaComment, IdeaVote, OpenSession, SessionParticipant
+from .models import Idea, IdeaComment, IdeaTeamMember, IdeaVote, OpenSession, SessionParticipant
 from .tokens import digest_token, generate_public_slug, generate_token
+
+MAX_TEAM_MEMBERS = 12
 
 
 class IdeationServiceError(ValidationError):
@@ -55,6 +58,8 @@ def create_session(
     description: str = "",
     voting_enabled: bool = True,
     submission_deadline: Any | None = None,
+    requires_guardian_consent: bool = False,
+    team_submissions_enabled: bool = False,
 ) -> OpenSession:
     membership = _active_membership(actor=actor, organisation_id=organisation.id)
     if membership.role not in CREATOR_ROLES:
@@ -79,6 +84,8 @@ def create_session(
         public_slug=generate_public_slug(),
         voting_enabled=voting_enabled,
         submission_deadline=submission_deadline,
+        requires_guardian_consent=requires_guardian_consent,
+        team_submissions_enabled=team_submissions_enabled,
         created_by=actor,
     )
     session.full_clean(validate_unique=False, validate_constraints=False)
@@ -129,21 +136,48 @@ def close_session(*, actor: User, session: OpenSession) -> OpenSession:
 
 
 @transaction.atomic
-def identify_participant(*, session: OpenSession, name: str, email: str) -> tuple[SessionParticipant, str]:
+def identify_participant(
+    *,
+    session: OpenSession,
+    name: str,
+    email: str,
+    school_name: str = "",
+    age_bracket: str = "",
+    guardian_name: str = "",
+    guardian_email: str = "",
+    guardian_consent_given: bool = False,
+) -> tuple[SessionParticipant, str]:
     """Get-or-create a lightweight identity for this session by email, returning a fresh bearer token.
 
     When the email matches a verified ApplicantAccount, the participant record is
     linked to it automatically, which is what lets that person's applications
     surface together on the cross-round "My applications" portal.
+
+    When the session requires guardian consent and the declared age bracket is
+    a minor one, a guardian name, guardian email, and explicit consent are
+    required before the identity can be registered at all - this is the
+    safeguard gate for student competitions open to under-18s.
     """
     normalised_email = email.strip().lower()
     raw_token = generate_token()
+
+    if session.requires_guardian_consent and age_bracket in SessionParticipant.MINOR_AGE_BRACKETS:
+        if not (guardian_name.strip() and guardian_email.strip() and guardian_consent_given):
+            raise IdeationServiceError(
+                {
+                    "guardian_consent_given": (
+                        "A parent or guardian must record consent before a participant "
+                        "under 18 can join this session."
+                    )
+                }
+            )
 
     from apps.applicants.models import ApplicantAccount
 
     linked_account = ApplicantAccount.objects.filter(
         email=normalised_email, email_verified_at__isnull=False
     ).first()
+    consent_timestamp = timezone.now() if guardian_consent_given else None
 
     try:
         participant = SessionParticipant.objects.get(session=session, email=normalised_email)
@@ -152,8 +186,30 @@ def identify_participant(*, session: OpenSession, name: str, email: str) -> tupl
             participant.name = name
         if linked_account is not None:
             participant.account = linked_account
+        if school_name.strip():
+            participant.school_name = school_name
+        if age_bracket:
+            participant.age_bracket = age_bracket
+        if guardian_name.strip():
+            participant.guardian_name = guardian_name
+        if guardian_email.strip():
+            participant.guardian_email = guardian_email
+        if consent_timestamp is not None:
+            participant.guardian_consent_given_at = consent_timestamp
         participant.full_clean(validate_unique=False, validate_constraints=False)
-        participant.save(update_fields=["name", "token_digest", "account", "updated_at"])
+        participant.save(
+            update_fields=[
+                "name",
+                "token_digest",
+                "account",
+                "school_name",
+                "age_bracket",
+                "guardian_name",
+                "guardian_email",
+                "guardian_consent_given_at",
+                "updated_at",
+            ]
+        )
     except SessionParticipant.DoesNotExist:
         participant = SessionParticipant(
             session=session,
@@ -161,6 +217,11 @@ def identify_participant(*, session: OpenSession, name: str, email: str) -> tupl
             email=normalised_email,
             token_digest=digest_token(raw_token),
             account=linked_account,
+            school_name=school_name,
+            age_bracket=age_bracket,
+            guardian_name=guardian_name,
+            guardian_email=guardian_email,
+            guardian_consent_given_at=consent_timestamp,
         )
         participant.full_clean(validate_unique=False, validate_constraints=False)
         try:
@@ -187,6 +248,8 @@ def submit_idea(
     description: str = "",
     category: str = "",
     requested_amount: Any | None = None,
+    team_name: str = "",
+    team_members: list[dict] | None = None,
 ) -> Idea:
     if session.status != OpenSession.Status.OPEN:
         raise IdeationServiceError("This session is not currently accepting submissions.")
@@ -196,11 +259,16 @@ def submit_idea(
         description=description,
         category=category,
         requested_amount=requested_amount,
+        team_name=team_name,
         submitted_by_participant=participant,
         submitted_by_user=user,
     )
     idea.full_clean(validate_unique=False, validate_constraints=False)
     idea.save()
+    for member in (team_members or [])[:MAX_TEAM_MEMBERS]:
+        team_member = IdeaTeamMember(idea=idea, name=member.get("name", ""), role=member.get("role", ""))
+        team_member.full_clean(validate_unique=False, validate_constraints=False)
+        team_member.save()
     return idea
 
 
@@ -264,7 +332,7 @@ def promote_idea_to_decision(*, actor: User, idea: Idea, decision: Decision | No
     """Turn a shortlisted idea into a real, accountable DecisionOption.
 
     Deliberately does not duplicate create_option's own permission check
-    (apps.decisions.reasoning_policies.can_contribute_reasoning) — it already
+    (apps.decisions.reasoning_policies.can_contribute_reasoning) - it already
     enforces whether this actor may add an option to this decision in its
     current state, and that failure should surface as-is, not be masked here.
 

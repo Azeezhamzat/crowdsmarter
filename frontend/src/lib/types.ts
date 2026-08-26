@@ -2066,6 +2066,13 @@ export type ContributionPreference = {
 
 export type IdeaStatus = "submitted" | "shortlisted" | "promoted" | "archived";
 export type OpenSessionStatus = "draft" | "open" | "closed" | "archived";
+export type AgeBracket = "under_13" | "age_13_17" | "age_18_plus";
+
+export type IdeaTeamMember = {
+  id: string;
+  name: string;
+  role: string;
+};
 
 export type IdeaApplicationStatus = {
   eligibility_status: EligibilityStatus;
@@ -2091,6 +2098,8 @@ export type Idea = {
   description: string;
   category: string;
   requested_amount: string | null;
+  team_name: string;
+  team_members: IdeaTeamMember[];
   status: IdeaStatus;
   status_label: string;
   submitted_by_participant: { name: string } | null;
@@ -2100,6 +2109,12 @@ export type Idea = {
   application_status: IdeaApplicationStatus | null;
   comments: IdeaComment[];
   created_at: string;
+  // Organiser-only safeguarding fields - present only on OpenSessionOrganiser
+  // responses, never on the public session feed.
+  submitter_school?: string | null;
+  submitter_age_bracket?: AgeBracket | null;
+  submitter_age_bracket_label?: string | null;
+  submitter_guardian_consent_given?: boolean | null;
 };
 
 export type MyApplicationOutcome = {
@@ -2147,6 +2162,8 @@ export type OpenSessionPublic = {
   status_label: string;
   voting_enabled: boolean;
   submission_deadline: string | null;
+  requires_guardian_consent: boolean;
+  team_submissions_enabled: boolean;
   decision_template_key: string | null;
   ideas: Idea[];
 };
@@ -2162,6 +2179,8 @@ export type OpenSessionSummary = {
   decision_title: string | null;
   decision_template_key: string | null;
   voting_enabled: boolean;
+  requires_guardian_consent: boolean;
+  team_submissions_enabled: boolean;
   idea_count: number;
   created_by: User;
   created_at: string;

@@ -28,7 +28,15 @@ export function getPublicSession(publicSlug: string): Promise<OpenSessionPublic>
 
 export async function joinSession(
   publicSlug: string,
-  input: { name: string; email: string },
+  input: {
+    name: string;
+    email: string;
+    school_name?: string;
+    age_bracket?: string;
+    guardian_name?: string;
+    guardian_email?: string;
+    guardian_consent_given?: boolean;
+  },
 ): Promise<{ participant_token: string; name: string }> {
   await ensureCsrfCookie();
   const result = await apiRequest<{ participant_token: string; name: string }>(
@@ -41,7 +49,14 @@ export async function joinSession(
 
 export async function submitIdea(
   publicSlug: string,
-  input: { title: string; description?: string; category?: string; requested_amount?: string },
+  input: {
+    title: string;
+    description?: string;
+    category?: string;
+    requested_amount?: string;
+    team_name?: string;
+    team_members?: Array<{ name: string; role?: string }>;
+  },
 ): Promise<OpenSessionPublic> {
   await ensureCsrfCookie();
   return apiRequest<OpenSessionPublic>(`/public/sessions/${publicSlug}/ideas/`, {
@@ -93,6 +108,8 @@ export function createOrganisationSession(
     decision_id?: string | null;
     voting_enabled?: boolean;
     submission_deadline?: string | null;
+    requires_guardian_consent?: boolean;
+    team_submissions_enabled?: boolean;
   },
 ): Promise<OpenSessionSummary> {
   return apiRequest<OpenSessionSummary>(`/organisations/${organisationId}/sessions/`, {
