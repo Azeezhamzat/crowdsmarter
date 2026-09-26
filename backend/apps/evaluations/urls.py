@@ -16,6 +16,9 @@ from .views import (
     LiquidDemocracyTallyView,
     LiquidVoteCastView,
     MinorityReportCreateView,
+    OpinionClusteringAnalysisView,
+    OpinionStatementCreateView,
+    OpinionVoteCastView,
     PortfolioAssessmentView,
     PortfolioCandidateCreateView,
     PortfolioCriterionCreateView,
@@ -100,6 +103,21 @@ urlpatterns = [
         "evaluations/<uuid:exercise_id>/liquid-tally/",
         LiquidDemocracyTallyView.as_view(),
         name="liquid-tally",
+    ),
+    path(
+        "evaluations/<uuid:exercise_id>/opinion-statements/",
+        OpinionStatementCreateView.as_view(),
+        name="opinion-statements",
+    ),
+    path(
+        "opinion-statements/<uuid:statement_id>/vote/",
+        OpinionVoteCastView.as_view(),
+        name="opinion-vote",
+    ),
+    path(
+        "evaluations/<uuid:exercise_id>/opinion-clustering/",
+        OpinionClusteringAnalysisView.as_view(),
+        name="opinion-clustering",
     ),
     path(
         "organisations/<uuid:organisation_id>/prioritisations/",

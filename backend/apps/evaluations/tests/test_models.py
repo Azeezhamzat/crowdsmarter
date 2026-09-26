@@ -5,7 +5,14 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 
 from apps.decision_options.services import create_option
-from apps.evaluations.models import EvaluationExercise, Forecast, ForecastQuestion, LiquidVote
+from apps.evaluations.models import (
+    EvaluationExercise,
+    Forecast,
+    ForecastQuestion,
+    LiquidVote,
+    OpinionStatement,
+    OpinionVote,
+)
 from apps.evaluations.services import create_exercise
 
 
@@ -245,3 +252,84 @@ def test_liquid_vote_rejects_self_delegation(
     )
     with pytest.raises(ValidationError):
         vote.full_clean(validate_unique=False, validate_constraints=False)
+
+
+@pytest.mark.django_db
+def test_opinion_statement_requires_opinion_clustering_exercise(
+    organisation_factory, decision_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    exercise = create_exercise(
+        actor=owner,
+        decision=decision,
+        owner_id=owner.id,
+        title="Scorecard",
+        purpose="p",
+        method="scorecard",
+        quorum_count=1,
+    )
+    statement = OpinionStatement(
+        organisation=exercise.organisation, exercise=exercise, author=owner, text="A statement."
+    )
+    with pytest.raises(ValidationError):
+        statement.full_clean(validate_unique=False, validate_constraints=False)
+
+
+@pytest.mark.django_db
+def test_opinion_statement_rejects_blank_text(
+    organisation_factory, decision_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    exercise = create_exercise(
+        actor=owner,
+        decision=decision,
+        owner_id=owner.id,
+        title="Opinion clustering",
+        purpose="p",
+        method="opinion_clustering",
+        quorum_count=1,
+    )
+    statement = OpinionStatement(
+        organisation=exercise.organisation, exercise=exercise, author=owner, text="   "
+    )
+    with pytest.raises(ValidationError):
+        statement.full_clean(validate_unique=False, validate_constraints=False)
+
+
+@pytest.mark.django_db
+def test_opinion_vote_enforces_one_vote_per_statement_per_voter(
+    organisation_factory, decision_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    exercise = create_exercise(
+        actor=owner,
+        decision=decision,
+        owner_id=owner.id,
+        title="Opinion clustering",
+        purpose="p",
+        method="opinion_clustering",
+        quorum_count=1,
+    )
+    statement = OpinionStatement.objects.create(
+        organisation=exercise.organisation, exercise=exercise, author=owner, text="A statement."
+    )
+    OpinionVote.objects.create(
+        organisation=exercise.organisation,
+        statement=statement,
+        voter=owner,
+        choice=OpinionVote.Choice.AGREE,
+    )
+    duplicate = OpinionVote(
+        organisation=exercise.organisation,
+        statement=statement,
+        voter=owner,
+        choice=OpinionVote.Choice.DISAGREE,
+    )
+    with pytest.raises(ValidationError):
+        duplicate.full_clean(validate_unique=False)

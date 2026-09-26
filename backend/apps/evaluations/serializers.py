@@ -17,6 +17,8 @@ from .models import (
     ForecastQuestion,
     LiquidVote,
     MinorityReport,
+    OpinionStatement,
+    OpinionVote,
     PortfolioAssessment,
     PortfolioCandidate,
     PortfolioCriterion,
@@ -265,6 +267,49 @@ class ForecastWriteSerializer(StrictSerializer):
     )
 
 
+class OpinionStatementSerializer(serializers.ModelSerializer):
+    author = DecisionUserSerializer(read_only=True)
+    agree_count = serializers.SerializerMethodField()
+    disagree_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = OpinionStatement
+        fields = [
+            "id",
+            "exercise_id",
+            "author",
+            "text",
+            "agree_count",
+            "disagree_count",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = fields
+
+    def get_agree_count(self, obj):
+        return sum(1 for vote in obj.votes.all() if vote.choice == OpinionVote.Choice.AGREE)
+
+    def get_disagree_count(self, obj):
+        return sum(1 for vote in obj.votes.all() if vote.choice == OpinionVote.Choice.DISAGREE)
+
+
+class OpinionStatementWriteSerializer(StrictSerializer):
+    text = serializers.CharField(max_length=500)
+
+
+class OpinionVoteSerializer(serializers.ModelSerializer):
+    voter = DecisionUserSerializer(read_only=True)
+
+    class Meta:
+        model = OpinionVote
+        fields = ["id", "statement_id", "voter", "choice", "created_at", "updated_at"]
+        read_only_fields = fields
+
+
+class OpinionVoteWriteSerializer(StrictSerializer):
+    choice = serializers.ChoiceField(choices=OpinionVote.Choice.choices)
+
+
 class EvaluationExerciseSerializer(serializers.ModelSerializer):
     owner = DecisionUserSerializer(read_only=True)
     created_by = DecisionUserSerializer(read_only=True)
@@ -274,6 +319,7 @@ class EvaluationExerciseSerializer(serializers.ModelSerializer):
     rounds = EvaluationRoundSerializer(many=True, read_only=True)
     minority_reports = MinorityReportSerializer(many=True, read_only=True)
     forecast_questions = ForecastQuestionSerializer(many=True, read_only=True)
+    opinion_statements = OpinionStatementSerializer(many=True, read_only=True)
     can_manage = serializers.SerializerMethodField()
     can_submit = serializers.SerializerMethodField()
 
@@ -302,6 +348,7 @@ class EvaluationExerciseSerializer(serializers.ModelSerializer):
             "rounds",
             "minority_reports",
             "forecast_questions",
+            "opinion_statements",
             "can_manage",
             "can_submit",
             "created_at",

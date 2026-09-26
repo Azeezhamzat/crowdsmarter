@@ -32,6 +32,8 @@ from .models import (
     ForecastQuestion,
     LiquidVote,
     MinorityReport,
+    OpinionStatement,
+    OpinionVote,
     PortfolioAssessment,
     PortfolioCandidate,
     PortfolioCriterion,
@@ -50,7 +52,10 @@ APPLICATION_LABEL_FORMAT = "Application {index}"
 ROUNDLESS_METHODS = {
     EvaluationExercise.Method.FORECASTING,
     EvaluationExercise.Method.LIQUID_DEMOCRACY,
+    EvaluationExercise.Method.OPINION_CLUSTERING,
 }
+
+OPINION_CLUSTER_CONSENSUS_THRESHOLD = 0.7
 
 MAX_DELEGATION_CHAIN_DEPTH = 10
 
@@ -1694,4 +1699,177 @@ def liquid_democracy_tally(*, exercise):
         "direct_voters": direct_voter_rows,
         "abstained_count": abstained_count,
         "total_vote_count": len(votes),
+    }
+
+
+@transaction.atomic
+def create_opinion_statement(*, actor, exercise, text):
+    exercise = (
+        EvaluationExercise.objects.select_for_update()
+        .select_related("decision", "organisation", "owner")
+        .get(id=exercise.id)
+    )
+    if exercise.method != EvaluationExercise.Method.OPINION_CLUSTERING:
+        raise EvaluationServiceError(
+            "Only an opinion-clustering exercise accepts statements."
+        )
+    if exercise.status != EvaluationExercise.Status.OPEN:
+        raise EvaluationServiceError("This opinion-clustering exercise is not open.")
+    if not can_submit_evaluation(actor=actor, exercise=exercise):
+        raise PermissionDenied("Only active, non-observer decision participants may add statements.")
+    statement = OpinionStatement(
+        organisation=exercise.organisation, exercise=exercise, author=actor, text=text
+    )
+    statement.full_clean(validate_unique=False, validate_constraints=False)
+    statement.save()
+    record_event(
+        action="evaluation.opinion_statement_created",
+        object_type="evaluations.OpinionStatement",
+        object_id=str(statement.id),
+        actor=actor,
+        organisation=exercise.organisation,
+        metadata={"exercise_id": str(exercise.id)},
+    )
+    return statement
+
+
+@transaction.atomic
+def cast_opinion_vote(*, actor, statement, choice):
+    statement = (
+        OpinionStatement.objects.select_for_update()
+        .select_related("exercise__decision", "exercise__organisation", "exercise__owner")
+        .get(id=statement.id)
+    )
+    exercise = statement.exercise
+    if not can_submit_evaluation(actor=actor, exercise=exercise):
+        raise PermissionDenied("Only active, non-observer decision participants may vote.")
+    if exercise.status != EvaluationExercise.Status.OPEN:
+        raise EvaluationServiceError("This opinion-clustering exercise is not open.")
+    vote, _ = OpinionVote.objects.update_or_create(
+        statement=statement,
+        voter=actor,
+        defaults={"organisation": statement.organisation, "choice": choice},
+    )
+    vote.full_clean(validate_unique=False, validate_constraints=False)
+    vote.save()
+    record_event(
+        action="evaluation.opinion_vote_cast",
+        object_type="evaluations.OpinionVote",
+        object_id=str(vote.id),
+        actor=actor,
+        organisation=statement.organisation,
+        metadata={"statement_id": str(statement.id), "choice": choice},
+    )
+    return vote
+
+
+def _select_pivot_statement(statements):
+    """The most-voted statement that has at least one agreeing and one disagreeing
+    voter - the natural axis to split the group on. Ties break on creation order.
+    """
+    candidates = sorted(statements, key=lambda s: len(s.votes.all()), reverse=True)
+    for statement in candidates:
+        agree_voters = {
+            v.voter_id for v in statement.votes.all() if v.choice == OpinionVote.Choice.AGREE
+        }
+        disagree_voters = {
+            v.voter_id for v in statement.votes.all() if v.choice == OpinionVote.Choice.DISAGREE
+        }
+        if agree_voters and disagree_voters:
+            return statement, agree_voters, disagree_voters
+    return None, set(), set()
+
+
+def _cluster_agree_rate(*, votes, cluster_voter_ids):
+    in_cluster = [v for v in votes if v.voter_id in cluster_voter_ids]
+    if not in_cluster:
+        return None
+    agree = sum(1 for v in in_cluster if v.choice == OpinionVote.Choice.AGREE)
+    return agree / len(in_cluster)
+
+
+def _classify_statement(*, cluster_a_rate, cluster_b_rate):
+    if cluster_a_rate is None or cluster_b_rate is None:
+        return "no_data"
+    high, low = OPINION_CLUSTER_CONSENSUS_THRESHOLD, 1 - OPINION_CLUSTER_CONSENSUS_THRESHOLD
+    both_agree = cluster_a_rate >= high and cluster_b_rate >= high
+    both_disagree = cluster_a_rate <= low and cluster_b_rate <= low
+    if both_agree or both_disagree:
+        return "bridging"
+    opposite_stances = (cluster_a_rate >= high and cluster_b_rate <= low) or (
+        cluster_b_rate >= high and cluster_a_rate <= low
+    )
+    if opposite_stances:
+        return "divisive"
+    return "mixed"
+
+
+def opinion_clustering_analysis(*, exercise):
+    """On-demand clustering of participants into two opinion groups from their votes.
+
+    A simple two-group split, not a PCA/k-means pipeline: the most-voted
+    statement with both agreeing and disagreeing voters becomes the pivot,
+    and everyone who voted on it is clustered by which side they took.
+    Everyone else - anyone who never voted on the pivot - isn't clustered.
+    Statements then get classified by whether the two clusters agree
+    ("bridging"), split ("divisive"), or neither ("mixed").
+    """
+    statements = list(
+        exercise.opinion_statements.select_related("author").prefetch_related("votes__voter")
+    )
+    base = {
+        "exercise_id": str(exercise.id),
+        "insufficient_data": True,
+        "pivot_statement_id": None,
+        "cluster_a_size": 0,
+        "cluster_b_size": 0,
+        "statements": [],
+        "bridging_statement_ids": [],
+        "divisive_statement_ids": [],
+        "warning": (
+            "Clusters are anchored on the most-voted statement with both agreeing and "
+            "disagreeing votes; participants who didn't vote on it aren't clustered."
+        ),
+    }
+    if not statements:
+        return base
+    pivot, cluster_a_ids, cluster_b_ids = _select_pivot_statement(statements)
+    if pivot is None:
+        return base
+
+    rows = []
+    bridging_ids = []
+    divisive_ids = []
+    for statement in statements:
+        votes = list(statement.votes.all())
+        cluster_a_rate = _cluster_agree_rate(votes=votes, cluster_voter_ids=cluster_a_ids)
+        cluster_b_rate = _cluster_agree_rate(votes=votes, cluster_voter_ids=cluster_b_ids)
+        classification = _classify_statement(
+            cluster_a_rate=cluster_a_rate, cluster_b_rate=cluster_b_rate
+        )
+        if classification == "bridging":
+            bridging_ids.append(str(statement.id))
+        elif classification == "divisive":
+            divisive_ids.append(str(statement.id))
+        rows.append(
+            {
+                "statement_id": str(statement.id),
+                "text": statement.text,
+                "author_email": statement.author.email,
+                "cluster_a_vote_count": sum(1 for v in votes if v.voter_id in cluster_a_ids),
+                "cluster_a_agree_rate": round_number(cluster_a_rate),
+                "cluster_b_vote_count": sum(1 for v in votes if v.voter_id in cluster_b_ids),
+                "cluster_b_agree_rate": round_number(cluster_b_rate),
+                "classification": classification,
+            }
+        )
+    return {
+        **base,
+        "insufficient_data": False,
+        "pivot_statement_id": str(pivot.id),
+        "cluster_a_size": len(cluster_a_ids),
+        "cluster_b_size": len(cluster_b_ids),
+        "statements": rows,
+        "bridging_statement_ids": bridging_ids,
+        "divisive_statement_ids": divisive_ids,
     }

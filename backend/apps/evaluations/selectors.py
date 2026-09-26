@@ -9,8 +9,18 @@ from .models import (
     EvaluationExercise,
     EvaluationRound,
     ForecastQuestion,
+    OpinionStatement,
     PortfolioCandidate,
     PrioritisationPortfolio,
+)
+
+_EXERCISE_PREFETCH = (
+    "criteria",
+    "rounds",
+    "forecast_questions__forecasts__forecaster",
+    "forecast_questions__resolved_by",
+    "opinion_statements__author",
+    "opinion_statements__votes__voter",
 )
 
 
@@ -19,9 +29,7 @@ def exercises_for_decision(*, user, decision_id):
     return (
         EvaluationExercise.objects.filter(decision=decision)
         .select_related("decision", "organisation", "owner", "created_by")
-        .prefetch_related(
-            "criteria", "rounds", "forecast_questions__forecasts__forecaster", "forecast_questions__resolved_by"
-        )
+        .prefetch_related(*_EXERCISE_PREFETCH)
     )
 
 
@@ -45,6 +53,8 @@ def exercise_workspace_for_user(*, user, exercise_id):
             "minority_reports__author",
             "forecast_questions__forecasts__forecaster",
             "forecast_questions__resolved_by",
+            "opinion_statements__author",
+            "opinion_statements__votes__voter",
         )
         .filter(organisation__memberships__user=user, organisation__memberships__status="active"),
         id=exercise_id,
@@ -66,6 +76,15 @@ def forecast_question_for_user(*, user, question_id):
             "exercise__decision", "exercise__organisation", "exercise__owner"
         ).filter(organisation__memberships__user=user, organisation__memberships__status="active"),
         id=question_id,
+    )
+
+
+def opinion_statement_for_user(*, user, statement_id):
+    return get_object_or_404(
+        OpinionStatement.objects.select_related(
+            "exercise__decision", "exercise__organisation", "exercise__owner"
+        ).filter(organisation__memberships__user=user, organisation__memberships__status="active"),
+        id=statement_id,
     )
 
 

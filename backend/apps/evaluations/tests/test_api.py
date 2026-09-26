@@ -489,3 +489,93 @@ def test_liquid_democracy_vote_delegation_and_tally_via_api(
     assert body["options"][0]["option_id"] == str(option.id)
     assert body["options"][0]["delegated_vote_count"] == 1
     assert body["direct_voters"][0]["delegated_vote_count"] == 1
+
+
+@pytest.mark.django_db
+def test_opinion_clustering_statement_vote_and_analysis_via_api(
+    api_client, organisation_factory, decision_factory, user_factory
+):  # type: ignore[no-untyped-def]
+    from apps.evaluations.models import EvaluationExercise
+    from apps.evaluations.services import create_exercise, update_exercise
+    from apps.organisations.models import Membership
+    from apps.participants.models import Participant
+
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    contributor = user_factory(email="contributor@example.com")
+    Membership.objects.create(
+        organisation=organisation,
+        user=contributor,
+        role=Membership.Role.CONTRIBUTOR,
+        status=Membership.Status.ACTIVE,
+    )
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    Participant.objects.create(
+        organisation=organisation,
+        decision=decision,
+        user=contributor,
+        role=Participant.Role.CONTRIBUTOR,
+        added_by=owner,
+    )
+    exercise = create_exercise(
+        actor=owner,
+        decision=decision,
+        owner_id=owner.id,
+        title="Opinion clustering",
+        purpose="p",
+        method="opinion_clustering",
+        quorum_count=1,
+    )
+    exercise = update_exercise(
+        actor=owner, exercise=exercise, fields={"status": EvaluationExercise.Status.OPEN}
+    )
+
+    api_client.force_authenticate(owner)
+    strict_response = api_client.post(
+        reverse("evaluations:opinion-statements", kwargs={"exercise_id": exercise.id}),
+        {"text": "Statement one.", "extra_field": True},
+        format="json",
+    )
+    assert strict_response.status_code == 400
+
+    created = api_client.post(
+        reverse("evaluations:opinion-statements", kwargs={"exercise_id": exercise.id}),
+        {"text": "Statement one."},
+        format="json",
+    )
+    assert created.status_code == 201
+    statement_id = created.json()["id"]
+
+    owner_vote = api_client.put(
+        reverse("evaluations:opinion-vote", kwargs={"statement_id": statement_id}),
+        {"choice": "agree"},
+        format="json",
+    )
+    assert owner_vote.status_code == 200
+    assert owner_vote.json()["choice"] == "agree"
+
+    api_client.force_authenticate(contributor)
+    contributor_vote = api_client.put(
+        reverse("evaluations:opinion-vote", kwargs={"statement_id": statement_id}),
+        {"choice": "disagree"},
+        format="json",
+    )
+    assert contributor_vote.status_code == 200
+
+    detail = api_client.get(
+        reverse("evaluations:evaluation-detail", kwargs={"exercise_id": exercise.id})
+    )
+    statement_payload = detail.json()["opinion_statements"][0]
+    assert statement_payload["agree_count"] == 1
+    assert statement_payload["disagree_count"] == 1
+
+    analysis = api_client.get(
+        reverse("evaluations:opinion-clustering", kwargs={"exercise_id": exercise.id})
+    )
+    assert analysis.status_code == 200
+    body = analysis.json()
+    # One statement split exactly one-for-one is enough to seed a (trivial) pivot;
+    # since it's the pivot itself, it's classified as maximally divisive.
+    assert body["insufficient_data"] is False
+    assert body["pivot_statement_id"] == statement_id
+    assert body["statements"][0]["classification"] == "divisive"

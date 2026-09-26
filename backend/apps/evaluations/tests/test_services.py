@@ -15,15 +15,18 @@ from apps.evaluations.services import (
     add_candidate,
     add_portfolio_criterion,
     cast_liquid_vote,
+    cast_opinion_vote,
     create_criterion,
     create_exercise,
     create_forecast_question,
     create_minority_report,
+    create_opinion_statement,
     create_portfolio,
     create_round,
     evaluation_results,
     forecasting_leaderboard,
     liquid_democracy_tally,
+    opinion_clustering_analysis,
     portfolio_recommendation,
     resolve_forecast_question,
     save_portfolio_assessment,
@@ -2218,3 +2221,255 @@ def test_cast_liquid_vote_allows_delegation_into_a_chain_with_an_unrelated_exist
 
     tally = liquid_democracy_tally(exercise=exercise)
     assert tally["abstained_count"] == 3  # owner, user_b, and user_c all resolve to nothing
+
+
+def _open_opinion_clustering_exercise(*, owner, decision, **overrides):
+    exercise = create_exercise(
+        actor=owner,
+        decision=decision,
+        owner_id=owner.id,
+        title=overrides.pop("title", "Community opinion mapping"),
+        purpose=overrides.pop("purpose", "Find where the group agrees and where it splits."),
+        method="opinion_clustering",
+        quorum_count=overrides.pop("quorum_count", 1),
+        **overrides,
+    )
+    return update_exercise(
+        actor=owner, exercise=exercise, fields={"status": EvaluationExercise.Status.OPEN}
+    )
+
+
+@pytest.mark.django_db
+def test_create_opinion_statement_requires_opinion_clustering_method(
+    organisation_factory, decision_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    exercise = create_exercise(
+        actor=owner,
+        decision=decision,
+        owner_id=owner.id,
+        title="Scorecard",
+        purpose="p",
+        method="scorecard",
+        quorum_count=1,
+    )
+    with pytest.raises(EvaluationServiceError):
+        create_opinion_statement(actor=owner, exercise=exercise, text="A statement.")
+
+
+@pytest.mark.django_db
+def test_create_opinion_statement_rejects_when_exercise_not_open(
+    organisation_factory, decision_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    exercise = create_exercise(
+        actor=owner,
+        decision=decision,
+        owner_id=owner.id,
+        title="Opinion clustering",
+        purpose="p",
+        method="opinion_clustering",
+        quorum_count=1,
+    )
+    with pytest.raises(EvaluationServiceError):
+        create_opinion_statement(actor=owner, exercise=exercise, text="A statement.")
+
+
+@pytest.mark.django_db
+def test_create_opinion_statement_permission_denied_for_non_participant(
+    organisation_factory, decision_factory, user_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    outsider = user_factory(email="outsider@example.com")
+    Membership.objects.create(
+        organisation=organisation,
+        user=outsider,
+        role=Membership.Role.CONTRIBUTOR,
+        status=Membership.Status.ACTIVE,
+    )
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    exercise = _open_opinion_clustering_exercise(owner=owner, decision=decision)
+    with pytest.raises(PermissionDenied):
+        create_opinion_statement(actor=outsider, exercise=exercise, text="A statement.")
+
+
+@pytest.mark.django_db
+def test_cast_opinion_vote_happy_path_and_revision(
+    organisation_factory, decision_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    exercise = _open_opinion_clustering_exercise(owner=owner, decision=decision)
+    statement = create_opinion_statement(actor=owner, exercise=exercise, text="A statement.")
+
+    vote = cast_opinion_vote(actor=owner, statement=statement, choice="agree")
+    assert vote.choice == "agree"
+
+    revised = cast_opinion_vote(actor=owner, statement=statement, choice="disagree")
+    assert revised.id == vote.id
+    assert revised.choice == "disagree"
+    assert statement.votes.count() == 1
+
+
+@pytest.mark.django_db
+def test_cast_opinion_vote_rejects_when_exercise_not_open(
+    organisation_factory, decision_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    exercise = _open_opinion_clustering_exercise(owner=owner, decision=decision)
+    statement = create_opinion_statement(actor=owner, exercise=exercise, text="A statement.")
+    update_exercise(actor=owner, exercise=exercise, fields={"status": EvaluationExercise.Status.CLOSED})
+
+    with pytest.raises(EvaluationServiceError):
+        cast_opinion_vote(actor=owner, statement=statement, choice="agree")
+
+
+@pytest.mark.django_db
+def test_opinion_clustering_analysis_insufficient_data_with_no_statements(
+    organisation_factory, decision_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    exercise = _open_opinion_clustering_exercise(owner=owner, decision=decision)
+
+    result = opinion_clustering_analysis(exercise=exercise)
+    assert result["insufficient_data"] is True
+    assert result["statements"] == []
+
+
+@pytest.mark.django_db
+def test_opinion_clustering_analysis_insufficient_data_when_no_statement_has_both_sides(
+    organisation_factory, decision_factory, user_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    contributor = user_factory(email="contributor@example.com")
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    _add_eligible_participant(organisation=organisation, decision=decision, owner=owner, user=contributor)
+    exercise = _open_opinion_clustering_exercise(owner=owner, decision=decision)
+    statement = create_opinion_statement(
+        actor=owner, exercise=exercise, text="Everyone agrees on this."
+    )
+    cast_opinion_vote(actor=owner, statement=statement, choice="agree")
+    cast_opinion_vote(actor=contributor, statement=statement, choice="agree")
+
+    result = opinion_clustering_analysis(exercise=exercise)
+    assert result["insufficient_data"] is True
+
+
+@pytest.mark.django_db
+def test_opinion_clustering_analysis_classifies_statements_and_excludes_unclustered_voters(
+    organisation_factory, decision_factory, user_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    p1 = organisation.created_by
+    p2 = user_factory(email="p2@example.com")
+    p3 = user_factory(email="p3@example.com")
+    p4 = user_factory(email="p4@example.com")
+    p5 = user_factory(email="p5@example.com")  # never votes on the pivot
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=p1)
+    for user in (p2, p3, p4, p5):
+        _add_eligible_participant(organisation=organisation, decision=decision, owner=p1, user=user)
+    exercise = _open_opinion_clustering_exercise(owner=p1, decision=decision)
+
+    # S1: 4 votes, split 2/2 - the most-voted statement with both sides, so it
+    # becomes the pivot. cluster_a = {p1, p3} (agree), cluster_b = {p2, p4} (disagree).
+    s1 = create_opinion_statement(actor=p1, exercise=exercise, text="S1: the pivot")
+    cast_opinion_vote(actor=p1, statement=s1, choice="agree")
+    cast_opinion_vote(actor=p2, statement=s1, choice="disagree")
+    cast_opinion_vote(actor=p3, statement=s1, choice="agree")
+    cast_opinion_vote(actor=p4, statement=s1, choice="disagree")
+
+    # S2: bridging - both clusters agree. p5 also votes here but isn't in either
+    # cluster (never voted on S1), so p5's vote must not affect the tally.
+    s2 = create_opinion_statement(actor=p1, exercise=exercise, text="S2: bridging")
+    cast_opinion_vote(actor=p1, statement=s2, choice="agree")
+    cast_opinion_vote(actor=p3, statement=s2, choice="agree")
+    cast_opinion_vote(actor=p2, statement=s2, choice="agree")
+    cast_opinion_vote(actor=p5, statement=s2, choice="disagree")
+
+    # S3: divisive - clusters take opposite stances.
+    s3 = create_opinion_statement(actor=p1, exercise=exercise, text="S3: divisive")
+    cast_opinion_vote(actor=p1, statement=s3, choice="agree")
+    cast_opinion_vote(actor=p3, statement=s3, choice="agree")
+    cast_opinion_vote(actor=p2, statement=s3, choice="disagree")
+
+    # S4: mixed - cluster_a is split down the middle, so neither side is a clean
+    # consensus or a clean split.
+    s4 = create_opinion_statement(actor=p1, exercise=exercise, text="S4: mixed")
+    cast_opinion_vote(actor=p1, statement=s4, choice="agree")
+    cast_opinion_vote(actor=p3, statement=s4, choice="disagree")
+    cast_opinion_vote(actor=p2, statement=s4, choice="agree")
+
+    result = opinion_clustering_analysis(exercise=exercise)
+
+    assert result["insufficient_data"] is False
+    assert result["pivot_statement_id"] == str(s1.id)
+    assert result["cluster_a_size"] == 2
+    assert result["cluster_b_size"] == 2
+
+    rows = {row["statement_id"]: row for row in result["statements"]}
+    assert rows[str(s1.id)]["classification"] == "divisive"  # the pivot is always divisive
+    assert rows[str(s2.id)]["classification"] == "bridging"
+    assert rows[str(s2.id)]["cluster_a_vote_count"] == 2
+    assert rows[str(s2.id)]["cluster_b_vote_count"] == 1  # p5's vote is excluded
+    assert rows[str(s3.id)]["classification"] == "divisive"
+    assert rows[str(s4.id)]["classification"] == "mixed"
+
+    assert set(result["bridging_statement_ids"]) == {str(s2.id)}
+    assert set(result["divisive_statement_ids"]) == {str(s1.id), str(s3.id)}
+
+
+@pytest.mark.django_db
+def test_cast_opinion_vote_permission_denied_for_non_participant(
+    organisation_factory, decision_factory, user_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    outsider = user_factory(email="outsider@example.com")
+    Membership.objects.create(
+        organisation=organisation,
+        user=outsider,
+        role=Membership.Role.CONTRIBUTOR,
+        status=Membership.Status.ACTIVE,
+    )
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    exercise = _open_opinion_clustering_exercise(owner=owner, decision=decision)
+    statement = create_opinion_statement(actor=owner, exercise=exercise, text="A statement.")
+    with pytest.raises(PermissionDenied):
+        cast_opinion_vote(actor=outsider, statement=statement, choice="agree")
+
+
+@pytest.mark.django_db
+def test_opinion_clustering_analysis_reports_no_data_when_a_cluster_never_voted(
+    organisation_factory, decision_factory, user_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    p1 = organisation.created_by
+    p2 = user_factory(email="p2@example.com")
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=p1)
+    _add_eligible_participant(organisation=organisation, decision=decision, owner=p1, user=p2)
+    exercise = _open_opinion_clustering_exercise(owner=p1, decision=decision)
+
+    pivot = create_opinion_statement(actor=p1, exercise=exercise, text="The pivot")
+    cast_opinion_vote(actor=p1, statement=pivot, choice="agree")
+    cast_opinion_vote(actor=p2, statement=pivot, choice="disagree")
+
+    only_a_votes = create_opinion_statement(actor=p1, exercise=exercise, text="Only p1 voted")
+    cast_opinion_vote(actor=p1, statement=only_a_votes, choice="agree")
+
+    result = opinion_clustering_analysis(exercise=exercise)
+    rows = {row["statement_id"]: row for row in result["statements"]}
+    row = rows[str(only_a_votes.id)]
+    assert row["classification"] == "no_data"
+    assert row["cluster_a_agree_rate"] == 1.0
+    assert row["cluster_b_agree_rate"] is None

@@ -22,6 +22,7 @@ class EvaluationExercise(UUIDTimeStampedModel):
         FORECASTING = "forecasting", "Calibrated forecasting"
         QUADRATIC = "quadratic", "Quadratic voting"
         LIQUID_DEMOCRACY = "liquid_democracy", "Liquid democracy"
+        OPINION_CLUSTERING = "opinion_clustering", "Opinion clustering"
 
     class Status(models.TextChoices):
         DRAFT = "draft", "Draft"
@@ -796,4 +797,82 @@ class LiquidVote(UUIDTimeStampedModel):
         ):
             raise ValidationError(
                 {"option": "Select an active option from the evaluated decision."}
+            )
+
+
+class OpinionStatement(UUIDTimeStampedModel):
+    """A free-text statement participants agree or disagree with, for opinion clustering."""
+
+    organisation = models.ForeignKey(
+        "organisations.Organisation", on_delete=models.CASCADE, related_name="opinion_statements"
+    )
+    exercise = models.ForeignKey(
+        EvaluationExercise, on_delete=models.CASCADE, related_name="opinion_statements"
+    )
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="opinion_statements"
+    )
+    text = models.CharField(max_length=500)
+
+    class Meta:
+        ordering = ["created_at", "id"]
+        indexes = [
+            models.Index(fields=["exercise", "created_at"], name="opinion_statement_exercise_idx"),
+        ]
+
+    def clean(self) -> None:
+        super().clean()
+        self.text = self.text.strip()
+        if not self.text:
+            raise ValidationError({"text": "A statement cannot be empty."})
+        if (
+            self.exercise_id
+            and self.organisation_id
+            and self.exercise.organisation_id != self.organisation_id
+        ):
+            raise ValidationError(
+                {"organisation": "The statement must share the exercise organisation."}
+            )
+        if (
+            self.exercise_id
+            and self.exercise.method != EvaluationExercise.Method.OPINION_CLUSTERING
+        ):
+            raise ValidationError(
+                {"exercise": "Statements may only be added to an opinion-clustering exercise."}
+            )
+
+
+class OpinionVote(UUIDTimeStampedModel):
+    """One participant's agree/disagree stance on one opinion statement."""
+
+    class Choice(models.TextChoices):
+        AGREE = "agree", "Agree"
+        DISAGREE = "disagree", "Disagree"
+
+    organisation = models.ForeignKey(
+        "organisations.Organisation", on_delete=models.CASCADE, related_name="opinion_votes"
+    )
+    statement = models.ForeignKey(OpinionStatement, on_delete=models.CASCADE, related_name="votes")
+    voter = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="opinion_votes"
+    )
+    choice = models.CharField(max_length=20, choices=Choice.choices)
+
+    class Meta:
+        ordering = ["-updated_at", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["statement", "voter"], name="one_opinion_vote_per_statement_voter"
+            ),
+        ]
+
+    def clean(self) -> None:
+        super().clean()
+        if (
+            self.statement_id
+            and self.organisation_id
+            and self.statement.organisation_id != self.organisation_id
+        ):
+            raise ValidationError(
+                {"organisation": "The vote must share the statement organisation."}
             )

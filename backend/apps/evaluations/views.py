@@ -15,6 +15,7 @@ from .selectors import (
     exercise_workspace_for_user,
     exercises_for_decision,
     forecast_question_for_user,
+    opinion_statement_for_user,
     portfolio_for_user,
     portfolios_for_organisation,
     round_for_user,
@@ -40,6 +41,10 @@ from .serializers import (
     LiquidVoteWriteSerializer,
     MinorityReportSerializer,
     MinorityReportWriteSerializer,
+    OpinionStatementSerializer,
+    OpinionStatementWriteSerializer,
+    OpinionVoteSerializer,
+    OpinionVoteWriteSerializer,
     PortfolioAssessmentSerializer,
     PortfolioAssessmentWriteSerializer,
     PortfolioCandidateSerializer,
@@ -56,15 +61,18 @@ from .services import (
     add_candidate,
     add_portfolio_criterion,
     cast_liquid_vote,
+    cast_opinion_vote,
     create_criterion,
     create_exercise,
     create_forecast_question,
     create_minority_report,
+    create_opinion_statement,
     create_portfolio,
     create_round,
     evaluation_results,
     forecasting_leaderboard,
     liquid_democracy_tally,
+    opinion_clustering_analysis,
     resolve_forecast_question,
     save_portfolio_assessment,
     save_submission,
@@ -262,6 +270,43 @@ class LiquidDemocracyTallyView(APIView):
     def get(self, request, exercise_id):
         exercise = exercise_for_user(user=request.user, exercise_id=exercise_id)
         return Response(liquid_democracy_tally(exercise=exercise))
+
+
+class OpinionStatementCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, exercise_id):
+        exercise = exercise_for_user(user=request.user, exercise_id=exercise_id)
+        serializer = OpinionStatementWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        item = create_opinion_statement(
+            actor=request.user, exercise=exercise, **serializer.validated_data
+        )
+        return Response(
+            OpinionStatementSerializer(item, context={"request": request}).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class OpinionVoteCastView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def put(self, request, statement_id):
+        statement = opinion_statement_for_user(user=request.user, statement_id=statement_id)
+        serializer = OpinionVoteWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        vote = cast_opinion_vote(
+            actor=request.user, statement=statement, **serializer.validated_data
+        )
+        return Response(OpinionVoteSerializer(vote, context={"request": request}).data)
+
+
+class OpinionClusteringAnalysisView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, exercise_id):
+        exercise = exercise_for_user(user=request.user, exercise_id=exercise_id)
+        return Response(opinion_clustering_analysis(exercise=exercise))
 
 
 class PrioritisationPortfolioListCreateView(APIView):
