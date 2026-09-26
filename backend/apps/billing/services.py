@@ -125,14 +125,18 @@ def assert_can_create_decision(*, organisation: Organisation) -> None:
     """Raise if creating one more active decision would exceed the plan limit."""
     from apps.decisions.models import Decision
 
-    subscription = OrganisationSubscription.objects.select_related("plan").filter(
-        organisation=organisation
-    ).first()
+    subscription = (
+        OrganisationSubscription.objects.select_related("plan")
+        .filter(organisation=organisation)
+        .first()
+    )
     if subscription is None or subscription.plan.max_active_decisions is None:
         return
-    active_count = Decision.objects.filter(organisation=organisation).exclude(
-        status=Decision.Status.ARCHIVED
-    ).count()
+    active_count = (
+        Decision.objects.filter(organisation=organisation)
+        .exclude(status=Decision.Status.ARCHIVED)
+        .count()
+    )
     if active_count >= subscription.plan.max_active_decisions:
         raise BillingServiceError(
             f"This organisation's {subscription.plan.name} plan allows up to "
@@ -143,9 +147,11 @@ def assert_can_create_decision(*, organisation: Organisation) -> None:
 
 def assert_can_add_member(*, organisation: Organisation) -> None:
     """Raise if adding one more active member would exceed the plan limit."""
-    subscription = OrganisationSubscription.objects.select_related("plan").filter(
-        organisation=organisation
-    ).first()
+    subscription = (
+        OrganisationSubscription.objects.select_related("plan")
+        .filter(organisation=organisation)
+        .first()
+    )
     if subscription is None or subscription.plan.max_active_members is None:
         return
     active_count = Membership.objects.filter(

@@ -42,12 +42,20 @@ def test_ownership_transfer_is_attributable_and_preserves_an_owner(
     api_client.force_authenticate(owner)
     response = api_client.post(
         reverse("organisations:transfer-ownership", kwargs={"organisation_id": organisation.id}),
-        {"target_membership_id": str(target.id), "rationale": "Leadership accountability has formally changed."},
+        {
+            "target_membership_id": str(target.id),
+            "rationale": "Leadership accountability has formally changed.",
+        },
         format="json",
     )
     assert response.status_code == 200
-    assert Membership.objects.get(organisation=organisation, user=successor).role == Membership.Role.OWNER
-    assert Membership.objects.get(organisation=organisation, user=owner).role == Membership.Role.ADMIN
+    assert (
+        Membership.objects.get(organisation=organisation, user=successor).role
+        == Membership.Role.OWNER
+    )
+    assert (
+        Membership.objects.get(organisation=organisation, user=owner).role == Membership.Role.ADMIN
+    )
     assert MembershipEvent.objects.filter(
         organisation=organisation, kind=MembershipEvent.Kind.OWNERSHIP_TRANSFERRED
     ).exists()

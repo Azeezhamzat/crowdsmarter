@@ -25,5 +25,9 @@ urlpatterns = [
         DisbursementConnectionTestView.as_view(),
         name="test-connection",
     ),
-    path("decision-options/<uuid:option_id>/disbursements/", OptionDisbursementListCreateView.as_view(), name="option-disbursements"),
+    path(
+        "decision-options/<uuid:option_id>/disbursements/",
+        OptionDisbursementListCreateView.as_view(),
+        name="option-disbursements",
+    ),
 ]

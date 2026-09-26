@@ -46,19 +46,28 @@ def test_totp_verify_accepts_current_code_and_rejects_wrong_code():
 
 @pytest.mark.django_db
 def test_full_mfa_enrollment_and_login_flow(user_factory):  # type: ignore[no-untyped-def]
-    user, client = _authenticated_client(user_factory, email="person@example.com", password="correct-password")
+    user, client = _authenticated_client(
+        user_factory, email="person@example.com", password="correct-password"
+    )
     assert client.get(reverse("accounts:mfa-status")).json()["is_enabled"] is False
 
     begin = client.post(
-        reverse("accounts:mfa-enroll-begin"), {}, format="json",
+        reverse("accounts:mfa-enroll-begin"),
+        {},
+        format="json",
         HTTP_X_CSRFTOKEN=client.cookies["csrftoken"].value,
     )
     assert begin.status_code == 200
     secret = begin.json()["secret"]
     assert begin.json()["provisioning_uri"].startswith("otpauth://totp/")
+    device = TOTPDevice.objects.get(user=user)
+    assert device.secret_encrypted != secret
+    assert secret not in device.secret_encrypted
 
     confirm = client.post(
-        reverse("accounts:mfa-enroll-confirm"), {"code": _current_code(secret)}, format="json",
+        reverse("accounts:mfa-enroll-confirm"),
+        {"code": _current_code(secret)},
+        format="json",
         HTTP_X_CSRFTOKEN=client.cookies["csrftoken"].value,
     )
     assert confirm.status_code == 200
@@ -71,7 +80,9 @@ def test_full_mfa_enrollment_and_login_flow(user_factory):  # type: ignore[no-un
     client.delete(reverse("accounts:logout"), HTTP_X_CSRFTOKEN=client.cookies["csrftoken"].value)
 
     login = client.post(
-        reverse("accounts:login"), {"email": user.email, "password": "correct-password"}, format="json",
+        reverse("accounts:login"),
+        {"email": user.email, "password": "correct-password"},
+        format="json",
         HTTP_X_CSRFTOKEN=client.cookies["csrftoken"].value,
     )
     assert login.status_code == 200
@@ -79,7 +90,9 @@ def test_full_mfa_enrollment_and_login_flow(user_factory):  # type: ignore[no-un
     assert client.get(reverse("accounts:me")).status_code == 403
 
     verify = client.post(
-        reverse("accounts:mfa-verify"), {"code": _current_code(secret)}, format="json",
+        reverse("accounts:mfa-verify"),
+        {"code": _current_code(secret)},
+        format="json",
         HTTP_X_CSRFTOKEN=client.cookies["csrftoken"].value,
     )
     assert verify.status_code == 200
@@ -103,19 +116,25 @@ def test_backup_code_can_complete_login_and_is_single_use(user_factory):  # type
 
 @pytest.mark.django_db
 def test_mfa_disable_requires_correct_password(user_factory):  # type: ignore[no-untyped-def]
-    user, client = _authenticated_client(user_factory, email="person@example.com", password="correct-password")
+    user, client = _authenticated_client(
+        user_factory, email="person@example.com", password="correct-password"
+    )
     enrollment = begin_mfa_enrollment(user=user)
     confirm_mfa_enrollment(user=user, code=_current_code(enrollment.secret))
 
     wrong = client.post(
-        reverse("accounts:mfa-disable"), {"password": "wrong-password"}, format="json",
+        reverse("accounts:mfa-disable"),
+        {"password": "wrong-password"},
+        format="json",
         HTTP_X_CSRFTOKEN=client.cookies["csrftoken"].value,
     )
     assert wrong.status_code == 400
     assert mfa_is_enabled(user=user) is True
 
     correct = client.post(
-        reverse("accounts:mfa-disable"), {"password": "correct-password"}, format="json",
+        reverse("accounts:mfa-disable"),
+        {"password": "correct-password"},
+        format="json",
         HTTP_X_CSRFTOKEN=client.cookies["csrftoken"].value,
     )
     assert correct.status_code == 200
@@ -144,12 +163,16 @@ def test_cannot_begin_enrollment_when_already_enabled(user_factory):  # type: ig
 
 @pytest.mark.django_db
 def test_mfa_verify_expires_after_the_pending_window(user_factory):  # type: ignore[no-untyped-def]
-    user, client = _authenticated_client(user_factory, email="person@example.com", password="correct-password")
+    user, client = _authenticated_client(
+        user_factory, email="person@example.com", password="correct-password"
+    )
     enrollment = begin_mfa_enrollment(user=user)
     confirm_mfa_enrollment(user=user, code=_current_code(enrollment.secret))
     client.delete(reverse("accounts:logout"), HTTP_X_CSRFTOKEN=client.cookies["csrftoken"].value)
     client.post(
-        reverse("accounts:login"), {"email": user.email, "password": "correct-password"}, format="json",
+        reverse("accounts:login"),
+        {"email": user.email, "password": "correct-password"},
+        format="json",
         HTTP_X_CSRFTOKEN=client.cookies["csrftoken"].value,
     )
 
@@ -158,7 +181,9 @@ def test_mfa_verify_expires_after_the_pending_window(user_factory):  # type: ign
         session["mfa_pending_started_at"] = time.time() - 301
         session.save()
         expired = client.post(
-            reverse("accounts:mfa-verify"), {"code": _current_code(enrollment.secret)}, format="json",
+            reverse("accounts:mfa-verify"),
+            {"code": _current_code(enrollment.secret)},
+            format="json",
             HTTP_X_CSRFTOKEN=client.cookies["csrftoken"].value,
         )
     assert expired.status_code == 400
@@ -171,21 +196,29 @@ def test_mfa_verify_is_rate_limited(user_factory, monkeypatch):  # type: ignore[
 
     monkeypatch.setattr(MFAVerifyThrottle, "rate", "1/min", raising=False)
     cache.clear()
-    user, client = _authenticated_client(user_factory, email="person@example.com", password="correct-password")
+    user, client = _authenticated_client(
+        user_factory, email="person@example.com", password="correct-password"
+    )
     enrollment = begin_mfa_enrollment(user=user)
     confirm_mfa_enrollment(user=user, code=_current_code(enrollment.secret))
     client.delete(reverse("accounts:logout"), HTTP_X_CSRFTOKEN=client.cookies["csrftoken"].value)
     client.post(
-        reverse("accounts:login"), {"email": user.email, "password": "correct-password"}, format="json",
+        reverse("accounts:login"),
+        {"email": user.email, "password": "correct-password"},
+        format="json",
         HTTP_X_CSRFTOKEN=client.cookies["csrftoken"].value,
     )
 
     first = client.post(
-        reverse("accounts:mfa-verify"), {"code": "000000"}, format="json",
+        reverse("accounts:mfa-verify"),
+        {"code": "000000"},
+        format="json",
         HTTP_X_CSRFTOKEN=client.cookies["csrftoken"].value,
     )
     second = client.post(
-        reverse("accounts:mfa-verify"), {"code": "000000"}, format="json",
+        reverse("accounts:mfa-verify"),
+        {"code": "000000"},
+        format="json",
         HTTP_X_CSRFTOKEN=client.cookies["csrftoken"].value,
     )
     assert first.status_code == 400

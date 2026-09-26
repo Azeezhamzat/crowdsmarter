@@ -107,9 +107,6 @@ class InvitationAcceptSerializer(StrictSerializer):
     def validate(self, attrs):  # type: ignore[no-untyped-def]
         password = attrs.get("password", "")
         confirmation = attrs.pop("password_confirm", "")
-        if password or confirmation:
-            if password != confirmation:
-                raise serializers.ValidationError(
-                    {"password_confirm": ["The passwords do not match."]}
-                )
+        if (password or confirmation) and password != confirmation:
+            raise serializers.ValidationError({"password_confirm": ["The passwords do not match."]})
         return attrs

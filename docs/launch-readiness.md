@@ -20,7 +20,8 @@ different claims, and this document draws the line between them honestly.
   auditable deletion safeguard (never immediate deletion) — see
   `docs/domain-model.md` and `docs/permissions.md`.
 - **Accessibility**: WCAG 2.2 AA audited across all routes (Phase 20.1).
-- **Data portability**: CSV/PDF/XLSX export with content-hash integrity,
+- **Data portability**: JSON/CSV/XLSX export with content-hash integrity and
+  print-ready facilitation reports that a browser can save as PDF,
   documented in ADR 0026 territory and `docs/api.md`.
 - **Advisory AI assistance**: rule-based, provider-independent, always
   human-reviewable and dismissible, with an evaluation harness tracking
@@ -74,15 +75,15 @@ are the place to pick this up when a real IdP is available for testing.
 
 ### Production infrastructure and observability
 
-The Docker Compose stack (`db`/`redis`/`backend`/`frontend`) is a
-development environment, not a production deployment target. There is no
-managed Postgres, no CDN, no autoscaling, no centralized log aggregation,
-no APM/tracing, and no uptime monitoring wired up — none of these can be
-meaningfully stood up or tested without a real cloud account and real
-traffic. `docs/deployment.md` documents the current state; a real
-production rollout needs a deployment target decision (the ADR pattern
-used throughout this project should be used for that decision too) before
-any of this is buildable.
+The repository now includes a locally testable Prometheus, Loki, Alloy,
+Grafana, and Alertmanager profile, structured request logs, request metrics,
+readiness probes, a provisioned dashboard, and baseline availability/error/
+latency alerts. This is a real centralised local foundation, but its receiver
+does not send external notifications and the built-in metrics collector is
+process-local. A production rollout still needs a deployment target, private
+telemetry networking, host/database/backup/certificate monitoring, a tested
+on-call receiver, and multiprocess-aware metrics or per-instance scraping.
+There is still no managed PostgreSQL, CDN, autoscaling, APM, or tracing.
 
 ### Public trust center and support operations
 
@@ -96,22 +97,21 @@ honest) or need policy decisions (a compliance page asserting SOC 2 status
 that isn't true is actively harmful) that are the account owner's to make,
 not something to fabricate.
 
-### Demo-to-trial conversion
+### Enquiry-to-engagement conversion
 
-`apps.demo_requests` fully covers lead capture and qualification status,
-but there is no automated "qualified demo request → provisioned trial
-organisation" pipeline. That conversion step is a deliberate human
-gate today (someone reads the qualified request and creates the account),
-which matches this project's general principle of not automating
-consequential account actions without a human decision.
+`apps.demo_requests` fully covers decision-enquiry capture and qualification
+status, but it does not automatically turn a qualified enquiry into an
+engagement or provision an organisation. That conversion remains a deliberate
+human gate: someone reviews the decision context, completes a fit assessment,
+and agrees the appropriate next step. This matches the project's principle of
+not automating consequential account actions without a human decision.
 
 ## Recommended order if this goes to real production
 
 1. Decide on a deployment target and write the ADR (`docs/deployment.md`
    already has groundwork).
-2. Wire real observability (logs, metrics, error tracking) before real
-   users arrive — you cannot retroactively observe an incident you didn't
-   instrument for.
+2. Deploy the supplied observability foundation privately, add infrastructure
+   and error tracking, and prove an alert reaches the on-call recipient.
 3. Connect Stripe Billing per ADR 0031, extending `OrganisationSubscription`
    rather than replacing it.
 4. Add SSO/SAML/SCIM once a target enterprise customer's IdP is available

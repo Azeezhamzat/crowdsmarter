@@ -44,9 +44,7 @@ def test_position_endpoint_submits_current_and_preserves_history(
     assert first.status_code == 201
     assert second.status_code == 201
     current = api_client.get(collection)
-    history = api_client.get(
-        reverse("positions:history", kwargs={"decision_id": decision.id})
-    )
+    history = api_client.get(reverse("positions:history", kwargs={"decision_id": decision.id}))
     assert current.status_code == 200
     assert len(current.json()) == 1
     assert current.json()[0]["version"] == 2
@@ -86,8 +84,6 @@ def test_position_endpoint_is_tenant_isolated(
     decision = decision_factory(status=Decision.Status.UNDER_REVIEW)
     api_client.force_authenticate(user_factory())
 
-    response = api_client.get(
-        reverse("positions:list-create", kwargs={"decision_id": decision.id})
-    )
+    response = api_client.get(reverse("positions:list-create", kwargs={"decision_id": decision.id}))
 
     assert response.status_code == 404

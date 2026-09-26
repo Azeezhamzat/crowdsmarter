@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 test("sign-in screen communicates human-led product positioning", async ({ page }) => {
   await page.goto("/login");
-  await expect(page.getByRole("heading", { name: "Continue the reasoning—not just the record." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Continue the reasoning, not just the record." })).toBeVisible();
   await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
 });
 
@@ -44,16 +44,18 @@ test("an organisation owner can invite a person who creates their own account", 
   await invitedContext.close();
 });
 
-test("public landing page explains the complete CrowdSmarter product", async ({ page }) => {
+test("public landing page presents facilitation before the supporting platform", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: /Turn uncertainty into accountable action/i })).toBeVisible();
-  await expect(page.getByRole("link", { name: /Request a tailored demo/i }).first()).toBeVisible();
-  await expect(page.getByRole("heading", { name: /missing connection between foresight and accountable decisions/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Make difficult decisions together, with a process people can trust/i })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Discuss a decision" }).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: "Set up a commons" }).first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: /distinction is facilitated continuity, not more software/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /designed to support scrutiny/i })).toBeVisible();
 });
 
 
-test("public demo request form is available", async ({ page }) => {
+test("public decision enquiry form is available", async ({ page }) => {
   await page.goto("/request-demo");
-  await expect(page.getByRole("heading", { name: /See how CrowdSmarter would support a real decision/i })).toBeVisible();
-  await expect(page.getByRole("button", { name: /Request demonstration/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Explore how CrowdSmarter could facilitate a real decision/i })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Send decision enquiry/i })).toBeVisible();
 });

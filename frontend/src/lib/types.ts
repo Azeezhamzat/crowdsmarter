@@ -212,6 +212,7 @@ export type DisbursementConfiguration = {
   provider_key: DisbursementProviderKey;
   provider_key_label: string;
   stripe_account_id: string;
+  currency: string;
   api_key_is_set: boolean;
   created_at: string;
   updated_at: string;
@@ -221,11 +222,14 @@ export type Disbursement = {
   id: string;
   option_id: string;
   amount: string;
+  currency: string;
   provider_key: DisbursementProviderKey;
   provider_key_label: string;
-  status: "paid" | "failed";
+  status: "pending" | "paid" | "failed";
   status_label: string;
+  idempotency_key: string;
   external_reference: string;
+  provider_detail: string;
   note: string;
   issued_by: User;
   created_at: string;
@@ -1085,8 +1089,13 @@ export type ForesightSource = {
   author: string;
   publisher: string;
   published_on: string | null;
+  accessed_on: string | null;
+  last_verified_at: string | null;
+  review_due_on: string | null;
   source_url: string;
+  archived_url: string;
   reference: string;
+  jurisdiction: string;
   credibility: "unassessed" | "low" | "moderate" | "high";
   credibility_label: string;
   credibility_rationale: string;
@@ -1101,10 +1110,65 @@ export type ForesightSource = {
     content_type: string;
     size_bytes: number;
     sha256: string;
+    malware_scan_status: "not_scanned" | "clean" | "infected" | "error";
+    malware_scan_engine: string;
+    malware_scanned_at: string | null;
     uploaded_by: User;
     created_at: string;
     download_url: string;
   }>;
+  can_edit: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ResearchClaim = {
+  id: string;
+  organisation_id: string;
+  statement: string;
+  state: "demonstrated" | "supported" | "plausible" | "unknown" | "contradicted";
+  state_label: string;
+  recommendation: "build" | "integrate" | "defer" | "avoid" | "monitor";
+  recommendation_label: string;
+  relevance: "facilitation" | "platform" | "operations" | "mixed";
+  relevance_label: string;
+  evidence_summary: string;
+  limitations: string;
+  assumptions: string;
+  reversal_conditions: string;
+  expected_outcome: string;
+  authority_score: number;
+  directness_score: number;
+  recency_score: number;
+  triangulation_score: number;
+  evidence_score: number;
+  linked_decision: { id: string; title: string } | null;
+  owner: User;
+  created_by: User;
+  review_due_on: string | null;
+  last_reviewed_at: string | null;
+  review_status: "unscheduled" | "overdue" | "due_soon" | "scheduled";
+  lifecycle_status: "draft" | "active" | "retired";
+  lifecycle_status_label: string;
+  source_links: Array<{
+    id: string;
+    source_id: string;
+    source_title: string;
+    source_type: ForesightSource["source_type"];
+    source_type_label: string;
+    credibility: ForesightSource["credibility"];
+    source_url: string;
+    publisher: string;
+    published_on: string | null;
+    relationship: "supports" | "contradicts" | "context";
+    relationship_label: string;
+    note: string;
+    linked_by: User;
+    created_at: string;
+    updated_at: string;
+  }>;
+  support_count: number;
+  contrary_count: number;
   can_edit: boolean;
   created_at: string;
   updated_at: string;
@@ -1167,6 +1231,9 @@ export type ForesightWatchlist = {
 export type ForesightOverview = {
   signal_count: number;
   source_count: number;
+  claim_count: number;
+  claims_due_for_review: number;
+  claims_with_evidence_gaps: number;
   watchlist_count: number;
   canvas_count: number;
   high_attention_count: number;
@@ -2018,11 +2085,89 @@ export type DecisionContributionWorkspace = {
 
 export type FacilitationSessionParticipant = {
   id: string;
-  user: User;
+  user: User | null;
+  display_label: string;
+  external_label: string;
+  stakeholder_group: string;
   role: "participant" | "observer";
   role_label: string;
   attendance: "invited" | "attended" | "absent";
   attendance_label: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type FacilitationRecord = {
+  id: string;
+  session_id: string;
+  agenda_item_id: string | null;
+  kind: "agreement" | "disagreement" | "action" | "evidence_gap" | "next_question" | "participant_statement";
+  kind_label: string;
+  body: string;
+  channel: "in_person" | "phone" | "paper" | "partner_assisted" | "digital" | "other";
+  channel_label: string;
+  origin: "participant_input" | "facilitator_synthesis";
+  origin_label: string;
+  attribution: "attributed" | "anonymous" | "confidential";
+  attribution_label: string;
+  source_participant: FacilitationSessionParticipant | null;
+  speaker_label: string;
+  permission_to_quote: boolean;
+  follow_up_owner: string;
+  created_by: User;
+  created_at: string;
+};
+
+export type FacilitationAgendaItem = {
+  id: string;
+  session_id: string;
+  title: string;
+  purpose: string;
+  method: string;
+  facilitator_prompt: string;
+  output_prompt: string;
+  planned_minutes: number;
+  actual_minutes: number | null;
+  order: number;
+  status: "queued" | "active" | "completed" | "skipped";
+  status_label: string;
+  started_at: string | null;
+  ended_at: string | null;
+  record_count: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type FacilitationAuthorityResponse = {
+  id: string;
+  session_id: string;
+  what_we_heard: string;
+  what_changed: string;
+  what_did_not_change: string;
+  rationale: string;
+  next_steps: string;
+  status: "draft" | "published";
+  status_label: string;
+  published_at: string | null;
+  published_by: User | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type FacilitationQualityReview = {
+  id: string;
+  session_id: string;
+  inclusion_score: number;
+  clarity_score: number;
+  neutrality_score: number;
+  participation_score: number;
+  follow_through_score: number;
+  overall_score: number;
+  what_worked: string;
+  improve_next_time: string;
+  unresolved_risks: string;
+  reviewed_by: User;
+  reviewed_at: string;
   created_at: string;
   updated_at: string;
 };
@@ -2034,13 +2179,24 @@ export type FacilitationSession = {
   objective: string;
   agenda: string;
   participation_guidance: string;
+  influence_boundary: string;
+  fixed_constraints: string;
+  participation_channels: Array<"in_person" | "phone" | "paper" | "partner_assisted" | "digital" | "other">;
+  missing_perspectives: string;
+  accessibility_arrangements: string;
+  consent_boundary: string;
   facilitator: User;
   starts_at: string | null;
   ends_at: string | null;
   status: "planned" | "open" | "closed" | "cancelled";
   status_label: string;
   participants: FacilitationSessionParticipant[];
+  agenda_items: FacilitationAgendaItem[];
+  records: FacilitationRecord[];
+  authority_response: FacilitationAuthorityResponse | null;
+  quality_review: FacilitationQualityReview | null;
   can_manage: boolean;
+  can_respond: boolean;
   closed_at: string | null;
   created_by: User;
   created_at: string;
@@ -2106,7 +2262,7 @@ export type Idea = {
   submitted_by_user: User | null;
   vote_count: number;
   voted_by_me: boolean;
-  application_status: IdeaApplicationStatus | null;
+  application_status?: IdeaApplicationStatus | null;
   comments: IdeaComment[];
   created_at: string;
   // Organiser-only safeguarding fields - present only on OpenSessionOrganiser

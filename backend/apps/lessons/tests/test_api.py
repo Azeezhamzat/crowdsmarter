@@ -5,9 +5,7 @@ from apps.decisions.models import Decision
 
 
 @pytest.mark.django_db
-def test_lessons_api_create_list_retire_and_archive(
-    api_client, decision_factory
-):  # type: ignore[no-untyped-def]
+def test_lessons_api_create_list_retire_and_archive(api_client, decision_factory):  # type: ignore[no-untyped-def]
     decision = decision_factory(status=Decision.Status.LESSONS_LEARNED)
     api_client.force_authenticate(decision.owner)
     list_url = reverse("lessons:list-create", kwargs={"decision_id": decision.id})
@@ -33,9 +31,7 @@ def test_lessons_api_create_list_retire_and_archive(
     )
     assert update_response.status_code == 200
 
-    retire_response = api_client.delete(
-        detail_url
-    )
+    retire_response = api_client.delete(detail_url)
     assert retire_response.status_code == 200
     assert retire_response.json()["status"] == "retired"
 
@@ -63,9 +59,7 @@ def test_lessons_api_create_list_retire_and_archive(
 
 
 @pytest.mark.django_db
-def test_lessons_api_is_tenant_isolated(
-    api_client, user_factory, decision_factory
-):  # type: ignore[no-untyped-def]
+def test_lessons_api_is_tenant_isolated(api_client, user_factory, decision_factory):  # type: ignore[no-untyped-def]
     decision = decision_factory(status=Decision.Status.LESSONS_LEARNED)
     api_client.force_authenticate(user_factory())
     response = api_client.get(reverse("lessons:list-create", kwargs={"decision_id": decision.id}))

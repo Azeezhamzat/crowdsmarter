@@ -5,7 +5,14 @@ from django.shortcuts import get_object_or_404
 
 from apps.organisations.selectors import organisation_for_user
 
-from .models import FeedSubscription, Signal, Source, SourceAttachment, Watchlist
+from .models import (
+    FeedSubscription,
+    ResearchClaim,
+    Signal,
+    Source,
+    SourceAttachment,
+    Watchlist,
+)
 
 
 def feeds_for_organisation(*, user, organisation_id):  # type: ignore[no-untyped-def]
@@ -50,9 +57,44 @@ def source_for_user(*, user, source_id):  # type: ignore[no-untyped-def]
 
 def attachment_for_user(*, user, attachment_id):  # type: ignore[no-untyped-def]
     return get_object_or_404(
-        SourceAttachment.objects.filter(source__organisation__in=user_organisations(user))
-        .select_related("source__organisation", "uploaded_by"),
+        SourceAttachment.objects.filter(
+            source__organisation__in=user_organisations(user)
+        ).select_related("source__organisation", "uploaded_by"),
         id=attachment_id,
+    )
+
+
+def research_claims_for_organisation(
+    *, user, organisation_id, query="", state="", recommendation="", lifecycle_status=""
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_for_user(user=user, organisation_id=organisation_id)
+    items = ResearchClaim.objects.filter(organisation=organisation).select_related(
+        "organisation", "owner", "created_by", "linked_decision"
+    )
+    if query:
+        items = items.filter(
+            Q(statement__icontains=query)
+            | Q(evidence_summary__icontains=query)
+            | Q(limitations__icontains=query)
+            | Q(expected_outcome__icontains=query)
+        )
+    filters = {
+        "state": state,
+        "recommendation": recommendation,
+        "lifecycle_status": lifecycle_status,
+    }
+    for field, value in filters.items():
+        if value:
+            items = items.filter(**{field: value})
+    return items.prefetch_related("source_links__source", "source_links__linked_by")
+
+
+def research_claim_for_user(*, user, claim_id):  # type: ignore[no-untyped-def]
+    return get_object_or_404(
+        ResearchClaim.objects.filter(organisation__in=user_organisations(user))
+        .select_related("organisation", "owner", "created_by", "linked_decision")
+        .prefetch_related("source_links__source", "source_links__linked_by"),
+        id=claim_id,
     )
 
 

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from django.conf import settings
+from django.core.exceptions import PermissionDenied
 from django.shortcuts import get_object_or_404
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_protect, ensure_csrf_cookie
@@ -19,7 +21,7 @@ from .serializers import (
     ProgressReportCreateSerializer,
 )
 
-APPLICANT_TOKEN_HEADER = "HTTP_X_APPLICANT_TOKEN"
+APPLICANT_SESSION_COOKIE = settings.APPLICANT_SESSION_COOKIE_NAME
 
 
 class _MagicLinkRequestThrottle(AnonRateThrottle):
@@ -35,12 +37,32 @@ class _ProgressReportThrottle(AnonRateThrottle):
 
 
 def _account_from_request(request):  # type: ignore[no-untyped-def]
-    raw_token = request.META.get(APPLICANT_TOKEN_HEADER, "").strip()
+    raw_token = request.COOKIES.get(APPLICANT_SESSION_COOKIE, "").strip()
     if not raw_token:
-        from django.core.exceptions import PermissionDenied
-
         raise PermissionDenied("Sign in to view your applications.")
     return services.applicant_account_from_portal_token(raw_token=raw_token)
+
+
+def _set_applicant_cookie(response: Response, raw_token: str) -> None:
+    from django.conf import settings
+
+    response.set_cookie(
+        APPLICANT_SESSION_COOKIE,
+        raw_token,
+        max_age=getattr(settings, "APPLICANT_SESSION_TTL_HOURS", 8) * 60 * 60,
+        httponly=True,
+        secure=getattr(settings, "SESSION_COOKIE_SECURE", False),
+        samesite="Lax",
+        path="/",
+    )
+
+
+def _clear_applicant_cookie(response: Response) -> None:
+    response.delete_cookie(
+        APPLICANT_SESSION_COOKIE,
+        samesite="Lax",
+        path="/",
+    )
 
 
 @method_decorator(ensure_csrf_cookie, name="dispatch")
@@ -74,15 +96,39 @@ class MagicLinkConsumeView(APIView):
     def post(self, request):  # type: ignore[no-untyped-def]
         serializer = MagicLinkConsumeSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        account, raw_portal_token = services.consume_magic_link(raw_token=serializer.validated_data["token"])
+        account, raw_portal_token = services.consume_magic_link(
+            raw_token=serializer.validated_data["token"]
+        )
         response = Response(
             {
-                "applicant_token": raw_portal_token,
                 "email": account.email,
                 "name": account.name,
             }
         )
+        _set_applicant_cookie(response, raw_portal_token)
         response["Cache-Control"] = "no-store"
+        return response
+
+
+@method_decorator(ensure_csrf_cookie, name="dispatch")
+@method_decorator(csrf_protect, name="dispatch")
+class ApplicantSessionLogoutView(APIView):
+    """Revoke the current applicant session and clear its HttpOnly cookie."""
+
+    permission_classes = [AllowAny]
+    authentication_classes: list[type] = []
+
+    def delete(self, request):  # type: ignore[no-untyped-def]
+        raw_token = request.COOKIES.get(APPLICANT_SESSION_COOKIE, "").strip()
+        if raw_token:
+            try:
+                account = services.applicant_account_from_portal_token(raw_token=raw_token)
+            except PermissionDenied:
+                account = None
+            if account is not None:
+                services.revoke_portal_session(account=account)
+        response = Response(status=status.HTTP_204_NO_CONTENT)
+        _clear_applicant_cookie(response)
         return response
 
 
@@ -129,4 +175,7 @@ class ProgressReportCreateView(APIView):
         data = MyApplicationSerializer(
             ideas, many=True, context={"progress_reports_by_idea": reports_by_idea}
         ).data
-        return Response({"email": account.email, "name": account.name, "applications": data}, status=status.HTTP_201_CREATED)
+        return Response(
+            {"email": account.email, "name": account.name, "applications": data},
+            status=status.HTTP_201_CREATED,
+        )

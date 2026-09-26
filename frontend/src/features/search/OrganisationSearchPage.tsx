@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { FormEvent, useState } from "react";
+import type { FormEvent} from "react";
+import { useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 
 import { StatusMessage } from "../../components/StatusMessage";

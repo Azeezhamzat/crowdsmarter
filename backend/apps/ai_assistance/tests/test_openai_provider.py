@@ -17,7 +17,15 @@ SNAPSHOT = {
         "context": "Current evidence is limited.",
     },
     "options": [{"id": "option-1", "title": "Run pilot"}],
-    "evidence": [{"id": "evidence-1", "title": "Survey", "summary": "x", "option_id": None, "stance": "supports"}],
+    "evidence": [
+        {
+            "id": "evidence-1",
+            "title": "Survey",
+            "summary": "x",
+            "option_id": None,
+            "stance": "supports",
+        }
+    ],
     "assumptions": [],
     "risks": [],
     "participants": [{"role": "decision_owner"}],
@@ -50,7 +58,11 @@ def test_parses_a_well_formed_tool_response_into_ai_review_output():
     payload = {
         "summary": "The pilot has thin evidence.",
         "missing_evidence": [
-            {"severity": "medium", "title": "No challenging evidence", "detail": "Only supportive evidence is recorded."}
+            {
+                "severity": "medium",
+                "title": "No challenging evidence",
+                "detail": "Only supportive evidence is recorded.",
+            }
         ],
         "unsupported_assumptions": [],
         "contradictory_evidence": [],
@@ -142,21 +154,44 @@ def test_summarise_analytics_parses_a_well_formed_narrative():
     config.save(update_fields=["ai_provider_api_key_encrypted"])
 
     metrics = {
-        "totals": {"decisions": 3, "open_decisions": 2, "finalised_decisions": 1, "archived_decisions": 0, "active_lessons": 1},
-        "flow": {"overdue_target_decisions": 0, "contribution_coverage_percent": 100.0, "median_days_to_finalise": 5.0, "created_last_90_days": 3, "finalised_last_90_days": 1},
-        "learning": {"reviews_due_or_overdue": 0, "outcome_success_percent": 100.0, "outcome_reviews_completed": 1, "active_lessons": 1},
+        "totals": {
+            "decisions": 3,
+            "open_decisions": 2,
+            "finalised_decisions": 1,
+            "archived_decisions": 0,
+            "active_lessons": 1,
+        },
+        "flow": {
+            "overdue_target_decisions": 0,
+            "contribution_coverage_percent": 100.0,
+            "median_days_to_finalise": 5.0,
+            "created_last_90_days": 3,
+            "finalised_last_90_days": 1,
+        },
+        "learning": {
+            "reviews_due_or_overdue": 0,
+            "outcome_success_percent": 100.0,
+            "outcome_reviews_completed": 1,
+            "active_lessons": 1,
+        },
     }
     payload = {
         "headline": "All open decisions have strong coverage.",
         "observations": [
-            {"severity": "low", "title": "Full contribution coverage", "detail": "Every open decision has two or more participants."},
+            {
+                "severity": "low",
+                "title": "Full contribution coverage",
+                "detail": "Every open decision has two or more participants.",
+            },
         ],
     }
 
     tool_call = SimpleNamespace(
         function=SimpleNamespace(name="submit_analytics_narrative", arguments=json.dumps(payload))
     )
-    response = SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(tool_calls=[tool_call]))])
+    response = SimpleNamespace(
+        choices=[SimpleNamespace(message=SimpleNamespace(tool_calls=[tool_call]))]
+    )
 
     with patch("apps.ai_assistance.providers.openai.openai.OpenAI") as mock_client_cls:
         mock_client_cls.return_value.chat.completions.create.return_value = response

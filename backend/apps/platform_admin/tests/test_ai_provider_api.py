@@ -35,19 +35,32 @@ def test_non_administrator_cannot_read_or_change_ai_provider(api_client, user_fa
     api_client.force_authenticate(user)
 
     assert api_client.get(reverse("platform_admin:platform-admin-configuration")).status_code == 403
-    assert api_client.patch(
-        reverse("platform_admin:platform-admin-ai-provider"),
-        {"provider_key": "rules", "model": "x", "rationale": "irrelevant, should be rejected first"},
-        format="json",
-    ).status_code == 403
-    assert api_client.post(
-        reverse("platform_admin:platform-admin-ai-provider-api-key"),
-        {"api_key": "sk-ant-test", "rationale": "irrelevant, should be rejected first"},
-        format="json",
-    ).status_code == 403
-    assert api_client.post(
-        reverse("platform_admin:platform-admin-ai-provider-test-connection"),
-    ).status_code == 403
+    assert (
+        api_client.patch(
+            reverse("platform_admin:platform-admin-ai-provider"),
+            {
+                "provider_key": "rules",
+                "model": "x",
+                "rationale": "irrelevant, should be rejected first",
+            },
+            format="json",
+        ).status_code
+        == 403
+    )
+    assert (
+        api_client.post(
+            reverse("platform_admin:platform-admin-ai-provider-api-key"),
+            {"api_key": "sk-ant-test", "rationale": "irrelevant, should be rejected first"},
+            format="json",
+        ).status_code
+        == 403
+    )
+    assert (
+        api_client.post(
+            reverse("platform_admin:platform-admin-ai-provider-test-connection"),
+        ).status_code
+        == 403
+    )
 
 
 @pytest.mark.django_db
@@ -103,9 +116,7 @@ def test_switching_to_anthropic_without_a_key_is_rejected(api_client, user_facto
 
 
 @pytest.mark.django_db
-def test_setting_api_key_never_leaks_the_raw_value_into_the_audit_log(
-    api_client, user_factory
-):
+def test_setting_api_key_never_leaks_the_raw_value_into_the_audit_log(api_client, user_factory):
     administrator = user_factory()
     grant_platform_capability(administrator)
     api_client.force_authenticate(administrator)
@@ -158,9 +169,7 @@ def test_switching_to_anthropic_succeeds_once_a_key_is_set(api_client, user_fact
 
 
 @pytest.mark.django_db
-def test_clearing_the_key_reverts_an_active_anthropic_provider_to_rules(
-    api_client, user_factory
-):
+def test_clearing_the_key_reverts_an_active_anthropic_provider_to_rules(api_client, user_factory):
     administrator = user_factory()
     grant_platform_capability(administrator)
     api_client.force_authenticate(administrator)
@@ -171,7 +180,11 @@ def test_clearing_the_key_reverts_an_active_anthropic_provider_to_rules(
     )
     api_client.patch(
         reverse("platform_admin:platform-admin-ai-provider"),
-        {"provider_key": "anthropic", "model": "claude-sonnet-5", "rationale": "Switch to the real reviewer."},
+        {
+            "provider_key": "anthropic",
+            "model": "claude-sonnet-5",
+            "rationale": "Switch to the real reviewer.",
+        },
         format="json",
     )
 

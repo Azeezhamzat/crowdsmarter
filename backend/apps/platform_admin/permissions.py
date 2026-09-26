@@ -19,7 +19,7 @@ def is_platform_administrator(user: Any) -> bool:
         user=user,
         status=PlatformAdministrator.Status.ACTIVE,
     ).exists()
-    setattr(user, "_crowdsmarter_platform_admin", value)
+    user._crowdsmarter_platform_admin = value
     return value
 
 

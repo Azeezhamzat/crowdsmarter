@@ -74,9 +74,7 @@ def notify_users(
         if recipient_id in seen or recipient.id == exclude_user_id:
             continue
         seen.add(recipient_id)
-        dedup_key = (
-            f"{dedup_key_prefix}:{recipient_id}" if dedup_key_prefix else ""
-        )
+        dedup_key = f"{dedup_key_prefix}:{recipient_id}" if dedup_key_prefix else ""
         created.append(
             create_notification(
                 recipient=recipient,
@@ -159,18 +157,22 @@ def deliver_signpost_watchlist_notifications(*, on_date: date | None = None) -> 
     due_date = on_date or timezone.localdate()
     delivered = 0
 
-    strong_observations = SignpostObservation.objects.filter(
-        assessment__in=[
-            SignpostObservation.Assessment.STRONG,
-            SignpostObservation.Assessment.CONTRADICTORY,
-        ],
-    ).select_related(
-        "signpost__owner",
-        "signpost__scenario_set__linked_decision__owner",
-        "signpost__scenario_set__canvas__organisation",
-    ).prefetch_related(
-        "signpost__assumption_links__assumption__owner",
-        "signpost__risk_links__risk__owner",
+    strong_observations = (
+        SignpostObservation.objects.filter(
+            assessment__in=[
+                SignpostObservation.Assessment.STRONG,
+                SignpostObservation.Assessment.CONTRADICTORY,
+            ],
+        )
+        .select_related(
+            "signpost__owner",
+            "signpost__scenario_set__linked_decision__owner",
+            "signpost__scenario_set__canvas__organisation",
+        )
+        .prefetch_related(
+            "signpost__assumption_links__assumption__owner",
+            "signpost__risk_links__risk__owner",
+        )
     )
     for observation in strong_observations:
         signpost = observation.signpost
@@ -179,10 +181,10 @@ def deliver_signpost_watchlist_notifications(*, on_date: date | None = None) -> 
         linked_decision = signpost.scenario_set.linked_decision
         if linked_decision is not None:
             recipients.add(linked_decision.owner)
-        for link in signpost.assumption_links.all():
-            recipients.add(link.assumption.owner)
-        for link in signpost.risk_links.all():
-            recipients.add(link.risk.owner)
+        for assumption_link in signpost.assumption_links.all():
+            recipients.add(assumption_link.assumption.owner)
+        for risk_link in signpost.risk_links.all():
+            recipients.add(risk_link.risk.owner)
         message = (
             f"“{signpost.title}” recorded {observation.get_assessment_display().lower()} "
             f"on {observation.observed_on.isoformat()}: {observation.value}"
@@ -190,9 +192,7 @@ def deliver_signpost_watchlist_notifications(*, on_date: date | None = None) -> 
         url = f"/foresight/scenario-sets/{signpost.scenario_set_id}"
         for recipient in recipients:
             dedup_key = f"signpost-observation:{observation.id}:{recipient.id}"
-            before = Notification.objects.filter(
-                recipient=recipient, dedup_key=dedup_key
-            ).exists()
+            before = Notification.objects.filter(recipient=recipient, dedup_key=dedup_key).exists()
             create_notification(
                 recipient=recipient,
                 organisation=organisation,
@@ -230,9 +230,7 @@ def deliver_signpost_watchlist_notifications(*, on_date: date | None = None) -> 
             continue
         organisation = signpost.scenario_set.canvas.organisation
         dedup_key = f"signpost-overdue:{signpost.id}:{anchor.isoformat()}"
-        before = Notification.objects.filter(
-            recipient=signpost.owner, dedup_key=dedup_key
-        ).exists()
+        before = Notification.objects.filter(recipient=signpost.owner, dedup_key=dedup_key).exists()
         create_notification(
             recipient=signpost.owner,
             organisation=organisation,

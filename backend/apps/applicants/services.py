@@ -10,7 +10,7 @@ from django.conf import settings
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.mail import send_mail
 from django.db import IntegrityError, transaction
-from django.db.models import Count, QuerySet
+from django.db.models import QuerySet
 from django.utils import timezone
 
 from apps.invitations.tokens import digest_token, generate_token
@@ -21,6 +21,7 @@ from .models import ApplicantAccount, MagicLinkToken, ProgressReport
 logger = logging.getLogger(__name__)
 
 MAGIC_LINK_TTL_MINUTES = 30
+PORTAL_SESSION_TTL_HOURS = 8
 
 
 class ApplicantServiceError(ValidationError):
@@ -87,8 +88,10 @@ def deliver_magic_link(*, account: ApplicantAccount, raw_token: str) -> str:
 def consume_magic_link(*, raw_token: str) -> tuple[ApplicantAccount, str]:
     """Verify and burn a magic link, returning the account and a fresh portal bearer token."""
     try:
-        token = MagicLinkToken.objects.select_for_update().select_related("account").get(
-            token_digest=digest_token(raw_token)
+        token = (
+            MagicLinkToken.objects.select_for_update()
+            .select_related("account")
+            .get(token_digest=digest_token(raw_token))
         )
     except MagicLinkToken.DoesNotExist as exc:
         raise PermissionDenied("This sign-in link is invalid.") from exc
@@ -106,15 +109,45 @@ def consume_magic_link(*, raw_token: str) -> tuple[ApplicantAccount, str]:
 
     raw_portal_token = generate_token()
     account.portal_token_digest = digest_token(raw_portal_token)
-    account.save(update_fields=["email_verified_at", "portal_token_digest", "updated_at"])
+    account.portal_token_expires_at = timezone.now() + timedelta(
+        hours=getattr(settings, "APPLICANT_SESSION_TTL_HOURS", PORTAL_SESSION_TTL_HOURS)
+    )
+    account.save(
+        update_fields=[
+            "email_verified_at",
+            "portal_token_digest",
+            "portal_token_expires_at",
+            "updated_at",
+        ]
+    )
+
+    # Email ownership has now been proven. Link any prior unclaimed session entries
+    # only at this point, never from an unauthenticated public join request.
+    from apps.ideation.models import SessionParticipant
+
+    SessionParticipant.objects.filter(
+        email__iexact=account.email,
+        account__isnull=True,
+    ).update(account=account)
     return account, raw_portal_token
 
 
 def applicant_account_from_portal_token(*, raw_token: str) -> ApplicantAccount:
     try:
-        return ApplicantAccount.objects.get(portal_token_digest=digest_token(raw_token))
+        return ApplicantAccount.objects.get(
+            portal_token_digest=digest_token(raw_token),
+            portal_token_expires_at__gt=timezone.now(),
+        )
     except ApplicantAccount.DoesNotExist as exc:
         raise PermissionDenied("Sign in again to view your applications.") from exc
+
+
+@transaction.atomic
+def revoke_portal_session(*, account: ApplicantAccount) -> None:
+    locked = ApplicantAccount.objects.select_for_update().get(id=account.id)
+    locked.portal_token_digest = None
+    locked.portal_token_expires_at = None
+    locked.save(update_fields=["portal_token_digest", "portal_token_expires_at", "updated_at"])
 
 
 def applications_for_account(*, account: ApplicantAccount) -> QuerySet:
@@ -137,7 +170,9 @@ def submit_progress_report(*, account: ApplicantAccount, idea, body: str) -> Pro
     if not owned:
         raise PermissionDenied("This application does not belong to your account.")
     if not idea.promoted_to_option_id or idea.promoted_to_option.outcome_status != "funded":
-        raise ApplicantServiceError("Progress reports can only be submitted for funded applications.")
+        raise ApplicantServiceError(
+            "Progress reports can only be submitted for funded applications."
+        )
 
     report = ProgressReport(idea=idea, account=account, body=body)
     report.full_clean(validate_unique=False, validate_constraints=False)

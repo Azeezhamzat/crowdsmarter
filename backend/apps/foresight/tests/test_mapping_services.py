@@ -170,14 +170,15 @@ def test_contributor_builds_traceable_systems_canvas(
     assert canvas.relationships.count() == 1
     assert canvas.feedback_loops.count() == 1
     assert list(
-        feedback_loop.driver_links.order_by("position").values_list(
-            "driver_id", flat=True
-        )
+        feedback_loop.driver_links.order_by("position").values_list("driver_id", flat=True)
     ) == [adaptation.id, finance.id]
     assert canvas.consequences.count() == 2
-    assert AuditEvent.objects.filter(
-        organisation=organisation, action__startswith="foresight."
-    ).count() >= 13
+    assert (
+        AuditEvent.objects.filter(
+            organisation=organisation, action__startswith="foresight."
+        ).count()
+        >= 13
+    )
 
 
 @pytest.mark.django_db

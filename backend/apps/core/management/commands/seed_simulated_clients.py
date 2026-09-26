@@ -61,8 +61,8 @@ from apps.foresight.models import (
 )
 from apps.lessons.models import Lesson
 from apps.organisations.models import Membership, Organisation
-from apps.platform_admin.models import PlatformAdministrator
 from apps.participants.models import Participant
+from apps.platform_admin.models import PlatformAdministrator
 from apps.positions.models import Position
 from apps.reviews.models import DecisionReview
 from apps.risks.models import Risk
@@ -152,7 +152,9 @@ CLIENTS: tuple[ClientSpec, ...] = (
         people=(
             PersonSpec("aoife.byrne@northstar.example", "Aoife", "Byrne", "Programme Director"),
             PersonSpec("kwame.mensah@northstar.example", "Kwame", "Mensah", "System Planning Lead"),
-            PersonSpec("niamh.oconnor@northstar.example", "Niamh", "O'Connor", "Community Engagement Lead"),
+            PersonSpec(
+                "niamh.oconnor@northstar.example", "Niamh", "O'Connor", "Community Engagement Lead"
+            ),
         ),
         options=(
             {
@@ -178,44 +180,236 @@ CLIENTS: tuple[ClientSpec, ...] = (
             },
         ),
         sources=(
-            {"title": "Regional peak-demand outlook 2026", "source_type": "dataset", "publisher": "NorthStar Analytics", "credibility": "high"},
-            {"title": "Community energy participation review", "source_type": "stakeholder", "publisher": "Independent Engagement Panel", "credibility": "moderate"},
-            {"title": "Flexibility market design consultation", "source_type": "government", "publisher": "Fictional Energy Regulator", "credibility": "high"},
+            {
+                "title": "Regional peak-demand outlook 2026",
+                "source_type": "dataset",
+                "publisher": "NorthStar Analytics",
+                "credibility": "high",
+            },
+            {
+                "title": "Community energy participation review",
+                "source_type": "stakeholder",
+                "publisher": "Independent Engagement Panel",
+                "credibility": "moderate",
+            },
+            {
+                "title": "Flexibility market design consultation",
+                "source_type": "government",
+                "publisher": "Fictional Energy Regulator",
+                "credibility": "high",
+            },
         ),
         signals=(
-            {"title": "Connection demand is concentrating faster than forecast", "summary": "Three growth zones account for most new connection requests.", "future_implication": "Portfolio value will depend on geographic targeting rather than system-wide averages.", "steep_category": "economic", "time_horizon": "near", "maturity": "established", "polarity": "both", "impact": 5, "uncertainty": 2},
-            {"title": "Household flexibility participation remains uneven", "summary": "Participation is higher among digitally confident and higher-income customers.", "future_implication": "A flexibility-first strategy could create distributional and legitimacy risks.", "steep_category": "social", "time_horizon": "near", "maturity": "emerging", "polarity": "threat", "impact": 4, "uncertainty": 3},
-            {"title": "Interoperable control standards are converging", "summary": "Vendors are adopting common interfaces for storage and demand-response assets.", "future_implication": "Vendor lock-in risk may decline, improving scale economics.", "steep_category": "technological", "time_horizon": "medium", "maturity": "emerging", "polarity": "opportunity", "impact": 4, "uncertainty": 3},
-            {"title": "Regulatory incentives are shifting toward outcomes", "summary": "Consultation language emphasises customer value and verified system outcomes.", "future_implication": "A staged portfolio with measurable gates may be rewarded over one-off capital programmes.", "steep_category": "legal", "time_horizon": "medium", "maturity": "emerging", "polarity": "opportunity", "impact": 5, "uncertainty": 3},
+            {
+                "title": "Connection demand is concentrating faster than forecast",
+                "summary": "Three growth zones account for most new connection requests.",
+                "future_implication": "Portfolio value will depend on geographic targeting rather than system-wide averages.",
+                "steep_category": "economic",
+                "time_horizon": "near",
+                "maturity": "established",
+                "polarity": "both",
+                "impact": 5,
+                "uncertainty": 2,
+            },
+            {
+                "title": "Household flexibility participation remains uneven",
+                "summary": "Participation is higher among digitally confident and higher-income customers.",
+                "future_implication": "A flexibility-first strategy could create distributional and legitimacy risks.",
+                "steep_category": "social",
+                "time_horizon": "near",
+                "maturity": "emerging",
+                "polarity": "threat",
+                "impact": 4,
+                "uncertainty": 3,
+            },
+            {
+                "title": "Interoperable control standards are converging",
+                "summary": "Vendors are adopting common interfaces for storage and demand-response assets.",
+                "future_implication": "Vendor lock-in risk may decline, improving scale economics.",
+                "steep_category": "technological",
+                "time_horizon": "medium",
+                "maturity": "emerging",
+                "polarity": "opportunity",
+                "impact": 4,
+                "uncertainty": 3,
+            },
+            {
+                "title": "Regulatory incentives are shifting toward outcomes",
+                "summary": "Consultation language emphasises customer value and verified system outcomes.",
+                "future_implication": "A staged portfolio with measurable gates may be rewarded over one-off capital programmes.",
+                "steep_category": "legal",
+                "time_horizon": "medium",
+                "maturity": "emerging",
+                "polarity": "opportunity",
+                "impact": 5,
+                "uncertainty": 3,
+            },
         ),
         drivers=(
-            {"title": "Electrification pace", "description": "Speed and concentration of transport, heat, and industrial electrification.", "driver_type": "critical_uncertainty", "steep_category": "technological", "direction": "increasing", "impact": 5, "uncertainty": 5},
-            {"title": "Public and customer trust", "description": "Willingness to participate in flexibility and accept network interventions.", "driver_type": "critical_uncertainty", "steep_category": "social", "direction": "volatile", "impact": 5, "uncertainty": 4},
-            {"title": "Interoperability maturity", "description": "Availability of secure, open, and scalable control interfaces.", "driver_type": "driver", "steep_category": "technological", "direction": "increasing", "impact": 4, "uncertainty": 3},
-            {"title": "Outcome-based regulation", "description": "Strength of incentives tied to measurable customer and resilience outcomes.", "driver_type": "trend", "steep_category": "legal", "direction": "increasing", "impact": 4, "uncertainty": 3},
+            {
+                "title": "Electrification pace",
+                "description": "Speed and concentration of transport, heat, and industrial electrification.",
+                "driver_type": "critical_uncertainty",
+                "steep_category": "technological",
+                "direction": "increasing",
+                "impact": 5,
+                "uncertainty": 5,
+            },
+            {
+                "title": "Public and customer trust",
+                "description": "Willingness to participate in flexibility and accept network interventions.",
+                "driver_type": "critical_uncertainty",
+                "steep_category": "social",
+                "direction": "volatile",
+                "impact": 5,
+                "uncertainty": 4,
+            },
+            {
+                "title": "Interoperability maturity",
+                "description": "Availability of secure, open, and scalable control interfaces.",
+                "driver_type": "driver",
+                "steep_category": "technological",
+                "direction": "increasing",
+                "impact": 4,
+                "uncertainty": 3,
+            },
+            {
+                "title": "Outcome-based regulation",
+                "description": "Strength of incentives tied to measurable customer and resilience outcomes.",
+                "driver_type": "trend",
+                "steep_category": "legal",
+                "direction": "increasing",
+                "impact": 4,
+                "uncertainty": 3,
+            },
         ),
-        scenario_axes=("Managed electrification", "Rapid electrification", "Low trust", "High trust"),
+        scenario_axes=(
+            "Managed electrification",
+            "Rapid electrification",
+            "Low trust",
+            "High trust",
+        ),
         scenarios=(
-            {"code": "A", "title": "Trusted acceleration", "x": "high", "y": "high", "headline": "Rapid demand growth is matched by strong participation and institutional trust.", "narrative": "Flexible assets scale quickly and communities accept staged investment when benefits are transparent.", "opportunities": "Scale local markets; defer selected capital works; build new customer services.", "threats": "Operational complexity and cyber exposure rise quickly."},
-            {"code": "B", "title": "Contested acceleration", "x": "high", "y": "low", "headline": "Demand rises quickly but customer participation and trust fragment.", "narrative": "The network faces urgent constraints while flexibility programmes are challenged on fairness and control.", "opportunities": "Target trusted intermediaries and protected-customer programmes.", "threats": "Connection delays, political pressure, and expensive emergency reinforcement."},
-            {"code": "C", "title": "Collaborative transition", "x": "low", "y": "high", "headline": "Demand grows steadily with time to co-design new services.", "narrative": "A slower transition enables careful pilots, standards alignment, and community capacity building.", "opportunities": "Optimise learning and sequence investment with evidence.", "threats": "Complacency may delay essential capability building."},
-            {"code": "D", "title": "Defensive grid", "x": "low", "y": "low", "headline": "Weak participation and uncertain demand favour conservative delivery.", "narrative": "The organisation protects reliability while preserving options for later acceleration.", "opportunities": "Focus on no-regret reinforcement and operational discipline.", "threats": "Missed innovation and higher long-run system costs."},
+            {
+                "code": "A",
+                "title": "Trusted acceleration",
+                "x": "high",
+                "y": "high",
+                "headline": "Rapid demand growth is matched by strong participation and institutional trust.",
+                "narrative": "Flexible assets scale quickly and communities accept staged investment when benefits are transparent.",
+                "opportunities": "Scale local markets; defer selected capital works; build new customer services.",
+                "threats": "Operational complexity and cyber exposure rise quickly.",
+            },
+            {
+                "code": "B",
+                "title": "Contested acceleration",
+                "x": "high",
+                "y": "low",
+                "headline": "Demand rises quickly but customer participation and trust fragment.",
+                "narrative": "The network faces urgent constraints while flexibility programmes are challenged on fairness and control.",
+                "opportunities": "Target trusted intermediaries and protected-customer programmes.",
+                "threats": "Connection delays, political pressure, and expensive emergency reinforcement.",
+            },
+            {
+                "code": "C",
+                "title": "Collaborative transition",
+                "x": "low",
+                "y": "high",
+                "headline": "Demand grows steadily with time to co-design new services.",
+                "narrative": "A slower transition enables careful pilots, standards alignment, and community capacity building.",
+                "opportunities": "Optimise learning and sequence investment with evidence.",
+                "threats": "Complacency may delay essential capability building.",
+            },
+            {
+                "code": "D",
+                "title": "Defensive grid",
+                "x": "low",
+                "y": "low",
+                "headline": "Weak participation and uncertain demand favour conservative delivery.",
+                "narrative": "The organisation protects reliability while preserving options for later acceleration.",
+                "opportunities": "Focus on no-regret reinforcement and operational discipline.",
+                "threats": "Missed innovation and higher long-run system costs.",
+            },
         ),
         evidence=(
-            {"title": "Constraint concentration analysis", "summary": "Most forecast overload risk is concentrated in a small number of zones.", "source_type": "internal_data", "stance": "supports", "strength": "high", "option": 2},
-            {"title": "Pilot participation findings", "summary": "Participation improves when benefits are visible and trusted intermediaries are involved.", "source_type": "stakeholder_input", "stance": "supports", "strength": "moderate", "option": 0},
-            {"title": "Whole-life cost comparison", "summary": "The hybrid portfolio has a higher governance cost but lower regret across demand ranges.", "source_type": "research", "stance": "supports", "strength": "high", "option": 2},
-            {"title": "Cyber assurance gap", "summary": "Current third-party control assurance is insufficient for immediate large-scale deployment.", "source_type": "expert_judgement", "stance": "challenges", "strength": "high", "option": 0},
+            {
+                "title": "Constraint concentration analysis",
+                "summary": "Most forecast overload risk is concentrated in a small number of zones.",
+                "source_type": "internal_data",
+                "stance": "supports",
+                "strength": "high",
+                "option": 2,
+            },
+            {
+                "title": "Pilot participation findings",
+                "summary": "Participation improves when benefits are visible and trusted intermediaries are involved.",
+                "source_type": "stakeholder_input",
+                "stance": "supports",
+                "strength": "moderate",
+                "option": 0,
+            },
+            {
+                "title": "Whole-life cost comparison",
+                "summary": "The hybrid portfolio has a higher governance cost but lower regret across demand ranges.",
+                "source_type": "research",
+                "stance": "supports",
+                "strength": "high",
+                "option": 2,
+            },
+            {
+                "title": "Cyber assurance gap",
+                "summary": "Current third-party control assurance is insufficient for immediate large-scale deployment.",
+                "source_type": "expert_judgement",
+                "stance": "challenges",
+                "strength": "high",
+                "option": 0,
+            },
         ),
         assumptions=(
-            {"statement": "At least two credible aggregators will enter each pilot zone.", "rationale": "Market sounding indicates interest but no binding commitment.", "impact_if_false": "Flexibility prices could become uncompetitive and pilots would not provide transferable evidence.", "confidence": "medium"},
-            {"statement": "Regulatory treatment will recognise verified deferral value.", "rationale": "Consultation direction is favourable but final methodology is pending.", "impact_if_false": "The hybrid option could underperform financially despite operational value.", "confidence": "medium"},
-            {"statement": "Critical interoperability controls can be assured within twelve months.", "rationale": "Standards are converging and vendors have published roadmaps.", "impact_if_false": "Scale-up gates must be delayed and reinforcement brought forward.", "confidence": "low"},
+            {
+                "statement": "At least two credible aggregators will enter each pilot zone.",
+                "rationale": "Market sounding indicates interest but no binding commitment.",
+                "impact_if_false": "Flexibility prices could become uncompetitive and pilots would not provide transferable evidence.",
+                "confidence": "medium",
+            },
+            {
+                "statement": "Regulatory treatment will recognise verified deferral value.",
+                "rationale": "Consultation direction is favourable but final methodology is pending.",
+                "impact_if_false": "The hybrid option could underperform financially despite operational value.",
+                "confidence": "medium",
+            },
+            {
+                "statement": "Critical interoperability controls can be assured within twelve months.",
+                "rationale": "Standards are converging and vendors have published roadmaps.",
+                "impact_if_false": "Scale-up gates must be delayed and reinforcement brought forward.",
+                "confidence": "low",
+            },
         ),
         risks=(
-            {"title": "Participation inequity", "description": "Benefits may accrue disproportionately to customers with capital and digital capability.", "likelihood": 4, "impact": 4, "response_strategy": "mitigate", "mitigation_plan": "Fund inclusive participation, publish distributional metrics, and use community intermediaries."},
-            {"title": "Cyber compromise through distributed assets", "description": "Third-party devices expand the operational attack surface.", "likelihood": 3, "impact": 5, "response_strategy": "mitigate", "mitigation_plan": "Require assurance gates, segmentation, incident drills, and vendor exit provisions."},
-            {"title": "Reinforcement lead-time shock", "description": "If demand accelerates, physical works may not be deliverable quickly enough.", "likelihood": 3, "impact": 5, "response_strategy": "monitor", "mitigation_plan": "Protect permits and designs for no-regret schemes while pilots run."},
+            {
+                "title": "Participation inequity",
+                "description": "Benefits may accrue disproportionately to customers with capital and digital capability.",
+                "likelihood": 4,
+                "impact": 4,
+                "response_strategy": "mitigate",
+                "mitigation_plan": "Fund inclusive participation, publish distributional metrics, and use community intermediaries.",
+            },
+            {
+                "title": "Cyber compromise through distributed assets",
+                "description": "Third-party devices expand the operational attack surface.",
+                "likelihood": 3,
+                "impact": 5,
+                "response_strategy": "mitigate",
+                "mitigation_plan": "Require assurance gates, segmentation, incident drills, and vendor exit provisions.",
+            },
+            {
+                "title": "Reinforcement lead-time shock",
+                "description": "If demand accelerates, physical works may not be deliverable quickly enough.",
+                "likelihood": 3,
+                "impact": 5,
+                "response_strategy": "monitor",
+                "mitigation_plan": "Protect permits and designs for no-regret schemes while pilots run.",
+            },
         ),
     ),
     ClientSpec(
@@ -251,54 +445,268 @@ CLIENTS: tuple[ClientSpec, ...] = (
         urgency="high",
         status="open_for_contribution",
         people=(
-            PersonSpec("sofia.malik@careweave.example", "Sofia", "Malik", "Transformation Director"),
+            PersonSpec(
+                "sofia.malik@careweave.example", "Sofia", "Malik", "Transformation Director"
+            ),
             PersonSpec("david.osei@careweave.example", "David", "Osei", "Clinical Operations Lead"),
-            PersonSpec("elena.rossi@careweave.example", "Elena", "Rossi", "Patient Partnership Lead"),
+            PersonSpec(
+                "elena.rossi@careweave.example", "Elena", "Rossi", "Patient Partnership Lead"
+            ),
         ),
         options=(
-            {"title": "Central virtual-care hub", "description": "Create one regional multidisciplinary hub that owns triage and remote monitoring.", "expected_benefits": "Concentrated expertise, standard protocols, and easier performance management.", "tradeoffs": "Risk of weak local integration and perceived transfer of control from clinical teams.", "is_status_quo": False},
-            {"title": "Distributed clinical network", "description": "Embed virtual-care capability within each locality using shared standards and peer support.", "expected_benefits": "Stronger continuity and local ownership.", "tradeoffs": "Variable implementation quality and duplicated coordination effort.", "is_status_quo": False},
-            {"title": "Staged specialty pathway", "description": "Launch one common pathway in two specialties with a small regional enablement team.", "expected_benefits": "Focused learning, bounded risk, and a clearer route to adaptation.", "tradeoffs": "Benefits arrive more slowly and require disciplined scale criteria.", "is_status_quo": False},
+            {
+                "title": "Central virtual-care hub",
+                "description": "Create one regional multidisciplinary hub that owns triage and remote monitoring.",
+                "expected_benefits": "Concentrated expertise, standard protocols, and easier performance management.",
+                "tradeoffs": "Risk of weak local integration and perceived transfer of control from clinical teams.",
+                "is_status_quo": False,
+            },
+            {
+                "title": "Distributed clinical network",
+                "description": "Embed virtual-care capability within each locality using shared standards and peer support.",
+                "expected_benefits": "Stronger continuity and local ownership.",
+                "tradeoffs": "Variable implementation quality and duplicated coordination effort.",
+                "is_status_quo": False,
+            },
+            {
+                "title": "Staged specialty pathway",
+                "description": "Launch one common pathway in two specialties with a small regional enablement team.",
+                "expected_benefits": "Focused learning, bounded risk, and a clearer route to adaptation.",
+                "tradeoffs": "Benefits arrive more slowly and require disciplined scale criteria.",
+                "is_status_quo": False,
+            },
         ),
         sources=(
-            {"title": "Virtual-care access baseline", "source_type": "internal", "publisher": "CareWeave Analytics", "credibility": "high"},
-            {"title": "Patient digital inclusion listening sessions", "source_type": "stakeholder", "publisher": "CareWeave Patient Council", "credibility": "high"},
-            {"title": "Clinical workload and safety review", "source_type": "expert", "publisher": "Independent Clinical Panel", "credibility": "moderate"},
+            {
+                "title": "Virtual-care access baseline",
+                "source_type": "internal",
+                "publisher": "CareWeave Analytics",
+                "credibility": "high",
+            },
+            {
+                "title": "Patient digital inclusion listening sessions",
+                "source_type": "stakeholder",
+                "publisher": "CareWeave Patient Council",
+                "credibility": "high",
+            },
+            {
+                "title": "Clinical workload and safety review",
+                "source_type": "expert",
+                "publisher": "Independent Clinical Panel",
+                "credibility": "moderate",
+            },
         ),
         signals=(
-            {"title": "Remote-monitoring demand is rising faster than support capacity", "summary": "Referrals for home monitoring are increasing while onboarding support remains fixed.", "future_implication": "Scale without service design could shift burden to patients and frontline teams.", "steep_category": "social", "time_horizon": "near", "maturity": "established", "polarity": "both", "impact": 5, "uncertainty": 2},
-            {"title": "Clinical teams are adopting asynchronous review unevenly", "summary": "Some specialties use asynchronous review routinely; others rely on synchronous appointments.", "future_implication": "A single operating model may create hidden workload and professional resistance.", "steep_category": "technological", "time_horizon": "near", "maturity": "emerging", "polarity": "both", "impact": 4, "uncertainty": 3},
-            {"title": "Digital exclusion is becoming more visible", "summary": "Language, disability, connectivity, and confidence barriers are increasingly documented.", "future_implication": "Access metrics must include who is excluded, not only total virtual contacts.", "steep_category": "ethical", "time_horizon": "near", "maturity": "established", "polarity": "threat", "impact": 5, "uncertainty": 2},
-            {"title": "Outcome-based service funding is gaining support", "summary": "Commissioning discussions increasingly emphasise access, safety, and avoided acute activity.", "future_implication": "A staged model with explicit outcomes may attract stronger institutional support.", "steep_category": "political", "time_horizon": "medium", "maturity": "emerging", "polarity": "opportunity", "impact": 4, "uncertainty": 3},
+            {
+                "title": "Remote-monitoring demand is rising faster than support capacity",
+                "summary": "Referrals for home monitoring are increasing while onboarding support remains fixed.",
+                "future_implication": "Scale without service design could shift burden to patients and frontline teams.",
+                "steep_category": "social",
+                "time_horizon": "near",
+                "maturity": "established",
+                "polarity": "both",
+                "impact": 5,
+                "uncertainty": 2,
+            },
+            {
+                "title": "Clinical teams are adopting asynchronous review unevenly",
+                "summary": "Some specialties use asynchronous review routinely; others rely on synchronous appointments.",
+                "future_implication": "A single operating model may create hidden workload and professional resistance.",
+                "steep_category": "technological",
+                "time_horizon": "near",
+                "maturity": "emerging",
+                "polarity": "both",
+                "impact": 4,
+                "uncertainty": 3,
+            },
+            {
+                "title": "Digital exclusion is becoming more visible",
+                "summary": "Language, disability, connectivity, and confidence barriers are increasingly documented.",
+                "future_implication": "Access metrics must include who is excluded, not only total virtual contacts.",
+                "steep_category": "ethical",
+                "time_horizon": "near",
+                "maturity": "established",
+                "polarity": "threat",
+                "impact": 5,
+                "uncertainty": 2,
+            },
+            {
+                "title": "Outcome-based service funding is gaining support",
+                "summary": "Commissioning discussions increasingly emphasise access, safety, and avoided acute activity.",
+                "future_implication": "A staged model with explicit outcomes may attract stronger institutional support.",
+                "steep_category": "political",
+                "time_horizon": "medium",
+                "maturity": "emerging",
+                "polarity": "opportunity",
+                "impact": 4,
+                "uncertainty": 3,
+            },
         ),
         drivers=(
-            {"title": "Workforce availability", "description": "Availability of clinical and coordination capacity for redesigned pathways.", "driver_type": "critical_uncertainty", "steep_category": "social", "direction": "decreasing", "impact": 5, "uncertainty": 5},
-            {"title": "Patient digital readiness", "description": "Ability and willingness of diverse patient groups to use virtual pathways.", "driver_type": "critical_uncertainty", "steep_category": "ethical", "direction": "volatile", "impact": 5, "uncertainty": 4},
-            {"title": "Clinical interoperability", "description": "Reliable flow of referrals, observations, escalation, and documentation.", "driver_type": "driver", "steep_category": "technological", "direction": "increasing", "impact": 4, "uncertainty": 3},
-            {"title": "Local leadership commitment", "description": "Consistency of clinical and operational sponsorship across localities.", "driver_type": "driver", "steep_category": "political", "direction": "volatile", "impact": 4, "uncertainty": 4},
+            {
+                "title": "Workforce availability",
+                "description": "Availability of clinical and coordination capacity for redesigned pathways.",
+                "driver_type": "critical_uncertainty",
+                "steep_category": "social",
+                "direction": "decreasing",
+                "impact": 5,
+                "uncertainty": 5,
+            },
+            {
+                "title": "Patient digital readiness",
+                "description": "Ability and willingness of diverse patient groups to use virtual pathways.",
+                "driver_type": "critical_uncertainty",
+                "steep_category": "ethical",
+                "direction": "volatile",
+                "impact": 5,
+                "uncertainty": 4,
+            },
+            {
+                "title": "Clinical interoperability",
+                "description": "Reliable flow of referrals, observations, escalation, and documentation.",
+                "driver_type": "driver",
+                "steep_category": "technological",
+                "direction": "increasing",
+                "impact": 4,
+                "uncertainty": 3,
+            },
+            {
+                "title": "Local leadership commitment",
+                "description": "Consistency of clinical and operational sponsorship across localities.",
+                "driver_type": "driver",
+                "steep_category": "political",
+                "direction": "volatile",
+                "impact": 4,
+                "uncertainty": 4,
+            },
         ),
-        scenario_axes=("Severe workforce constraint", "Manageable workforce constraint", "Low patient readiness", "High patient readiness"),
+        scenario_axes=(
+            "Severe workforce constraint",
+            "Manageable workforce constraint",
+            "Low patient readiness",
+            "High patient readiness",
+        ),
         scenarios=(
-            {"code": "A", "title": "Supported adoption", "x": "high", "y": "high", "headline": "Capacity and readiness allow virtual care to become a normal pathway.", "narrative": "Clinical teams, patients, and support services adapt together with visible safeguards.", "opportunities": "Scale pathways and redeploy capacity to higher-acuity care.", "threats": "Success may encourage over-expansion before evidence stabilises."},
-            {"code": "B", "title": "Demand without capacity", "x": "low", "y": "high", "headline": "Patients are ready but workforce constraints limit safe delivery.", "narrative": "Demand grows faster than clinical review and coordination capacity.", "opportunities": "Automate low-risk tasks and redesign roles.", "threats": "Backlogs move rather than disappear; burnout and safety incidents increase."},
-            {"code": "C", "title": "Protected transition", "x": "high", "y": "low", "headline": "Capacity exists, but many patients need alternatives and active support.", "narrative": "The service invests in blended access, navigation, and assisted digital pathways.", "opportunities": "Build an equitable model with stronger trust.", "threats": "Costs rise if inclusion is treated as a parallel service."},
-            {"code": "D", "title": "Fragmented care", "x": "low", "y": "low", "headline": "Low capacity and low readiness make rapid scale unsafe.", "narrative": "Virtual care remains limited to narrowly selected pathways while core services stabilise.", "opportunities": "Focus on high-value, low-complexity use cases.", "threats": "Regional inequity and duplicated local solutions persist."},
+            {
+                "code": "A",
+                "title": "Supported adoption",
+                "x": "high",
+                "y": "high",
+                "headline": "Capacity and readiness allow virtual care to become a normal pathway.",
+                "narrative": "Clinical teams, patients, and support services adapt together with visible safeguards.",
+                "opportunities": "Scale pathways and redeploy capacity to higher-acuity care.",
+                "threats": "Success may encourage over-expansion before evidence stabilises.",
+            },
+            {
+                "code": "B",
+                "title": "Demand without capacity",
+                "x": "low",
+                "y": "high",
+                "headline": "Patients are ready but workforce constraints limit safe delivery.",
+                "narrative": "Demand grows faster than clinical review and coordination capacity.",
+                "opportunities": "Automate low-risk tasks and redesign roles.",
+                "threats": "Backlogs move rather than disappear; burnout and safety incidents increase.",
+            },
+            {
+                "code": "C",
+                "title": "Protected transition",
+                "x": "high",
+                "y": "low",
+                "headline": "Capacity exists, but many patients need alternatives and active support.",
+                "narrative": "The service invests in blended access, navigation, and assisted digital pathways.",
+                "opportunities": "Build an equitable model with stronger trust.",
+                "threats": "Costs rise if inclusion is treated as a parallel service.",
+            },
+            {
+                "code": "D",
+                "title": "Fragmented care",
+                "x": "low",
+                "y": "low",
+                "headline": "Low capacity and low readiness make rapid scale unsafe.",
+                "narrative": "Virtual care remains limited to narrowly selected pathways while core services stabilise.",
+                "opportunities": "Focus on high-value, low-complexity use cases.",
+                "threats": "Regional inequity and duplicated local solutions persist.",
+            },
         ),
         evidence=(
-            {"title": "Specialty pathway baseline", "summary": "Two specialties have measurable delays that virtual review could reduce.", "source_type": "internal_data", "stance": "supports", "strength": "high", "option": 2},
-            {"title": "Patient partnership findings", "summary": "Patients prefer choice, assisted access, and clear escalation routes over digital-only pathways.", "source_type": "stakeholder_input", "stance": "challenges", "strength": "high", "option": 0},
-            {"title": "Clinical governance review", "summary": "A shared protocol is feasible if responsibility for escalation remains explicit.", "source_type": "expert_judgement", "stance": "supports", "strength": "moderate", "option": 2},
-            {"title": "Locality readiness survey", "summary": "Readiness varies substantially by specialty and locality.", "source_type": "internal_data", "stance": "challenges", "strength": "high", "option": 1},
+            {
+                "title": "Specialty pathway baseline",
+                "summary": "Two specialties have measurable delays that virtual review could reduce.",
+                "source_type": "internal_data",
+                "stance": "supports",
+                "strength": "high",
+                "option": 2,
+            },
+            {
+                "title": "Patient partnership findings",
+                "summary": "Patients prefer choice, assisted access, and clear escalation routes over digital-only pathways.",
+                "source_type": "stakeholder_input",
+                "stance": "challenges",
+                "strength": "high",
+                "option": 0,
+            },
+            {
+                "title": "Clinical governance review",
+                "summary": "A shared protocol is feasible if responsibility for escalation remains explicit.",
+                "source_type": "expert_judgement",
+                "stance": "supports",
+                "strength": "moderate",
+                "option": 2,
+            },
+            {
+                "title": "Locality readiness survey",
+                "summary": "Readiness varies substantially by specialty and locality.",
+                "source_type": "internal_data",
+                "stance": "challenges",
+                "strength": "high",
+                "option": 1,
+            },
         ),
         assumptions=(
-            {"statement": "Clinical teams can protect weekly redesign time during the pilot.", "rationale": "Local leaders support the pilot but rota changes are not yet agreed.", "impact_if_false": "The pathway could be layered onto existing workload and fail for avoidable reasons.", "confidence": "low"},
-            {"statement": "Assisted-digital support can be commissioned before launch.", "rationale": "Potential partners exist and funding has been identified.", "impact_if_false": "Excluded patients may experience worse access and confidence.", "confidence": "medium"},
-            {"statement": "Outcome data can be linked across referral and acute-care systems.", "rationale": "Data teams have a feasible design but information-governance approval is pending.", "impact_if_false": "The organisation cannot distinguish activity transfer from genuine improvement.", "confidence": "medium"},
+            {
+                "statement": "Clinical teams can protect weekly redesign time during the pilot.",
+                "rationale": "Local leaders support the pilot but rota changes are not yet agreed.",
+                "impact_if_false": "The pathway could be layered onto existing workload and fail for avoidable reasons.",
+                "confidence": "low",
+            },
+            {
+                "statement": "Assisted-digital support can be commissioned before launch.",
+                "rationale": "Potential partners exist and funding has been identified.",
+                "impact_if_false": "Excluded patients may experience worse access and confidence.",
+                "confidence": "medium",
+            },
+            {
+                "statement": "Outcome data can be linked across referral and acute-care systems.",
+                "rationale": "Data teams have a feasible design but information-governance approval is pending.",
+                "impact_if_false": "The organisation cannot distinguish activity transfer from genuine improvement.",
+                "confidence": "medium",
+            },
         ),
         risks=(
-            {"title": "Hidden workload transfer", "description": "Remote pathways may shift administrative and monitoring work to clinicians without removing other tasks.", "likelihood": 4, "impact": 5, "response_strategy": "mitigate", "mitigation_plan": "Baseline workload, redesign roles, cap caseloads, and review weekly during launch."},
-            {"title": "Digital exclusion", "description": "Patients facing language, disability, connectivity, or confidence barriers may receive worse access.", "likelihood": 4, "impact": 5, "response_strategy": "avoid", "mitigation_plan": "Guarantee non-digital routes, assisted access, accessibility testing, and equity metrics."},
-            {"title": "Unclear escalation accountability", "description": "Delayed or abnormal readings may not reach the right clinical owner quickly.", "likelihood": 3, "impact": 5, "response_strategy": "mitigate", "mitigation_plan": "Define escalation ownership, simulation-test protocols, and audit response times."},
+            {
+                "title": "Hidden workload transfer",
+                "description": "Remote pathways may shift administrative and monitoring work to clinicians without removing other tasks.",
+                "likelihood": 4,
+                "impact": 5,
+                "response_strategy": "mitigate",
+                "mitigation_plan": "Baseline workload, redesign roles, cap caseloads, and review weekly during launch.",
+            },
+            {
+                "title": "Digital exclusion",
+                "description": "Patients facing language, disability, connectivity, or confidence barriers may receive worse access.",
+                "likelihood": 4,
+                "impact": 5,
+                "response_strategy": "avoid",
+                "mitigation_plan": "Guarantee non-digital routes, assisted access, accessibility testing, and equity metrics.",
+            },
+            {
+                "title": "Unclear escalation accountability",
+                "description": "Delayed or abnormal readings may not reach the right clinical owner quickly.",
+                "likelihood": 3,
+                "impact": 5,
+                "response_strategy": "mitigate",
+                "mitigation_plan": "Define escalation ownership, simulation-test protocols, and audit response times.",
+            },
         ),
     ),
     ClientSpec(
@@ -334,54 +742,273 @@ CLIENTS: tuple[ClientSpec, ...] = (
         urgency="normal",
         status="implementation",
         people=(
-            PersonSpec("maeve.sullivan@terrafood.example", "Maeve", "Sullivan", "Research Strategy Director"),
-            PersonSpec("ibrahim.diallo@terrafood.example", "Ibrahim", "Diallo", "Climate Systems Scientist"),
-            PersonSpec("laura.chen@terrafood.example", "Laura", "Chen", "Industry Partnership Lead"),
+            PersonSpec(
+                "maeve.sullivan@terrafood.example",
+                "Maeve",
+                "Sullivan",
+                "Research Strategy Director",
+            ),
+            PersonSpec(
+                "ibrahim.diallo@terrafood.example", "Ibrahim", "Diallo", "Climate Systems Scientist"
+            ),
+            PersonSpec(
+                "laura.chen@terrafood.example", "Laura", "Chen", "Industry Partnership Lead"
+            ),
         ),
         options=(
-            {"title": "Climate-resilient genetics programme", "description": "Concentrate on resilient crop and livestock genetics with long-term field validation.", "expected_benefits": "Deep scientific capability and potentially durable productivity gains.", "tradeoffs": "Long time to impact and dependence on adoption, regulation, and complementary practices.", "is_status_quo": False},
-            {"title": "Circular bioeconomy programme", "description": "Prioritise nutrient recovery, side-stream valorisation, and low-waste value chains.", "expected_benefits": "New revenue pathways and measurable environmental benefits.", "tradeoffs": "Complex coordination and uncertain market development.", "is_status_quo": False},
-            {"title": "Integrated resilient farm-systems programme", "description": "Combine climate analytics, practice trials, farmer decision support, and policy learning.", "expected_benefits": "Earlier usable outcomes, stronger adoption evidence, and cross-system learning.", "tradeoffs": "Broad scope requires disciplined programme governance and shared methods.", "is_status_quo": False},
+            {
+                "title": "Climate-resilient genetics programme",
+                "description": "Concentrate on resilient crop and livestock genetics with long-term field validation.",
+                "expected_benefits": "Deep scientific capability and potentially durable productivity gains.",
+                "tradeoffs": "Long time to impact and dependence on adoption, regulation, and complementary practices.",
+                "is_status_quo": False,
+            },
+            {
+                "title": "Circular bioeconomy programme",
+                "description": "Prioritise nutrient recovery, side-stream valorisation, and low-waste value chains.",
+                "expected_benefits": "New revenue pathways and measurable environmental benefits.",
+                "tradeoffs": "Complex coordination and uncertain market development.",
+                "is_status_quo": False,
+            },
+            {
+                "title": "Integrated resilient farm-systems programme",
+                "description": "Combine climate analytics, practice trials, farmer decision support, and policy learning.",
+                "expected_benefits": "Earlier usable outcomes, stronger adoption evidence, and cross-system learning.",
+                "tradeoffs": "Broad scope requires disciplined programme governance and shared methods.",
+                "is_status_quo": False,
+            },
         ),
         sources=(
-            {"title": "Farm resilience longitudinal dataset", "source_type": "dataset", "publisher": "TerraFood Research Data Office", "credibility": "high"},
-            {"title": "Farmer and adviser futures workshops", "source_type": "stakeholder", "publisher": "TerraFood Engagement Unit", "credibility": "high"},
-            {"title": "2035 agri-food policy pathways review", "source_type": "government", "publisher": "Fictional Food Systems Department", "credibility": "moderate"},
+            {
+                "title": "Farm resilience longitudinal dataset",
+                "source_type": "dataset",
+                "publisher": "TerraFood Research Data Office",
+                "credibility": "high",
+            },
+            {
+                "title": "Farmer and adviser futures workshops",
+                "source_type": "stakeholder",
+                "publisher": "TerraFood Engagement Unit",
+                "credibility": "high",
+            },
+            {
+                "title": "2035 agri-food policy pathways review",
+                "source_type": "government",
+                "publisher": "Fictional Food Systems Department",
+                "credibility": "moderate",
+            },
         ),
         signals=(
-            {"title": "Climate variability is outpacing static recommendations", "summary": "Seasonal patterns and extremes are reducing the reliability of fixed advisory calendars.", "future_implication": "Research must produce adaptive decision rules, not only average-response guidance.", "steep_category": "environmental", "time_horizon": "near", "maturity": "established", "polarity": "threat", "impact": 5, "uncertainty": 2},
-            {"title": "Farm data tools are becoming cheaper but more fragmented", "summary": "Sensor and analytics adoption is rising without common interpretation standards.", "future_implication": "Decision-support interoperability may matter more than any single tool.", "steep_category": "technological", "time_horizon": "medium", "maturity": "emerging", "polarity": "both", "impact": 4, "uncertainty": 3},
-            {"title": "Environmental performance is moving into market access", "summary": "Buyers increasingly request verified emissions, biodiversity, and nutrient data.", "future_implication": "Research value will be judged partly by credible measurement and implementation pathways.", "steep_category": "economic", "time_horizon": "medium", "maturity": "emerging", "polarity": "both", "impact": 5, "uncertainty": 3},
-            {"title": "Farmers prefer co-designed, testable recommendations", "summary": "Engagement shows stronger trust where farmers can challenge assumptions and see local evidence.", "future_implication": "Participatory research design may become a core capability rather than dissemination activity.", "steep_category": "social", "time_horizon": "near", "maturity": "established", "polarity": "opportunity", "impact": 4, "uncertainty": 2},
+            {
+                "title": "Climate variability is outpacing static recommendations",
+                "summary": "Seasonal patterns and extremes are reducing the reliability of fixed advisory calendars.",
+                "future_implication": "Research must produce adaptive decision rules, not only average-response guidance.",
+                "steep_category": "environmental",
+                "time_horizon": "near",
+                "maturity": "established",
+                "polarity": "threat",
+                "impact": 5,
+                "uncertainty": 2,
+            },
+            {
+                "title": "Farm data tools are becoming cheaper but more fragmented",
+                "summary": "Sensor and analytics adoption is rising without common interpretation standards.",
+                "future_implication": "Decision-support interoperability may matter more than any single tool.",
+                "steep_category": "technological",
+                "time_horizon": "medium",
+                "maturity": "emerging",
+                "polarity": "both",
+                "impact": 4,
+                "uncertainty": 3,
+            },
+            {
+                "title": "Environmental performance is moving into market access",
+                "summary": "Buyers increasingly request verified emissions, biodiversity, and nutrient data.",
+                "future_implication": "Research value will be judged partly by credible measurement and implementation pathways.",
+                "steep_category": "economic",
+                "time_horizon": "medium",
+                "maturity": "emerging",
+                "polarity": "both",
+                "impact": 5,
+                "uncertainty": 3,
+            },
+            {
+                "title": "Farmers prefer co-designed, testable recommendations",
+                "summary": "Engagement shows stronger trust where farmers can challenge assumptions and see local evidence.",
+                "future_implication": "Participatory research design may become a core capability rather than dissemination activity.",
+                "steep_category": "social",
+                "time_horizon": "near",
+                "maturity": "established",
+                "polarity": "opportunity",
+                "impact": 4,
+                "uncertainty": 2,
+            },
         ),
         drivers=(
-            {"title": "Climate volatility", "description": "Frequency and severity of weather and biological shocks.", "driver_type": "critical_uncertainty", "steep_category": "environmental", "direction": "increasing", "impact": 5, "uncertainty": 5},
-            {"title": "Farmer adoption capacity", "description": "Financial, cognitive, labour, and advisory capacity to implement new practices.", "driver_type": "critical_uncertainty", "steep_category": "social", "direction": "volatile", "impact": 5, "uncertainty": 4},
-            {"title": "Outcome verification requirements", "description": "Market and policy demand for credible environmental and resilience evidence.", "driver_type": "trend", "steep_category": "legal", "direction": "increasing", "impact": 4, "uncertainty": 3},
-            {"title": "Cross-disciplinary research capability", "description": "Ability to integrate biological, digital, economic, and behavioural research.", "driver_type": "driver", "steep_category": "technological", "direction": "increasing", "impact": 4, "uncertainty": 3},
+            {
+                "title": "Climate volatility",
+                "description": "Frequency and severity of weather and biological shocks.",
+                "driver_type": "critical_uncertainty",
+                "steep_category": "environmental",
+                "direction": "increasing",
+                "impact": 5,
+                "uncertainty": 5,
+            },
+            {
+                "title": "Farmer adoption capacity",
+                "description": "Financial, cognitive, labour, and advisory capacity to implement new practices.",
+                "driver_type": "critical_uncertainty",
+                "steep_category": "social",
+                "direction": "volatile",
+                "impact": 5,
+                "uncertainty": 4,
+            },
+            {
+                "title": "Outcome verification requirements",
+                "description": "Market and policy demand for credible environmental and resilience evidence.",
+                "driver_type": "trend",
+                "steep_category": "legal",
+                "direction": "increasing",
+                "impact": 4,
+                "uncertainty": 3,
+            },
+            {
+                "title": "Cross-disciplinary research capability",
+                "description": "Ability to integrate biological, digital, economic, and behavioural research.",
+                "driver_type": "driver",
+                "steep_category": "technological",
+                "direction": "increasing",
+                "impact": 4,
+                "uncertainty": 3,
+            },
         ),
-        scenario_axes=("Moderate climate volatility", "Severe climate volatility", "Low adoption capacity", "High adoption capacity"),
+        scenario_axes=(
+            "Moderate climate volatility",
+            "Severe climate volatility",
+            "Low adoption capacity",
+            "High adoption capacity",
+        ),
         scenarios=(
-            {"code": "A", "title": "Adaptive acceleration", "x": "high", "y": "high", "headline": "Severe pressure combines with strong adoption and learning capacity.", "narrative": "Demand for integrated evidence is high and farms rapidly test adaptive practices.", "opportunities": "Scale decision support and system-level trials.", "threats": "Research cycles may be pushed faster than quality assurance allows."},
-            {"code": "B", "title": "Resilience divide", "x": "high", "y": "low", "headline": "Severe shocks meet limited capacity to respond.", "narrative": "Benefits concentrate among well-resourced farms unless programmes include transition support.", "opportunities": "Target vulnerable systems and simplify adoption pathways.", "threats": "Exit, inequality, and policy conflict increase."},
-            {"code": "C", "title": "Steady transformation", "x": "low", "y": "high", "headline": "Moderate pressure allows cumulative, evidence-led improvement.", "narrative": "Research partnerships mature and practices spread through trusted networks.", "opportunities": "Build durable platforms and longitudinal evidence.", "threats": "Urgency may fade and investment may fragment."},
-            {"code": "D", "title": "Incremental lock-in", "x": "low", "y": "low", "headline": "Moderate pressure and low capacity reinforce incremental programmes.", "narrative": "Existing systems persist while strategic capability erodes.", "opportunities": "Use low-cost demonstration and advisory integration.", "threats": "The sector is unprepared when volatility increases."},
+            {
+                "code": "A",
+                "title": "Adaptive acceleration",
+                "x": "high",
+                "y": "high",
+                "headline": "Severe pressure combines with strong adoption and learning capacity.",
+                "narrative": "Demand for integrated evidence is high and farms rapidly test adaptive practices.",
+                "opportunities": "Scale decision support and system-level trials.",
+                "threats": "Research cycles may be pushed faster than quality assurance allows.",
+            },
+            {
+                "code": "B",
+                "title": "Resilience divide",
+                "x": "high",
+                "y": "low",
+                "headline": "Severe shocks meet limited capacity to respond.",
+                "narrative": "Benefits concentrate among well-resourced farms unless programmes include transition support.",
+                "opportunities": "Target vulnerable systems and simplify adoption pathways.",
+                "threats": "Exit, inequality, and policy conflict increase.",
+            },
+            {
+                "code": "C",
+                "title": "Steady transformation",
+                "x": "low",
+                "y": "high",
+                "headline": "Moderate pressure allows cumulative, evidence-led improvement.",
+                "narrative": "Research partnerships mature and practices spread through trusted networks.",
+                "opportunities": "Build durable platforms and longitudinal evidence.",
+                "threats": "Urgency may fade and investment may fragment.",
+            },
+            {
+                "code": "D",
+                "title": "Incremental lock-in",
+                "x": "low",
+                "y": "low",
+                "headline": "Moderate pressure and low capacity reinforce incremental programmes.",
+                "narrative": "Existing systems persist while strategic capability erodes.",
+                "opportunities": "Use low-cost demonstration and advisory integration.",
+                "threats": "The sector is unprepared when volatility increases.",
+            },
         ),
         evidence=(
-            {"title": "Longitudinal resilience analysis", "summary": "Integrated management practices explain more resilience variance than isolated technology adoption.", "source_type": "research", "stance": "supports", "strength": "high", "option": 2},
-            {"title": "Farmer futures workshops", "summary": "Participants favour testable packages with transparent trade-offs over single-solution programmes.", "source_type": "stakeholder_input", "stance": "supports", "strength": "high", "option": 2},
-            {"title": "Commercial pathway review", "summary": "Circular bioeconomy opportunities are material but depend on infrastructure and offtake coordination.", "source_type": "expert_judgement", "stance": "mixed", "strength": "moderate", "option": 1},
-            {"title": "Genetics impact horizon", "summary": "Genetics remains strategically important but near-term resilience benefits require complementary management changes.", "source_type": "research", "stance": "mixed", "strength": "high", "option": 0},
+            {
+                "title": "Longitudinal resilience analysis",
+                "summary": "Integrated management practices explain more resilience variance than isolated technology adoption.",
+                "source_type": "research",
+                "stance": "supports",
+                "strength": "high",
+                "option": 2,
+            },
+            {
+                "title": "Farmer futures workshops",
+                "summary": "Participants favour testable packages with transparent trade-offs over single-solution programmes.",
+                "source_type": "stakeholder_input",
+                "stance": "supports",
+                "strength": "high",
+                "option": 2,
+            },
+            {
+                "title": "Commercial pathway review",
+                "summary": "Circular bioeconomy opportunities are material but depend on infrastructure and offtake coordination.",
+                "source_type": "expert_judgement",
+                "stance": "mixed",
+                "strength": "moderate",
+                "option": 1,
+            },
+            {
+                "title": "Genetics impact horizon",
+                "summary": "Genetics remains strategically important but near-term resilience benefits require complementary management changes.",
+                "source_type": "research",
+                "stance": "mixed",
+                "strength": "high",
+                "option": 0,
+            },
         ),
         assumptions=(
-            {"statement": "Research teams will adopt shared system-level outcome measures.", "rationale": "Leadership supports integration but disciplines use different success conventions.", "impact_if_false": "The programme may become a bundle of projects rather than a coherent learning system.", "confidence": "medium"},
-            {"statement": "A representative farm network can be maintained for five years.", "rationale": "Existing relationships are strong but participation costs are rising.", "impact_if_false": "External validity and adoption evidence would weaken.", "confidence": "medium"},
-            {"statement": "Policy partners will use interim evidence before final programme completion.", "rationale": "Partners requested annual synthesis but governance is informal.", "impact_if_false": "Useful learning may arrive too late to shape policy cycles.", "confidence": "low"},
+            {
+                "statement": "Research teams will adopt shared system-level outcome measures.",
+                "rationale": "Leadership supports integration but disciplines use different success conventions.",
+                "impact_if_false": "The programme may become a bundle of projects rather than a coherent learning system.",
+                "confidence": "medium",
+            },
+            {
+                "statement": "A representative farm network can be maintained for five years.",
+                "rationale": "Existing relationships are strong but participation costs are rising.",
+                "impact_if_false": "External validity and adoption evidence would weaken.",
+                "confidence": "medium",
+            },
+            {
+                "statement": "Policy partners will use interim evidence before final programme completion.",
+                "rationale": "Partners requested annual synthesis but governance is informal.",
+                "impact_if_false": "Useful learning may arrive too late to shape policy cycles.",
+                "confidence": "low",
+            },
         ),
         risks=(
-            {"title": "Programme breadth dilutes accountability", "description": "Cross-disciplinary scope could obscure ownership and produce disconnected work packages.", "likelihood": 3, "impact": 4, "response_strategy": "mitigate", "mitigation_plan": "Use shared outcomes, integration reviews, and explicit stop-or-merge decisions."},
-            {"title": "Participation bias", "description": "Research farms may over-represent organisations already able to adopt innovation.", "likelihood": 4, "impact": 4, "response_strategy": "mitigate", "mitigation_plan": "Recruit stratified cohorts, fund participation, and publish representation gaps."},
-            {"title": "Policy timing mismatch", "description": "Policy decisions may precede robust programme evidence.", "likelihood": 4, "impact": 3, "response_strategy": "monitor", "mitigation_plan": "Publish bounded interim findings with uncertainty and pre-agreed review dates."},
+            {
+                "title": "Programme breadth dilutes accountability",
+                "description": "Cross-disciplinary scope could obscure ownership and produce disconnected work packages.",
+                "likelihood": 3,
+                "impact": 4,
+                "response_strategy": "mitigate",
+                "mitigation_plan": "Use shared outcomes, integration reviews, and explicit stop-or-merge decisions.",
+            },
+            {
+                "title": "Participation bias",
+                "description": "Research farms may over-represent organisations already able to adopt innovation.",
+                "likelihood": 4,
+                "impact": 4,
+                "response_strategy": "mitigate",
+                "mitigation_plan": "Recruit stratified cohorts, fund participation, and publish representation gaps.",
+            },
+            {
+                "title": "Policy timing mismatch",
+                "description": "Policy decisions may precede robust programme evidence.",
+                "likelihood": 4,
+                "impact": 3,
+                "response_strategy": "monitor",
+                "mitigation_plan": "Publish bounded interim findings with uncertainty and pre-agreed review dates.",
+            },
         ),
         selected_option_index=2,
     ),
@@ -411,10 +1038,12 @@ class Command(BaseCommand):
 
         administrators = [
             item.user
-            for item in PlatformAdministrator.objects.select_related("user").filter(
+            for item in PlatformAdministrator.objects.select_related("user")
+            .filter(
                 status=PlatformAdministrator.Status.ACTIVE,
                 user__is_active=True,
-            ).order_by("user__email")
+            )
+            .order_by("user__email")
         ]
         if not administrators:
             administrators = list(
@@ -688,7 +1317,7 @@ class Command(BaseCommand):
             )
             for index, item in enumerate(spec.assumptions)
         ]
-        risks = [
+        [
             Risk.objects.create(
                 organisation=organisation,
                 decision=decision,
@@ -729,14 +1358,72 @@ class Command(BaseCommand):
             )
         SystemStakeholder.objects.bulk_create(
             [
-                SystemStakeholder(canvas=canvas, name="Operational teams", stakeholder_type="internal", role="Deliver and govern the chosen model.", interests="Safety, feasibility, workload, and clear accountability.", influence=5, exposure=5, stance="mixed", created_by=primary_admin),
-                SystemStakeholder(canvas=canvas, name="Customers and service users", stakeholder_type="customer", role="Experience the benefits, burdens, and access conditions.", interests="Fair outcomes, understandable choices, and reliable service.", influence=3, exposure=5, stance="mixed", created_by=primary_admin),
-                SystemStakeholder(canvas=canvas, name="Regulators and public authorities", stakeholder_type="regulator", role="Set constraints, incentives, and assurance expectations.", interests="Public value, compliance, resilience, and evidence.", influence=5, exposure=3, stance="neutral", created_by=primary_admin),
-                SystemStakeholder(canvas=canvas, name="Delivery partners", stakeholder_type="partner", role="Provide capability, infrastructure, and specialist knowledge.", interests="Stable requirements, viable contracts, and trusted collaboration.", influence=4, exposure=4, stance="supportive", created_by=primary_admin),
+                SystemStakeholder(
+                    canvas=canvas,
+                    name="Operational teams",
+                    stakeholder_type="internal",
+                    role="Deliver and govern the chosen model.",
+                    interests="Safety, feasibility, workload, and clear accountability.",
+                    influence=5,
+                    exposure=5,
+                    stance="mixed",
+                    created_by=primary_admin,
+                ),
+                SystemStakeholder(
+                    canvas=canvas,
+                    name="Customers and service users",
+                    stakeholder_type="customer",
+                    role="Experience the benefits, burdens, and access conditions.",
+                    interests="Fair outcomes, understandable choices, and reliable service.",
+                    influence=3,
+                    exposure=5,
+                    stance="mixed",
+                    created_by=primary_admin,
+                ),
+                SystemStakeholder(
+                    canvas=canvas,
+                    name="Regulators and public authorities",
+                    stakeholder_type="regulator",
+                    role="Set constraints, incentives, and assurance expectations.",
+                    interests="Public value, compliance, resilience, and evidence.",
+                    influence=5,
+                    exposure=3,
+                    stance="neutral",
+                    created_by=primary_admin,
+                ),
+                SystemStakeholder(
+                    canvas=canvas,
+                    name="Delivery partners",
+                    stakeholder_type="partner",
+                    role="Provide capability, infrastructure, and specialist knowledge.",
+                    interests="Stable requirements, viable contracts, and trusted collaboration.",
+                    influence=4,
+                    exposure=4,
+                    stance="supportive",
+                    created_by=primary_admin,
+                ),
             ]
         )
-        CausalRelationship.objects.create(canvas=canvas, source_driver=drivers[0], target_driver=drivers[1], polarity="reinforcing", strength=4, delay="short", rationale="Faster external change increases pressure on trust, adoption, and perceived fairness.", created_by=primary_admin)
-        CausalRelationship.objects.create(canvas=canvas, source_driver=drivers[2], target_driver=drivers[1], polarity="reinforcing", strength=3, delay="medium", rationale="Better enabling capability can improve confidence and participation when governance is visible.", created_by=primary_admin)
+        CausalRelationship.objects.create(
+            canvas=canvas,
+            source_driver=drivers[0],
+            target_driver=drivers[1],
+            polarity="reinforcing",
+            strength=4,
+            delay="short",
+            rationale="Faster external change increases pressure on trust, adoption, and perceived fairness.",
+            created_by=primary_admin,
+        )
+        CausalRelationship.objects.create(
+            canvas=canvas,
+            source_driver=drivers[2],
+            target_driver=drivers[1],
+            polarity="reinforcing",
+            strength=3,
+            delay="medium",
+            rationale="Better enabling capability can improve confidence and participation when governance is visible.",
+            created_by=primary_admin,
+        )
 
         implication = StrategicImplication.objects.create(
             canvas=canvas,
@@ -787,7 +1474,9 @@ class Command(BaseCommand):
                 ScenarioDriverState.objects.create(
                     scenario=scenario,
                     driver=driver,
-                    state=("strengthening", "volatile", "transformed", "stable")[(index + d_index) % 4],
+                    state=("strengthening", "volatile", "transformed", "stable")[
+                        (index + d_index) % 4
+                    ],
                     salience=5 if d_index < 2 else 3,
                     description=f"In {scenario.title}, {driver.title.lower()} materially shapes feasibility and timing.",
                     created_by=primary_admin,
@@ -814,7 +1503,9 @@ class Command(BaseCommand):
                 WindTunnelAssessment.objects.create(
                     scenario=scenario,
                     option=option,
-                    verdict="robust" if option_index == 2 else ("adaptable" if index % 2 == 0 else "vulnerable"),
+                    verdict="robust"
+                    if option_index == 2
+                    else ("adaptable" if index % 2 == 0 else "vulnerable"),
                     desirability=min(5, base),
                     feasibility=4 if option_index == 2 else 3,
                     resilience=5 if option_index == 2 else 3,
@@ -872,10 +1563,38 @@ class Command(BaseCommand):
             created_by=primary_admin,
         )
         criteria = [
-            EvaluationCriterion.objects.create(organisation=organisation, exercise=exercise, title="Strategic value", description="Contribution to the stated outcomes.", weight=Decimal("1.40"), order=1),
-            EvaluationCriterion.objects.create(organisation=organisation, exercise=exercise, title="Feasibility", description="Operational, technical, and capability feasibility.", weight=Decimal("1.20"), order=2),
-            EvaluationCriterion.objects.create(organisation=organisation, exercise=exercise, title="Equity and legitimacy", description="Distributional effects, inclusion, and stakeholder trust.", weight=Decimal("1.30"), order=3),
-            EvaluationCriterion.objects.create(organisation=organisation, exercise=exercise, title="Scenario robustness", description="Performance across the four scenarios.", weight=Decimal("1.50"), order=4),
+            EvaluationCriterion.objects.create(
+                organisation=organisation,
+                exercise=exercise,
+                title="Strategic value",
+                description="Contribution to the stated outcomes.",
+                weight=Decimal("1.40"),
+                order=1,
+            ),
+            EvaluationCriterion.objects.create(
+                organisation=organisation,
+                exercise=exercise,
+                title="Feasibility",
+                description="Operational, technical, and capability feasibility.",
+                weight=Decimal("1.20"),
+                order=2,
+            ),
+            EvaluationCriterion.objects.create(
+                organisation=organisation,
+                exercise=exercise,
+                title="Equity and legitimacy",
+                description="Distributional effects, inclusion, and stakeholder trust.",
+                weight=Decimal("1.30"),
+                order=3,
+            ),
+            EvaluationCriterion.objects.create(
+                organisation=organisation,
+                exercise=exercise,
+                title="Scenario robustness",
+                description="Performance across the four scenarios.",
+                weight=Decimal("1.50"),
+                order=4,
+            ),
         ]
         evaluation_round = EvaluationRound.objects.create(
             organisation=organisation,
@@ -885,7 +1604,9 @@ class Command(BaseCommand):
             status="closed" if exercise.status == "closed" else "open",
             feedback_summary="The staged option scores highest overall; concerns focus on governance capacity and inclusion.",
             opens_at=now - timedelta(days=14),
-            closes_at=now - timedelta(days=2) if exercise.status == "closed" else now + timedelta(days=7),
+            closes_at=now - timedelta(days=2)
+            if exercise.status == "closed"
+            else now + timedelta(days=7),
             opened_by=primary_admin,
             closed_by=primary_admin if exercise.status == "closed" else None,
         )
@@ -901,7 +1622,13 @@ class Command(BaseCommand):
             )
             for option_index, option in enumerate(options):
                 for criterion_index, criterion in enumerate(criteria):
-                    score = Decimal(str(3 + (2 if option_index == 2 else 0) - (1 if criterion_index == 2 and option_index == 0 else 0)))
+                    score = Decimal(
+                        str(
+                            3
+                            + (2 if option_index == 2 else 0)
+                            - (1 if criterion_index == 2 and option_index == 0 else 0)
+                        )
+                    )
                     EvaluationResponse.objects.create(
                         organisation=organisation,
                         submission=submission,
@@ -962,7 +1689,7 @@ class Command(BaseCommand):
             reviewed_at=now - timedelta(days=8),
             completed_at=now - timedelta(days=8),
         )
-        submission = ContributionSubmission.objects.create(
+        contribution_submission = ContributionSubmission.objects.create(
             organisation=organisation,
             decision=decision,
             request=request,
@@ -977,7 +1704,7 @@ class Command(BaseCommand):
             organisation=organisation,
             decision=decision,
             request=request,
-            submission=submission,
+            submission=contribution_submission,
             reviewer=fictional_users[0],
             outcome="accepted",
             note="Accepted as a binding design condition and linked to the executive summary.",
@@ -1020,7 +1747,9 @@ class Command(BaseCommand):
             decision=decision,
             version=1,
             status="published",
-            judgement="ready_with_conditions" if spec.status != "open_for_contribution" else "not_ready",
+            judgement="ready_with_conditions"
+            if spec.status != "open_for_contribution"
+            else "not_ready",
             answers={
                 "framing": "clear",
                 "evidence": "mixed_but_traceable",
@@ -1038,7 +1767,9 @@ class Command(BaseCommand):
             organisation=organisation,
             decision=decision,
             version=1,
-            status="approved" if spec.status in {"ready_for_decision", "implementation"} else "draft",
+            status="approved"
+            if spec.status in {"ready_for_decision", "implementation"}
+            else "draft",
             context_summary=spec.context,
             options_summary="Three options were compared: concentrated change, distributed change, and a staged hybrid path.",
             evidence_summary="Evidence favours a staged option but also exposes capability and inclusion constraints.",
@@ -1052,7 +1783,9 @@ class Command(BaseCommand):
             conditions="Publish gate criteria, fund accountable owners, preserve accessible alternatives, and review signposts quarterly.",
             implementation_implications="Begin with bounded pilots, protected fallback capacity, and an evidence review before each expansion.",
             created_by=primary_admin,
-            approved_by=primary_admin if spec.status in {"ready_for_decision", "implementation"} else None,
+            approved_by=primary_admin
+            if spec.status in {"ready_for_decision", "implementation"}
+            else None,
             approved_at=now if spec.status in {"ready_for_decision", "implementation"} else None,
         )
 
@@ -1069,8 +1802,16 @@ class Command(BaseCommand):
                 conditions="Use annual portfolio gates, maintain a representative participation network, and preserve distinct genetics and circular-economy work packages where evidence supports them.",
                 dissent_summary="A minority preferred deeper single-discipline investment and warned that integration could dilute scientific accountability.",
                 position_snapshot=[
-                    {"participant": participants[1].user.email, "recommendation": "support_with_conditions", "preferred_option": selected.title},
-                    {"participant": participants[2].user.email, "recommendation": "support_with_conditions", "preferred_option": selected.title},
+                    {
+                        "participant": participants[1].user.email,
+                        "recommendation": "support_with_conditions",
+                        "preferred_option": selected.title,
+                    },
+                    {
+                        "participant": participants[2].user.email,
+                        "recommendation": "support_with_conditions",
+                        "preferred_option": selected.title,
+                    },
                 ],
                 decided_at=now - timedelta(days=30),
             )
@@ -1109,7 +1850,9 @@ class Command(BaseCommand):
         }
 
     @staticmethod
-    def _create_transitions(decision: Decision, organisation: Organisation, actor: Any, final_status: str) -> None:
+    def _create_transitions(
+        decision: Decision, organisation: Organisation, actor: Any, final_status: str
+    ) -> None:
         order = [
             "draft",
             "framing",
@@ -1124,7 +1867,7 @@ class Command(BaseCommand):
             return
         target_index = order.index(final_status)
         for sequence, (from_status, to_status) in enumerate(
-            zip(order[:target_index], order[1 : target_index + 1]), start=1
+            zip(order[:target_index], order[1 : target_index + 1], strict=False), start=1
         ):
             DecisionTransition.objects.create(
                 decision=decision,

@@ -3,12 +3,13 @@
 from django.contrib import admin
 from django.urls import include, path
 
-from apps.core.views import LivenessView, ReadinessView
+from apps.core.views import LivenessView, MetricsView, ReadinessView
 
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("health/live/", LivenessView.as_view(), name="health-live"),
     path("health/ready/", ReadinessView.as_view(), name="health-ready"),
+    path("health/metrics/", MetricsView.as_view(), name="health-metrics"),
     path("api/v1/auth/", include("apps.accounts.urls")),
     path("api/v1/organisations/", include("apps.organisations.urls")),
     path("api/v1/", include("apps.invitations.urls")),

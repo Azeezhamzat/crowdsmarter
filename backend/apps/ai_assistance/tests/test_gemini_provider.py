@@ -17,7 +17,15 @@ SNAPSHOT = {
         "context": "Current evidence is limited.",
     },
     "options": [{"id": "option-1", "title": "Run pilot"}],
-    "evidence": [{"id": "evidence-1", "title": "Survey", "summary": "x", "option_id": None, "stance": "supports"}],
+    "evidence": [
+        {
+            "id": "evidence-1",
+            "title": "Survey",
+            "summary": "x",
+            "option_id": None,
+            "stance": "supports",
+        }
+    ],
     "assumptions": [],
     "risks": [],
     "participants": [{"role": "decision_owner"}],
@@ -46,7 +54,11 @@ def test_parses_a_well_formed_json_response_into_ai_review_output():
     payload = {
         "summary": "The pilot has thin evidence.",
         "missing_evidence": [
-            {"severity": "medium", "title": "No challenging evidence", "detail": "Only supportive evidence is recorded."}
+            {
+                "severity": "medium",
+                "title": "No challenging evidence",
+                "detail": "Only supportive evidence is recorded.",
+            }
         ],
         "unsupported_assumptions": [],
         "contradictory_evidence": [],
@@ -91,7 +103,9 @@ def test_raises_when_the_model_returns_unparseable_text():
     config.save(update_fields=["ai_provider_api_key_encrypted"])
 
     with patch("apps.ai_assistance.providers.gemini.genai.Client") as mock_client_cls:
-        mock_client_cls.return_value.models.generate_content.return_value = SimpleNamespace(text="not json")
+        mock_client_cls.return_value.models.generate_content.return_value = SimpleNamespace(
+            text="not json"
+        )
         with pytest.raises(ValueError, match="unparseable structured review"):
             GeminiProvider().review_decision(snapshot=SNAPSHOT)
 
@@ -113,9 +127,26 @@ def test_summarise_analytics_parses_a_well_formed_narrative():
     config.save(update_fields=["ai_provider_api_key_encrypted"])
 
     metrics = {
-        "totals": {"decisions": 1, "open_decisions": 1, "finalised_decisions": 0, "archived_decisions": 0, "active_lessons": 0},
-        "flow": {"overdue_target_decisions": 0, "contribution_coverage_percent": None, "median_days_to_finalise": None, "created_last_90_days": 1, "finalised_last_90_days": 0},
-        "learning": {"reviews_due_or_overdue": 0, "outcome_success_percent": None, "outcome_reviews_completed": 0, "active_lessons": 0},
+        "totals": {
+            "decisions": 1,
+            "open_decisions": 1,
+            "finalised_decisions": 0,
+            "archived_decisions": 0,
+            "active_lessons": 0,
+        },
+        "flow": {
+            "overdue_target_decisions": 0,
+            "contribution_coverage_percent": None,
+            "median_days_to_finalise": None,
+            "created_last_90_days": 1,
+            "finalised_last_90_days": 0,
+        },
+        "learning": {
+            "reviews_due_or_overdue": 0,
+            "outcome_success_percent": None,
+            "outcome_reviews_completed": 0,
+            "active_lessons": 0,
+        },
     }
     payload = {
         "headline": "One decision is open; not enough history for trends yet.",

@@ -1,52 +1,54 @@
+import { lazy } from "react";
 import { createBrowserRouter } from "react-router";
 
 import { RouteAccessibility } from "./components/RouteAccessibility";
-
-import { OrganisationAuditPage } from "./features/audit/OrganisationAuditPage";
-import { MyApplicationsPage } from "./features/applicants/MyApplicationsPage";
-import { TrustPage } from "./features/trust/TrustPage";
-import { DecisionAIReviewPage } from "./features/ai-assistance/DecisionAIReviewPage";
-import { DecisionCollaborationPage } from "./features/collaboration/DecisionCollaborationPage";
-import { OrganisationAnalyticsPage } from "./features/analytics/OrganisationAnalyticsPage";
-import { AccountSettingsPage } from "./features/auth/AccountSettingsPage";
-import { ForgotPasswordPage } from "./features/auth/ForgotPasswordPage";
-import { LoginPage } from "./features/auth/LoginPage";
-import { SignupPage } from "./features/auth/SignupPage";
-import { ResetPasswordPage } from "./features/auth/ResetPasswordPage";
 import { ProtectedRoute } from "./features/auth/ProtectedRoute";
-import { DecisionWorkspacePage } from "./features/decisions/DecisionWorkspacePage";
-import { RequestDemoPage } from "./features/demo-request/RequestDemoPage";
-import { DecisionContributionsPage } from "./features/contributions/DecisionContributionsPage";
-import { MyContributionsPage } from "./features/contributions/MyContributionsPage";
-import { GuidedDecisionCreatePage } from "./features/decisions/GuidedDecisionCreatePage";
-import { OrganisationExportPage } from "./features/exports/OrganisationExportPage";
-import { OpenSessionOrganiserPage } from "./features/ideation/OpenSessionOrganiserPage";
-import { OpenSessionPublicPage } from "./features/ideation/OpenSessionPublicPage";
-import { OrganisationSessionsPage } from "./features/ideation/OrganisationSessionsPage";
-import { DecisionEvaluationPage } from "./features/evaluations/DecisionEvaluationPage";
-import { DecisionAnalysisPage } from "./features/decision-analysis/DecisionAnalysisPage";
-import { OrganisationPrioritisationPage } from "./features/evaluations/OrganisationPrioritisationPage";
-import { OrganisationForesightPage } from "./features/foresight/OrganisationForesightPage";
-import { ForesightCanvasesPage } from "./features/foresight/ForesightCanvasesPage";
-import { ForesightCanvasPage } from "./features/foresight/ForesightCanvasPage";
-import { ForesightScenarioSetPage } from "./features/foresight/ForesightScenarioSetPage";
-import { DecisionGovernancePage } from "./features/governance/DecisionGovernancePage";
-import { AcceptInvitationPage } from "./features/invitations/AcceptInvitationPage";
-import { NotificationsPage } from "./features/notifications/NotificationsPage";
-import { LandingPage } from "./features/landing/LandingPage";
-import { NotFoundPage } from "./features/not-found/NotFoundPage";
-import { OrganisationAdministrationPage } from "./features/organisations/OrganisationAdministrationPage";
-import { OrganisationDetailPage } from "./features/organisations/OrganisationDetailPage";
-import { OrganisationMethodsPage } from "./features/organisations/OrganisationMethodsPage";
-import { OrganisationListPage } from "./features/organisations/OrganisationListPage";
-import { OrganisationPortfolioPage } from "./features/portfolio/OrganisationPortfolioPage";
-import { PlatformAdminPage } from "./features/platform-admin/PlatformAdminPage";
-import { PlatformOrganisationSupportPage } from "./features/platform-admin/PlatformOrganisationSupportPage";
-import { DecisionOutcomesPage } from "./features/outcomes/DecisionOutcomesPage";
-import { DecisionReasoningPage } from "./features/reasoning/DecisionReasoningPage";
-import { OrganisationSearchPage } from "./features/search/OrganisationSearchPage";
-import { WorkspaceDetailPage } from "./features/workspaces/WorkspaceDetailPage";
-import { WorkspaceListPage } from "./features/workspaces/WorkspaceListPage";
+
+const OrganisationAuditPage = lazy(() => import("./features/audit/OrganisationAuditPage").then((module) => ({ default: module.OrganisationAuditPage })));
+const MyApplicationsPage = lazy(() => import("./features/applicants/MyApplicationsPage").then((module) => ({ default: module.MyApplicationsPage })));
+const TrustPage = lazy(() => import("./features/trust/TrustPage").then((module) => ({ default: module.TrustPage })));
+const DecisionAIReviewPage = lazy(() => import("./features/ai-assistance/DecisionAIReviewPage").then((module) => ({ default: module.DecisionAIReviewPage })));
+const DecisionCollaborationPage = lazy(() => import("./features/collaboration/DecisionCollaborationPage").then((module) => ({ default: module.DecisionCollaborationPage })));
+const OrganisationAnalyticsPage = lazy(() => import("./features/analytics/OrganisationAnalyticsPage").then((module) => ({ default: module.OrganisationAnalyticsPage })));
+const AccountSettingsPage = lazy(() => import("./features/auth/AccountSettingsPage").then((module) => ({ default: module.AccountSettingsPage })));
+const ForgotPasswordPage = lazy(() => import("./features/auth/ForgotPasswordPage").then((module) => ({ default: module.ForgotPasswordPage })));
+const LoginPage = lazy(() => import("./features/auth/LoginPage").then((module) => ({ default: module.LoginPage })));
+const SignupPage = lazy(() => import("./features/auth/SignupPage").then((module) => ({ default: module.SignupPage })));
+const ResetPasswordPage = lazy(() => import("./features/auth/ResetPasswordPage").then((module) => ({ default: module.ResetPasswordPage })));
+const VerifyEmailChangePage = lazy(() => import("./features/auth/VerifyEmailChangePage").then((module) => ({ default: module.VerifyEmailChangePage })));
+const DecisionWorkspacePage = lazy(() => import("./features/decisions/DecisionWorkspacePage").then((module) => ({ default: module.DecisionWorkspacePage })));
+const RequestDemoPage = lazy(() => import("./features/demo-request/RequestDemoPage").then((module) => ({ default: module.RequestDemoPage })));
+const DecisionContributionsPage = lazy(() => import("./features/contributions/DecisionContributionsPage").then((module) => ({ default: module.DecisionContributionsPage })));
+const MyContributionsPage = lazy(() => import("./features/contributions/MyContributionsPage").then((module) => ({ default: module.MyContributionsPage })));
+const GuidedDecisionCreatePage = lazy(() => import("./features/decisions/GuidedDecisionCreatePage").then((module) => ({ default: module.GuidedDecisionCreatePage })));
+const OrganisationExportPage = lazy(() => import("./features/exports/OrganisationExportPage").then((module) => ({ default: module.OrganisationExportPage })));
+const OpenSessionOrganiserPage = lazy(() => import("./features/ideation/OpenSessionOrganiserPage").then((module) => ({ default: module.OpenSessionOrganiserPage })));
+const OpenSessionPublicPage = lazy(() => import("./features/ideation/OpenSessionPublicPage").then((module) => ({ default: module.OpenSessionPublicPage })));
+const OrganisationSessionsPage = lazy(() => import("./features/ideation/OrganisationSessionsPage").then((module) => ({ default: module.OrganisationSessionsPage })));
+const DecisionEvaluationPage = lazy(() => import("./features/evaluations/DecisionEvaluationPage").then((module) => ({ default: module.DecisionEvaluationPage })));
+const DecisionAnalysisPage = lazy(() => import("./features/decision-analysis/DecisionAnalysisPage").then((module) => ({ default: module.DecisionAnalysisPage })));
+const OrganisationPrioritisationPage = lazy(() => import("./features/evaluations/OrganisationPrioritisationPage").then((module) => ({ default: module.OrganisationPrioritisationPage })));
+const OrganisationForesightPage = lazy(() => import("./features/foresight/OrganisationForesightPage").then((module) => ({ default: module.OrganisationForesightPage })));
+const ForesightCanvasesPage = lazy(() => import("./features/foresight/ForesightCanvasesPage").then((module) => ({ default: module.ForesightCanvasesPage })));
+const ForesightCanvasPage = lazy(() => import("./features/foresight/ForesightCanvasPage").then((module) => ({ default: module.ForesightCanvasPage })));
+const ForesightScenarioSetPage = lazy(() => import("./features/foresight/ForesightScenarioSetPage").then((module) => ({ default: module.ForesightScenarioSetPage })));
+const DecisionGovernancePage = lazy(() => import("./features/governance/DecisionGovernancePage").then((module) => ({ default: module.DecisionGovernancePage })));
+const AcceptInvitationPage = lazy(() => import("./features/invitations/AcceptInvitationPage").then((module) => ({ default: module.AcceptInvitationPage })));
+const NotificationsPage = lazy(() => import("./features/notifications/NotificationsPage").then((module) => ({ default: module.NotificationsPage })));
+const LandingPage = lazy(() => import("./features/landing/LandingPage").then((module) => ({ default: module.LandingPage })));
+const NotFoundPage = lazy(() => import("./features/not-found/NotFoundPage").then((module) => ({ default: module.NotFoundPage })));
+const OrganisationAdministrationPage = lazy(() => import("./features/organisations/OrganisationAdministrationPage").then((module) => ({ default: module.OrganisationAdministrationPage })));
+const OrganisationDetailPage = lazy(() => import("./features/organisations/OrganisationDetailPage").then((module) => ({ default: module.OrganisationDetailPage })));
+const OrganisationMethodsPage = lazy(() => import("./features/organisations/OrganisationMethodsPage").then((module) => ({ default: module.OrganisationMethodsPage })));
+const OrganisationListPage = lazy(() => import("./features/organisations/OrganisationListPage").then((module) => ({ default: module.OrganisationListPage })));
+const OrganisationPortfolioPage = lazy(() => import("./features/portfolio/OrganisationPortfolioPage").then((module) => ({ default: module.OrganisationPortfolioPage })));
+const PlatformAdminPage = lazy(() => import("./features/platform-admin/PlatformAdminPage").then((module) => ({ default: module.PlatformAdminPage })));
+const PlatformOrganisationSupportPage = lazy(() => import("./features/platform-admin/PlatformOrganisationSupportPage").then((module) => ({ default: module.PlatformOrganisationSupportPage })));
+const DecisionOutcomesPage = lazy(() => import("./features/outcomes/DecisionOutcomesPage").then((module) => ({ default: module.DecisionOutcomesPage })));
+const DecisionReasoningPage = lazy(() => import("./features/reasoning/DecisionReasoningPage").then((module) => ({ default: module.DecisionReasoningPage })));
+const OrganisationSearchPage = lazy(() => import("./features/search/OrganisationSearchPage").then((module) => ({ default: module.OrganisationSearchPage })));
+const WorkspaceDetailPage = lazy(() => import("./features/workspaces/WorkspaceDetailPage").then((module) => ({ default: module.WorkspaceDetailPage })));
+const WorkspaceListPage = lazy(() => import("./features/workspaces/WorkspaceListPage").then((module) => ({ default: module.WorkspaceListPage })));
 
 export const router = createBrowserRouter([
   {
@@ -58,6 +60,7 @@ export const router = createBrowserRouter([
   { path: "/request-demo", element: <RequestDemoPage /> },
   { path: "/forgot-password", element: <ForgotPasswordPage /> },
   { path: "/reset-password", element: <ResetPasswordPage /> },
+  { path: "/verify-email-change", element: <VerifyEmailChangePage /> },
   { path: "/accept-invitation", element: <AcceptInvitationPage /> },
   { path: "/s/:publicSlug", element: <OpenSessionPublicPage /> },
   { path: "/my-applications", element: <MyApplicationsPage /> },

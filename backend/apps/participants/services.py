@@ -11,9 +11,9 @@ from apps.audit.services import record_event
 from apps.decision_options.models import DecisionOption
 from apps.decisions.models import Decision
 from apps.decisions.policies import can_manage_participants
-from apps.organisations.models import Membership, Organisation
 from apps.notifications.models import Notification
 from apps.notifications.services import create_notification
+from apps.organisations.models import Membership, Organisation
 
 from .models import ConflictOfInterest, Participant
 
@@ -130,12 +130,10 @@ def change_owner_participant(*, decision: Decision, owner: User, actor: User) ->
 
 
 @transaction.atomic
-def add_participant(
-    *, actor: User, decision: Decision, user: User, role: str
-) -> Participant:
+def add_participant(*, actor: User, decision: Decision, user: User, role: str) -> Participant:
     """Add or restore an organisation member as a decision participant."""
-    decision = Decision.objects.select_for_update().select_related("organisation").get(
-        id=decision.id
+    decision = (
+        Decision.objects.select_for_update().select_related("organisation").get(id=decision.id)
     )
     _require_manager(actor=actor, decision=decision)
     if role not in ASSIGNABLE_ROLES:
@@ -148,11 +146,15 @@ def add_participant(
     ).exists():
         raise ParticipantServiceError("That user already participates in this decision.")
 
-    removed = Participant.objects.filter(
-        decision=decision,
-        user=user,
-        status=Participant.Status.REMOVED,
-    ).order_by("-updated_at").first()
+    removed = (
+        Participant.objects.filter(
+            decision=decision,
+            user=user,
+            status=Participant.Status.REMOVED,
+        )
+        .order_by("-updated_at")
+        .first()
+    )
     if removed:
         removed.role = role
         removed.status = Participant.Status.ACTIVE
@@ -214,13 +216,13 @@ def add_participant(
 
 
 @transaction.atomic
-def change_participant_role(
-    *, actor: User, participant: Participant, role: str
-) -> Participant:
+def change_participant_role(*, actor: User, participant: Participant, role: str) -> Participant:
     """Change a stakeholder role without modifying decision ownership."""
-    participant = Participant.objects.select_for_update().select_related(
-        "decision", "decision__organisation", "user"
-    ).get(id=participant.id, status=Participant.Status.ACTIVE)
+    participant = (
+        Participant.objects.select_for_update()
+        .select_related("decision", "decision__organisation", "user")
+        .get(id=participant.id, status=Participant.Status.ACTIVE)
+    )
     _require_manager(actor=actor, decision=participant.decision)
     if participant.role == Participant.Role.DECISION_OWNER:
         raise ParticipantServiceError(
@@ -266,9 +268,11 @@ def change_participant_role(
 @transaction.atomic
 def remove_participant(*, actor: User, participant: Participant) -> Participant:
     """Soft-remove a stakeholder while preserving participation history."""
-    participant = Participant.objects.select_for_update().select_related(
-        "decision", "decision__organisation", "user"
-    ).get(id=participant.id, status=Participant.Status.ACTIVE)
+    participant = (
+        Participant.objects.select_for_update()
+        .select_related("decision", "decision__organisation", "user")
+        .get(id=participant.id, status=Participant.Status.ACTIVE)
+    )
     _require_manager(actor=actor, decision=participant.decision)
     if participant.role == Participant.Role.DECISION_OWNER:
         raise ParticipantServiceError("The decision owner cannot be removed as a participant.")
@@ -276,9 +280,7 @@ def remove_participant(*, actor: User, participant: Participant) -> Participant:
     participant.removed_at = timezone.now()
     participant.removed_by = actor
     participant.full_clean(validate_unique=False, validate_constraints=False)
-    participant.save(
-        update_fields=["status", "removed_at", "removed_by", "updated_at"]
-    )
+    participant.save(update_fields=["status", "removed_at", "removed_by", "updated_at"])
     if participant.user_id != actor.id:
         create_notification(
             recipient=participant.user,
@@ -334,9 +336,7 @@ def remove_non_owner_participations_for_member_departure(
         participant.removed_at = removed_at
         participant.removed_by = actor
         participant.full_clean(validate_unique=False, validate_constraints=False)
-        participant.save(
-            update_fields=["status", "removed_at", "removed_by", "updated_at"]
-        )
+        participant.save(update_fields=["status", "removed_at", "removed_by", "updated_at"])
         record_event(
             action="participant.removed",
             object_type="participant",
@@ -363,9 +363,11 @@ def declare_conflict(
     reason: str = "",
 ) -> ConflictOfInterest:
     """Record a reviewer's conflict of interest, self-declared or manager-recorded."""
-    participant = Participant.objects.select_for_update().select_related(
-        "decision", "decision__organisation", "user"
-    ).get(id=participant.id, status=Participant.Status.ACTIVE)
+    participant = (
+        Participant.objects.select_for_update()
+        .select_related("decision", "decision__organisation", "user")
+        .get(id=participant.id, status=Participant.Status.ACTIVE)
+    )
     if participant.user_id != actor.id and not can_manage_participants(
         actor=actor, decision=participant.decision
     ):
@@ -411,9 +413,11 @@ def declare_conflict(
 @transaction.atomic
 def withdraw_conflict(*, actor: User, conflict: ConflictOfInterest) -> ConflictOfInterest:
     """Withdraw an active conflict declaration."""
-    conflict = ConflictOfInterest.objects.select_for_update().select_related(
-        "participant", "participant__decision", "participant__user"
-    ).get(id=conflict.id, withdrawn_at__isnull=True)
+    conflict = (
+        ConflictOfInterest.objects.select_for_update()
+        .select_related("participant", "participant__decision", "participant__user")
+        .get(id=conflict.id, withdrawn_at__isnull=True)
+    )
     if conflict.participant.user_id != actor.id and not can_manage_participants(
         actor=actor, decision=conflict.participant.decision
     ):

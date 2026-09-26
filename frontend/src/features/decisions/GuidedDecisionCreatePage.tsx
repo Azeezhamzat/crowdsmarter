@@ -1,7 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useEffect, useState } from "react";
+import { useForm, useWatch } from "react-hook-form";
 import { Link, useNavigate, useParams } from "react-router";
 import { z } from "zod";
 
@@ -124,16 +124,14 @@ export function GuidedDecisionCreatePage() {
       (actorMembership?.role !== "contributor" || item.user.id === currentUser.data?.id),
   );
 
-  const selectedTemplateKey = form.watch("template_key");
-  const selectedMethodVersionId = form.watch("method_version_id");
+  const selectedTemplateKey = useWatch({ control: form.control, name: "template_key" });
+  const selectedMethodVersionId = useWatch({ control: form.control, name: "method_version_id" });
+  const values = useWatch({ control: form.control });
   const approvedMethods = (methods.data ?? []).filter((item) => item.status === "approved" && item.current_version);
   const selectedMethod = approvedMethods.find((item) => item.current_version?.id === selectedMethodVersionId);
-  const selectedTemplate = useMemo(
-    () => {
-      const builtIn = templates.data?.find((item) => item.key === selectedTemplateKey);
-      if (builtIn) return builtIn;
-      if (!selectedMethod?.current_version) return undefined;
-      return {
+  const builtInTemplate = templates.data?.find((item) => item.key === selectedTemplateKey);
+  const selectedTemplate = builtInTemplate ?? (selectedMethod?.current_version
+    ? {
         key: `method:${selectedMethod.current_version.id}`,
         name: selectedMethod.name,
         summary: selectedMethod.summary,
@@ -146,10 +144,8 @@ export function GuidedDecisionCreatePage() {
         suggested_urgency: selectedMethod.current_version.suggested_urgency,
         checklist: selectedMethod.current_version.checklist,
         version: selectedMethod.current_version.version,
-      } satisfies DecisionTemplate;
-    },
-    [selectedMethod, selectedTemplateKey, templates.data],
-  );
+      } satisfies DecisionTemplate
+    : undefined);
   const terms = getTerminology(selectedTemplateKey);
 
   const create = useMutation({
@@ -212,8 +208,6 @@ export function GuidedDecisionCreatePage() {
       </StatusMessage>
     );
   }
-
-  const values = form.watch();
 
   return (
     <div className="guided-create">

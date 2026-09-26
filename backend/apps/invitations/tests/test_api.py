@@ -9,7 +9,6 @@ from django.urls import reverse
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from apps.invitations.models import OrganisationInvitation
 from apps.invitations.services import create_invitation
 from apps.organisations.models import Membership
 
@@ -43,9 +42,7 @@ def test_owner_can_create_list_resend_and_revoke_invitation(
     assert create_response["Cache-Control"] == "no-store"
     invitation_id = created["invitation"]["id"]
 
-    list_response = api_client.get(
-        reverse("invitations:list-create", args=[organisation.id])
-    )
+    list_response = api_client.get(reverse("invitations:list-create", args=[organisation.id]))
     assert list_response.status_code == 200
     assert [item["id"] for item in list_response.json()] == [invitation_id]
 
@@ -84,11 +81,14 @@ def test_contributor_cannot_list_or_create_invitations(
     url = reverse("invitations:list-create", args=[organisation.id])
 
     assert api_client.get(url).status_code == 403
-    assert api_client.post(
-        url,
-        {"email": "person@example.com", "role": "viewer"},
-        format="json",
-    ).status_code == 403
+    assert (
+        api_client.post(
+            url,
+            {"email": "person@example.com", "role": "viewer"},
+            format="json",
+        ).status_code
+        == 403
+    )
 
 
 @pytest.mark.django_db
@@ -302,16 +302,22 @@ def test_non_manager_cannot_resend_or_revoke_invitation(
     )
     api_client.force_authenticate(contributor)
 
-    assert api_client.post(
-        reverse("invitations:resend", args=[invitation.id]),
-        {},
-        format="json",
-    ).status_code == 404
-    assert api_client.post(
-        reverse("invitations:revoke", args=[invitation.id]),
-        {},
-        format="json",
-    ).status_code == 404
+    assert (
+        api_client.post(
+            reverse("invitations:resend", args=[invitation.id]),
+            {},
+            format="json",
+        ).status_code
+        == 404
+    )
+    assert (
+        api_client.post(
+            reverse("invitations:revoke", args=[invitation.id]),
+            {},
+            format="json",
+        ).status_code
+        == 404
+    )
 
 
 @pytest.mark.django_db

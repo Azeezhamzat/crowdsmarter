@@ -13,6 +13,8 @@ htmlcov/
 node_modules/
 dist/
 frontend/coverage/
+frontend/playwright-report/
+frontend/test-results/
 backend/staticfiles/
 backend/media/
 .DS_Store
@@ -46,6 +48,7 @@ staticfiles/
 *.log
 *.tar.gz
 crowdsmarter-local-access-*.txt
+backups/
 
 # Local Claude Code tooling (per-machine, not shared)
 .claude/

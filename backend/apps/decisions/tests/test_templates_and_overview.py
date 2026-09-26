@@ -14,9 +14,7 @@ def test_template_catalog_requires_authentication(api_client):  # type: ignore[n
 
 
 @pytest.mark.django_db
-def test_template_catalog_returns_versioned_human_prompts(
-    api_client, user_factory
-):  # type: ignore[no-untyped-def]
+def test_template_catalog_returns_versioned_human_prompts(api_client, user_factory):  # type: ignore[no-untyped-def]
     user = user_factory()
     api_client.force_authenticate(user)
 
@@ -25,8 +23,12 @@ def test_template_catalog_returns_versioned_human_prompts(
     assert response.status_code == 200
     keys = {item["key"] for item in response.json()}
     assert {
-        "blank", "technology_adoption", "pilot_experiment", "grant_round",
-        "idea_competition", "anticipatory_commons",
+        "blank",
+        "technology_adoption",
+        "pilot_experiment",
+        "grant_round",
+        "idea_competition",
+        "anticipatory_commons",
     }.issubset(keys)
     grant_round = next(item for item in response.json() if item["key"] == "grant_round")
     assert grant_round["checklist"]
@@ -93,9 +95,7 @@ def test_guided_creation_rejects_unknown_template(
 
 
 @pytest.mark.django_db
-def test_decision_overview_is_tenant_isolated(
-    api_client, user_factory, decision_factory
-):  # type: ignore[no-untyped-def]
+def test_decision_overview_is_tenant_isolated(api_client, user_factory, decision_factory):  # type: ignore[no-untyped-def]
     decision = decision_factory()
     outsider = user_factory()
     api_client.force_authenticate(outsider)
@@ -172,10 +172,9 @@ def test_decision_overview_surfaces_next_action_people_options_and_risks(
     assert body["options"][0]["title"] == "Run a pilot"
     assert body["material_risks"][0]["score"] == 12
 
+
 @pytest.mark.django_db
-def test_decision_overview_surfaces_linked_strategic_implication(
-    api_client, decision_factory
-):  # type: ignore[no-untyped-def]
+def test_decision_overview_surfaces_linked_strategic_implication(api_client, decision_factory):  # type: ignore[no-untyped-def]
     from apps.foresight.mapping_services import create_canvas, create_implication
 
     decision = decision_factory()
@@ -201,9 +200,7 @@ def test_decision_overview_surfaces_linked_strategic_implication(
     )
     api_client.force_authenticate(decision.owner)
 
-    response = api_client.get(
-        reverse("decisions:overview", kwargs={"decision_id": decision.id})
-    )
+    response = api_client.get(reverse("decisions:overview", kwargs={"decision_id": decision.id}))
 
     assert response.status_code == 200
     assert response.json()["foresight_implications"] == [

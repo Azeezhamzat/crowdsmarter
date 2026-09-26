@@ -37,8 +37,11 @@ def test_reproducibility_same_snapshot_produces_identical_output():
     snapshot = _base_snapshot(
         evidence=[
             {
-                "id": "ev-1", "option_id": None, "title": "Market survey",
-                "summary": "70% of respondents want this.", "stance": "supports",
+                "id": "ev-1",
+                "option_id": None,
+                "title": "Market survey",
+                "summary": "70% of respondents want this.",
+                "stance": "supports",
                 "strength": "high",
             }
         ],
@@ -55,9 +58,13 @@ def test_adversarial_input_passes_through_as_literal_text():
     snapshot = _base_snapshot(
         assumptions=[
             {
-                "id": "as-1", "option_id": None, "statement": payload,
-                "impact_if_false": payload, "confidence": "high",
-                "verification_status": "unverified", "review_date": None,
+                "id": "as-1",
+                "option_id": None,
+                "statement": payload,
+                "impact_if_false": payload,
+                "confidence": "high",
+                "verification_status": "unverified",
+                "review_date": None,
             }
         ],
     )
@@ -72,19 +79,28 @@ def test_duplicate_evidence_detection():
     snapshot = _base_snapshot(
         evidence=[
             {
-                "id": "ev-1", "option_id": None, "title": "Customer survey results",
+                "id": "ev-1",
+                "option_id": None,
+                "title": "Customer survey results",
                 "summary": "Seventy percent of customers want faster shipping.",
-                "stance": "supports", "strength": "high",
+                "stance": "supports",
+                "strength": "high",
             },
             {
-                "id": "ev-2", "option_id": None, "title": "Customer survey results",
+                "id": "ev-2",
+                "option_id": None,
+                "title": "Customer survey results",
                 "summary": "Seventy percent of customers want faster shipping options.",
-                "stance": "supports", "strength": "high",
+                "stance": "supports",
+                "strength": "high",
             },
             {
-                "id": "ev-3", "option_id": None, "title": "Competitor pricing",
+                "id": "ev-3",
+                "option_id": None,
+                "title": "Competitor pricing",
                 "summary": "A competitor cut prices by ten percent last quarter.",
-                "stance": "challenges", "strength": "moderate",
+                "stance": "challenges",
+                "strength": "moderate",
             },
         ],
     )
@@ -100,23 +116,34 @@ def test_review_trigger_detection_for_overdue_assumption_and_risk():
         generated_at=today.isoformat(),
         assumptions=[
             {
-                "id": "as-overdue", "option_id": None, "statement": "Overdue assumption",
-                "impact_if_false": "Plan changes.", "confidence": "medium",
+                "id": "as-overdue",
+                "option_id": None,
+                "statement": "Overdue assumption",
+                "impact_if_false": "Plan changes.",
+                "confidence": "medium",
                 "verification_status": "unverified",
                 "review_date": (today - timedelta(days=5)).date().isoformat(),
             },
             {
-                "id": "as-future", "option_id": None, "statement": "Future assumption",
-                "impact_if_false": "Plan changes.", "confidence": "medium",
+                "id": "as-future",
+                "option_id": None,
+                "statement": "Future assumption",
+                "impact_if_false": "Plan changes.",
+                "confidence": "medium",
                 "verification_status": "unverified",
                 "review_date": (today + timedelta(days=5)).date().isoformat(),
             },
         ],
         risks=[
             {
-                "id": "risk-overdue", "option_id": None, "title": "Overdue risk",
-                "likelihood": 2, "impact": 2, "response_strategy": "monitor",
-                "status": "open", "review_date": (today - timedelta(days=1)).date().isoformat(),
+                "id": "risk-overdue",
+                "option_id": None,
+                "title": "Overdue risk",
+                "likelihood": 2,
+                "impact": 2,
+                "response_strategy": "monitor",
+                "status": "open",
+                "review_date": (today - timedelta(days=1)).date().isoformat(),
             },
         ],
     )
@@ -146,14 +173,20 @@ def test_quality_metrics_calculates_correction_rate(
     organisation = organisation_factory()
     owner = organisation.created_by
     decision = decision_factory(
-        workspace=organisation.workspaces.get(is_default=True), owner=owner,
+        workspace=organisation.workspaces.get(is_default=True),
+        owner=owner,
     )
 
     def _completed_review(*, reviewed: bool, dismissed: bool) -> AIReview:  # type: ignore[no-untyped-def]
         review = AIReview.objects.create(
-            organisation=organisation, decision=decision, requested_by=owner,
-            status=AIReview.Status.COMPLETED, provider_key="rules", provider_label="Rules",
-            input_fingerprint="a" * 64, output={"summary": "test"},
+            organisation=organisation,
+            decision=decision,
+            requested_by=owner,
+            status=AIReview.Status.COMPLETED,
+            provider_key="rules",
+            provider_label="Rules",
+            input_fingerprint="a" * 64,
+            output={"summary": "test"},
         )
         if reviewed:
             review.reviewed_by = owner
@@ -185,11 +218,11 @@ def test_quality_metrics_endpoint_requires_owner_or_admin(
     organisation = organisation_factory()
     contributor = user_factory()
     Membership.objects.create(
-        organisation=organisation, user=contributor, role=Membership.Role.CONTRIBUTOR,
+        organisation=organisation,
+        user=contributor,
+        role=Membership.Role.CONTRIBUTOR,
     )
-    url = reverse(
-        "ai_assistance:organisation-quality", kwargs={"organisation_id": organisation.id}
-    )
+    url = reverse("ai_assistance:organisation-quality", kwargs={"organisation_id": organisation.id})
 
     api_client.force_authenticate(contributor)
     assert api_client.get(url).status_code == 403

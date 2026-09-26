@@ -16,9 +16,21 @@ class OrganisationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Organisation
         fields = [
-            "id", "name", "slug", "description", "website_url", "brand_name", "primary_colour",
-            "invitation_policy", "default_invitation_role", "retention_days", "status",
-            "deactivated_at", "current_user_role", "created_at", "updated_at",
+            "id",
+            "name",
+            "slug",
+            "description",
+            "website_url",
+            "brand_name",
+            "primary_colour",
+            "invitation_policy",
+            "default_invitation_role",
+            "retention_days",
+            "status",
+            "deactivated_at",
+            "current_user_role",
+            "created_at",
+            "updated_at",
         ]
         read_only_fields = fields
 
@@ -85,15 +97,24 @@ class OrganisationAdministrationUpdateSerializer(StrictSerializer):
     """Mutable organisation profile, branding, invitation, and retention fields."""
 
     name = serializers.CharField(max_length=200, trim_whitespace=True, required=False)
-    description = serializers.CharField(max_length=8000, trim_whitespace=True, allow_blank=True, required=False)
-    website_url = serializers.URLField(max_length=500, allow_blank=True, required=False)
-    brand_name = serializers.CharField(max_length=120, trim_whitespace=True, allow_blank=True, required=False)
-    primary_colour = serializers.RegexField(r"^#[0-9A-Fa-f]{6}$", required=False)
-    invitation_policy = serializers.ChoiceField(choices=Organisation.InvitationPolicy.choices, required=False)
-    default_invitation_role = serializers.ChoiceField(
-        choices=[Membership.Role.ADMIN, Membership.Role.CONTRIBUTOR, Membership.Role.VIEWER], required=False
+    description = serializers.CharField(
+        max_length=8000, trim_whitespace=True, allow_blank=True, required=False
     )
-    retention_days = serializers.IntegerField(min_value=30, max_value=3650, allow_null=True, required=False)
+    website_url = serializers.URLField(max_length=500, allow_blank=True, required=False)
+    brand_name = serializers.CharField(
+        max_length=120, trim_whitespace=True, allow_blank=True, required=False
+    )
+    primary_colour = serializers.RegexField(r"^#[0-9A-Fa-f]{6}$", required=False)
+    invitation_policy = serializers.ChoiceField(
+        choices=Organisation.InvitationPolicy.choices, required=False
+    )
+    default_invitation_role = serializers.ChoiceField(
+        choices=[Membership.Role.ADMIN, Membership.Role.CONTRIBUTOR, Membership.Role.VIEWER],
+        required=False,
+    )
+    retention_days = serializers.IntegerField(
+        min_value=30, max_value=3650, allow_null=True, required=False
+    )
 
     def validate(self, attrs):  # type: ignore[no-untyped-def]
         if not attrs:
@@ -107,9 +128,15 @@ class OwnershipTransferSerializer(StrictSerializer):
 
 
 class OrganisationStateChangeSerializer(StrictSerializer):
-    confirmation = serializers.CharField(max_length=300, trim_whitespace=True, required=False, default="")
-    reason = serializers.CharField(max_length=4000, trim_whitespace=True, required=False, default="")
-    rationale = serializers.CharField(max_length=4000, trim_whitespace=True, required=False, default="")
+    confirmation = serializers.CharField(
+        max_length=300, trim_whitespace=True, required=False, default=""
+    )
+    reason = serializers.CharField(
+        max_length=4000, trim_whitespace=True, required=False, default=""
+    )
+    rationale = serializers.CharField(
+        max_length=4000, trim_whitespace=True, required=False, default=""
+    )
 
 
 class MembershipEventSerializer(serializers.ModelSerializer):
@@ -120,8 +147,19 @@ class MembershipEventSerializer(serializers.ModelSerializer):
     class Meta:
         model = MembershipEvent
         fields = [
-            "id", "organisation_id", "membership_id_snapshot", "user", "actor", "kind", "kind_label",
-            "previous_role", "new_role", "previous_status", "new_status", "note", "created_at",
+            "id",
+            "organisation_id",
+            "membership_id_snapshot",
+            "user",
+            "actor",
+            "kind",
+            "kind_label",
+            "previous_role",
+            "new_role",
+            "previous_status",
+            "new_status",
+            "note",
+            "created_at",
         ]
         read_only_fields = fields
 
@@ -133,7 +171,15 @@ class OrganisationDeletionRequestSerializer(serializers.ModelSerializer):
     class Meta:
         model = OrganisationDeletionRequest
         fields = [
-            "id", "organisation_id", "requested_by", "status", "reason", "earliest_deletion_at",
-            "cancelled_by", "cancelled_at", "created_at", "updated_at",
+            "id",
+            "organisation_id",
+            "requested_by",
+            "status",
+            "reason",
+            "earliest_deletion_at",
+            "cancelled_by",
+            "cancelled_at",
+            "created_at",
+            "updated_at",
         ]
         read_only_fields = fields

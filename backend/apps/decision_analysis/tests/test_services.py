@@ -13,10 +13,18 @@ from apps.decision_analysis.services import (
 @pytest.mark.django_db
 def test_publishing_review_supersedes_previous_version(decision_factory):  # type: ignore[no-untyped-def]
     decision = decision_factory()
-    first = create_quality_review(actor=decision.owner, decision=decision, judgement="not_ready", answers={})
-    first = update_quality_review(actor=decision.owner, review=first, fields={"status": "published"})
-    second = create_quality_review(actor=decision.owner, decision=decision, judgement="ready", answers={})
-    second = update_quality_review(actor=decision.owner, review=second, fields={"status": "published"})
+    first = create_quality_review(
+        actor=decision.owner, decision=decision, judgement="not_ready", answers={}
+    )
+    first = update_quality_review(
+        actor=decision.owner, review=first, fields={"status": "published"}
+    )
+    second = create_quality_review(
+        actor=decision.owner, decision=decision, judgement="ready", answers={}
+    )
+    second = update_quality_review(
+        actor=decision.owner, review=second, fields={"status": "published"}
+    )
     first.refresh_from_db()
     assert first.status == DecisionQualityReview.Status.SUPERSEDED
     assert second.status == DecisionQualityReview.Status.PUBLISHED
@@ -44,10 +52,9 @@ def test_approved_summary_is_immutable(decision_factory):  # type: ignore[no-unt
             fields={"proposed_judgement": "Silently changed."},
         )
 
+
 @pytest.mark.django_db
-def test_issue_owner_can_resolve_but_cannot_transfer_ownership(
-    decision_factory, user_factory
-):  # type: ignore[no-untyped-def]
+def test_issue_owner_can_resolve_but_cannot_transfer_ownership(decision_factory, user_factory):  # type: ignore[no-untyped-def]
     from django.core.exceptions import PermissionDenied
 
     from apps.decision_analysis.services import create_issue, update_issue

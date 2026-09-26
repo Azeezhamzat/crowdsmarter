@@ -48,9 +48,7 @@ def _position_snapshot(*, decision: Decision) -> tuple[list[dict[str, Any]], lis
             "version": position.version,
             "recommendation": position.recommendation,
             "preferred_option_id": (
-                str(position.preferred_option_id)
-                if position.preferred_option_id
-                else None
+                str(position.preferred_option_id) if position.preferred_option_id else None
             ),
             "confidence": position.confidence,
             "rationale": position.rationale,
@@ -62,9 +60,7 @@ def _position_snapshot(*, decision: Decision) -> tuple[list[dict[str, Any]], lis
     return snapshot, current_positions
 
 
-def _validate_authority_positions(
-    *, decision: Decision, current_positions: list[Position]
-) -> None:
+def _validate_authority_positions(*, decision: Decision, current_positions: list[Position]) -> None:
     required = list(
         Participant.objects.filter(
             decision=decision,
@@ -81,9 +77,7 @@ def _validate_authority_positions(
         )
     positioned_ids = {position.participant_id for position in current_positions}
     missing = [
-        participant.user.email
-        for participant in required
-        if participant.id not in positioned_ids
+        participant.user.email for participant in required if participant.id not in positioned_ids
     ]
     if missing:
         raise DecisionFinalisationError(
@@ -121,10 +115,14 @@ def finalise_decision(
     positions_reviewed: bool,
 ) -> DecisionFinalisation:
     """Select an option and create the immutable human final decision record."""
-    decision = Decision.objects.select_for_update().select_related(
-        "organisation",
-        "owner",
-    ).get(id=decision.id)
+    decision = (
+        Decision.objects.select_for_update()
+        .select_related(
+            "organisation",
+            "owner",
+        )
+        .get(id=decision.id)
+    )
     if not has_finalisation_authority(actor=actor, decision=decision):
         raise PermissionDenied("You do not hold authority to finalise this decision.")
     if decision.status != expected_status:
@@ -136,9 +134,7 @@ def finalise_decision(
             }
         )
     if decision.status != Decision.Status.READY_FOR_DECISION:
-        raise DecisionFinalisationError(
-            "Only a decision in Ready for Decision may be finalised."
-        )
+        raise DecisionFinalisationError("Only a decision in Ready for Decision may be finalised.")
     if DecisionFinalisation.objects.filter(decision=decision).exists():
         raise DecisionFinalisationError("This decision already has a finalisation record.")
     if not positions_reviewed:

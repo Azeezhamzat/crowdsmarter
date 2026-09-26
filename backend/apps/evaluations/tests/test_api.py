@@ -37,14 +37,14 @@ def test_evaluation_api_is_strict_and_tenant_safe(
 
 
 @pytest.mark.django_db
-def test_prioritisation_api_creates_portfolio(
-    api_client, organisation_factory
-):  # type: ignore[no-untyped-def]
+def test_prioritisation_api_creates_portfolio(api_client, organisation_factory):  # type: ignore[no-untyped-def]
     organisation = organisation_factory()
     owner = organisation.created_by
     api_client.force_authenticate(owner)
     response = api_client.post(
-        reverse("evaluations:prioritisation-portfolios", kwargs={"organisation_id": organisation.id}),
+        reverse(
+            "evaluations:prioritisation-portfolios", kwargs={"organisation_id": organisation.id}
+        ),
         {
             "title": "Annual investment portfolio",
             "purpose": "Choose initiatives within the delivery envelope.",
@@ -71,16 +71,29 @@ def test_scoring_options_endpoint_blinds_titles_for_non_managers(
     owner = organisation.created_by
     reviewer = user_factory(email="scoring-reviewer@example.com")
     Membership.objects.create(
-        organisation=organisation, user=reviewer, role=Membership.Role.CONTRIBUTOR, status=Membership.Status.ACTIVE,
+        organisation=organisation,
+        user=reviewer,
+        role=Membership.Role.CONTRIBUTOR,
+        status=Membership.Status.ACTIVE,
     )
     decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
     Participant.objects.create(
-        organisation=organisation, decision=decision, user=reviewer, role=Participant.Role.CONTRIBUTOR, added_by=owner,
+        organisation=organisation,
+        decision=decision,
+        user=reviewer,
+        role=Participant.Role.CONTRIBUTOR,
+        added_by=owner,
     )
     create_option(actor=owner, decision=decision, title="Named Applicant Org", description="d")
     exercise = create_exercise(
-        actor=owner, decision=decision, owner_id=owner.id, title="Blind scorecard", purpose="p",
-        method="scorecard", blind_applicant_identity=True, quorum_count=1,
+        actor=owner,
+        decision=decision,
+        owner_id=owner.id,
+        title="Blind scorecard",
+        purpose="p",
+        method="scorecard",
+        blind_applicant_identity=True,
+        quorum_count=1,
     )
 
     api_client.force_authenticate(reviewer)

@@ -13,12 +13,19 @@ def test_set_lookup_provider_requires_manager(organisation_factory, user_factory
     organisation = organisation_factory()
     owner = organisation.created_by
     viewer = user_factory(email="viewer@example.com")
-    Membership.objects.create(organisation=organisation, user=viewer, role=Membership.Role.VIEWER, status=Membership.Status.ACTIVE)
+    Membership.objects.create(
+        organisation=organisation,
+        user=viewer,
+        role=Membership.Role.VIEWER,
+        status=Membership.Status.ACTIVE,
+    )
 
     with pytest.raises(PermissionDenied):
         services.set_lookup_provider(actor=viewer, organisation=organisation, provider_key="manual")
 
-    config = services.set_lookup_provider(actor=owner, organisation=organisation, provider_key="manual")
+    config = services.set_lookup_provider(
+        actor=owner, organisation=organisation, provider_key="manual"
+    )
     assert config.provider_key == "manual"
 
 
@@ -52,15 +59,24 @@ def test_lookup_organisation_available_to_any_active_member(organisation_factory
     organisation = organisation_factory()
     owner = organisation.created_by
     contributor = user_factory(email="contributor@example.com")
-    Membership.objects.create(organisation=organisation, user=contributor, role=Membership.Role.CONTRIBUTOR, status=Membership.Status.ACTIVE)
+    Membership.objects.create(
+        organisation=organisation,
+        user=contributor,
+        role=Membership.Role.CONTRIBUTOR,
+        status=Membership.Status.ACTIVE,
+    )
     outsider = user_factory(email="outsider@example.com")
 
-    result = services.lookup_organisation(actor=contributor, organisation=organisation, query="Water for All")
+    result = services.lookup_organisation(
+        actor=contributor, organisation=organisation, query="Water for All"
+    )
     assert result["ok"] is True
     assert result["found"] is False
 
     with pytest.raises(PermissionDenied):
-        services.lookup_organisation(actor=outsider, organisation=organisation, query="Water for All")
+        services.lookup_organisation(
+            actor=outsider, organisation=organisation, query="Water for All"
+        )
 
     with pytest.raises(ValidationError):
         services.lookup_organisation(actor=owner, organisation=organisation, query="   ")

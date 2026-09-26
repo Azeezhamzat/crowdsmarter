@@ -23,9 +23,10 @@ not replace the provider-neutral guidance elsewhere in this document — it is
 what `docker-compose.prod.yml`, `docker-compose.tls.yml`, and
 `frontend/nginx.prod.conf` in this repository are for.
 
-1. **Create the droplet.** A Basic 2GB/1vCPU plan is enough to start (the
-   full stack — Postgres, Redis, gunicorn, Nginx — idles under 1GB); resize
-   later if needed. Ubuntu LTS image. Point `crowdsmarter.com` and
+1. **Create the droplet.** Size the host from a staging load test that includes
+   PostgreSQL, Redis, Gunicorn, Nginx, monitoring, and ClamAV. The earlier
+   2GB baseline is no longer appropriate now that fail-closed signature
+   scanning is part of the production stack. Use an Ubuntu LTS image. Point `crowdsmarter.com` and
    `www.crowdsmarter.com`'s DNS `A` records at the droplet's IP before
    continuing — certificate issuance in step 5 needs this to already be live.
 2. **Install Docker.** `curl -fsSL https://get.docker.com | sh` (or
@@ -81,6 +82,8 @@ At minimum set:
 - `DATABASE_URL`;
 - `FRONTEND_BASE_URL` for invitation links;
 - SMTP settings before external invitations;
+- fail-closed ClamAV settings and a healthy signature database;
+- the private metrics/logging stack and a tested external alert receiver;
 - HTTPS proxy headers and certificates.
 
 Production startup fails when the secret, allowed hosts, or database URL are absent. Run `python manage.py migrate` as an explicit release step before replacing application containers.
@@ -94,7 +97,7 @@ Expose the static frontend and `/api`, `/admin`, `/health`, and `/static` under 
 Any PostgreSQL service is supported through `DATABASE_URL`. Before onboarding customer data:
 
 1. schedule encrypted `pg_dump` backups;
-2. test restoration, not only backup creation;
+2. run `./scripts/backup-restore-drill.sh` locally and adapt the isolated restore drill to production;
 3. restrict network access and database roles;
 4. monitor disk use and connection exhaustion;
 5. document retention and deletion procedures.
@@ -107,7 +110,16 @@ Local filesystem storage is the default. Before multiple application replicas or
 
 ## Email and invitations
 
-The console backend is safe for development and the local UI exposes the current invitation link only when `DEBUG=true`. SMTP settings are environment-driven. Production invitation responses never return the raw link, so configure a working SMTP provider and `FRONTEND_BASE_URL` before inviting external users. Keep `DJANGO_SECRET_KEY` stable because invitation digests are keyed with it. No workflow assumes one commercial email provider.
+The console backend is safe for development and the local UI exposes the current invitation link only when `DEBUG=true`. SMTP settings are environment-driven. Production invitation responses never return the raw link, so configure a working SMTP provider and `FRONTEND_BASE_URL` before inviting external users. Keep `DJANGO_SECRET_KEY` stable because invitation digests are keyed with it. No workflow assumes one commercial email provider. Follow `docs/operations/email-delivery.md`; production startup runs deployment checks that reject incomplete SMTP and weakened malware controls.
+
+## Monitoring and alerting
+
+The optional `docker-compose.observability.yml` profile provides Prometheus,
+Loki, Alloy, Grafana, Alertmanager, a dashboard, and baseline backend alerts.
+Use it for local/staging verification as documented in
+`docs/operations/observability.md`. Production must keep telemetry endpoints
+private and replace the deliberately local-only Alertmanager receiver with a
+tested on-call destination.
 
 ## Workers
 
@@ -161,3 +173,9 @@ API_FORESIGHT_FEED_SYNC_THROTTLE_RATE=20/hour
 ```
 
 Production should configure a private S3-compatible Django storage backend and an explicit comma-separated feed-domain allowlist. Leaving `FORESIGHT_FEED_ALLOWED_DOMAINS` empty disables production feed creation and retrieval safely. Storage migration changes Django `STORAGES` configuration rather than foresight domain code.
+
+All source files are synchronously malware-scanned before persistence. The
+development default uses only the deterministic EICAR control; production is
+required to use the ClamAV service, fail closed, and allow download/export only
+for clean records. See `docs/operations/malware-scanning.md`, including the
+legacy-file rescan step required after a storage import.

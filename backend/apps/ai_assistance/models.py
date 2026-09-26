@@ -71,9 +71,7 @@ class AIReview(UUIDTimeStampedModel):
         ordering = ["-created_at", "id"]
         constraints = [
             models.CheckConstraint(
-                condition=models.Q(
-                    status__in=["pending", "running", "completed", "failed"]
-                ),
+                condition=models.Q(status__in=["pending", "running", "completed", "failed"]),
                 name="ai_review_status_valid",
             ),
             models.CheckConstraint(
@@ -112,9 +110,7 @@ class AIReview(UUIDTimeStampedModel):
                 {"error_message": "A failed AI review requires an error message."}
             )
         if self.dismissed_at and not self.dismissal_reason:
-            raise ValidationError(
-                {"dismissal_reason": "A dismissed review requires a reason."}
-            )
+            raise ValidationError({"dismissal_reason": "A dismissed review requires a reason."})
 
     @property
     def is_dismissed(self) -> bool:

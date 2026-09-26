@@ -7,7 +7,7 @@ export function getDisbursementConfiguration(organisationId: string): Promise<Di
 
 export function setDisbursementProvider(
   organisationId: string,
-  input: { provider_key: "manual" | "stripe"; stripe_account_id?: string },
+  input: { provider_key: "manual" | "stripe"; stripe_account_id?: string; currency: string },
 ): Promise<DisbursementConfiguration> {
   return apiRequest(`/organisations/${organisationId}/disbursement-configuration/`, {
     method: "PUT",
@@ -46,6 +46,6 @@ export function issueDisbursement(
 ): Promise<Disbursement> {
   return apiRequest(`/decision-options/${optionId}/disbursements/`, {
     method: "POST",
-    body: JSON.stringify(input),
+    body: JSON.stringify({ ...input, idempotency_key: crypto.randomUUID() }),
   });
 }

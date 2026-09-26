@@ -11,9 +11,9 @@ from django.utils import timezone
 
 from apps.accounts.models import User
 from apps.audit.services import record_event
-from apps.organisations.models import Membership
 from apps.notifications.models import Notification
 from apps.notifications.services import notify_users
+from apps.organisations.models import Membership
 from apps.workspaces.models import Workspace
 
 from .models import Decision, DecisionTransition
@@ -141,9 +141,13 @@ def create_decision(
 
     assert_can_create_decision(organisation=workspace.organisation)
 
-    owner = actor if owner_id is None else _active_member(
-        organisation_id=workspace.organisation_id,
-        user_id=owner_id,
+    owner = (
+        actor
+        if owner_id is None
+        else _active_member(
+            organisation_id=workspace.organisation_id,
+            user_id=owner_id,
+        )
     )
     if membership.role == Membership.Role.CONTRIBUTOR and owner.id != actor.id:
         raise PermissionDenied("Contributors may only create decisions they own.")
@@ -161,13 +165,13 @@ def create_decision(
                 method__status="approved",
             )
         except DecisionMethodVersion.DoesNotExist as exc:
-            raise DecisionServiceError({"method_version_id": "Choose an approved organisation method."}) from exc
+            raise DecisionServiceError(
+                {"method_version_id": "Choose an approved organisation method."}
+            ) from exc
     else:
         selected_template = template_for_key(template_key)
         if selected_template is None:
-            raise DecisionServiceError(
-                {"template_key": "Choose a recognised decision template."}
-            )
+            raise DecisionServiceError({"template_key": "Choose a recognised decision template."})
 
     decision = Decision(
         organisation=workspace.organisation,
@@ -197,8 +201,10 @@ def create_decision(
         from apps.methodology.models import DecisionMethodUsage
 
         usage = DecisionMethodUsage(
-            organisation=decision.organisation, method_version=selected_method_version,
-            decision=decision, applied_by=actor,
+            organisation=decision.organisation,
+            method_version=selected_method_version,
+            decision=decision,
+            applied_by=actor,
         )
         usage.full_clean(validate_unique=False, validate_constraints=False)
         usage.save()
@@ -215,7 +221,9 @@ def create_decision(
             "status": decision.status,
             "template_key": decision.source_template_key,
             "template_version": decision.source_template_version,
-            "method_version_id": str(decision.source_method_version_id) if decision.source_method_version_id else None,
+            "method_version_id": str(decision.source_method_version_id)
+            if decision.source_method_version_id
+            else None,
         },
     )
     return decision
@@ -229,9 +237,11 @@ def update_decision(
     fields: dict[str, Any],
 ) -> Decision:
     """Update framing fields while the lifecycle still permits editing."""
-    decision = Decision.objects.select_for_update().select_related(
-        "organisation", "workspace", "owner"
-    ).get(id=decision.id)
+    decision = (
+        Decision.objects.select_for_update()
+        .select_related("organisation", "workspace", "owner")
+        .get(id=decision.id)
+    )
     if not can_edit_decision(actor=actor, decision=decision):
         raise PermissionDenied("You cannot edit this decision in its current state.")
 
@@ -242,9 +252,7 @@ def update_decision(
             organisation_id=decision.organisation_id,
             user_id=requested_owner_id,
         )
-        actor_membership = _active_membership(
-            actor=actor, organisation_id=decision.organisation_id
-        )
+        actor_membership = _active_membership(actor=actor, organisation_id=decision.organisation_id)
         if actor_membership.role not in MANAGER_ROLES and decision.owner_id != actor.id:
             raise PermissionDenied(
                 "Only the decision owner or a tenant manager may transfer ownership."
@@ -313,10 +321,14 @@ def _validate_framing_to_contribution(decision: Decision, rationale: str) -> Non
         errors["contribution_deadline"] = "A contribution deadline is required."
     elif decision.contribution_deadline <= timezone.now():
         errors["contribution_deadline"] = "The contribution deadline must be in the future."
-    stakeholder_count = Participant.objects.filter(
-        decision=decision,
-        status=Participant.Status.ACTIVE,
-    ).exclude(role=Participant.Role.DECISION_OWNER).count()
+    stakeholder_count = (
+        Participant.objects.filter(
+            decision=decision,
+            status=Participant.Status.ACTIVE,
+        )
+        .exclude(role=Participant.Role.DECISION_OWNER)
+        .count()
+    )
     if stakeholder_count < 1:
         errors["participants"] = "Add at least one stakeholder before opening contribution."
     if errors:
@@ -344,25 +356,17 @@ def _validate_review_to_ready(decision: Decision, rationale: str) -> None:
     ).count()
     if option_count < 2:
         errors["options"] = "At least two active options are required."
-    if not Evidence.objects.filter(
-        decision=decision, status=Evidence.Status.ACTIVE
-    ).exists():
+    if not Evidence.objects.filter(decision=decision, status=Evidence.Status.ACTIVE).exists():
         errors["evidence"] = "Record at least one active evidence item."
-    if not Assumption.objects.filter(
-        decision=decision, status=Assumption.Status.ACTIVE
-    ).exists():
+    if not Assumption.objects.filter(decision=decision, status=Assumption.Status.ACTIVE).exists():
         errors["assumptions"] = "Record at least one active assumption."
     if Assumption.objects.filter(
         decision=decision,
         status=Assumption.Status.ACTIVE,
         verification_status=Assumption.VerificationStatus.INVALIDATED,
     ).exists():
-        errors["assumptions"] = (
-            "Retire or resolve invalidated assumptions before readiness."
-        )
-    if not Risk.objects.filter(decision=decision).exclude(
-        status=Risk.Status.CLOSED
-    ).exists():
+        errors["assumptions"] = "Retire or resolve invalidated assumptions before readiness."
+    if not Risk.objects.filter(decision=decision).exclude(status=Risk.Status.CLOSED).exists():
         errors["risks"] = "Record at least one current risk."
     if errors:
         raise DecisionServiceError(errors)
@@ -452,17 +456,18 @@ def transition_decision(
     warnings_acknowledged: list[str] | None = None,
 ) -> DecisionTransition:
     """Advance exactly one authorised lifecycle step and preserve history."""
-    decision = Decision.objects.select_for_update().select_related(
-        "organisation", "owner"
-    ).get(id=decision.id)
+    decision = (
+        Decision.objects.select_for_update()
+        .select_related("organisation", "owner")
+        .get(id=decision.id)
+    )
     if not can_transition_decision(actor=actor, decision=decision):
         raise PermissionDenied("You do not hold lifecycle authority for this decision.")
     if decision.status != expected_status:
         raise DecisionServiceError(
             {
                 "expected_status": (
-                    "The decision changed after this page was loaded. "
-                    "Refresh and retry."
+                    "The decision changed after this page was loaded. Refresh and retry."
                 )
             }
         )

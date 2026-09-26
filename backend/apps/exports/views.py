@@ -55,7 +55,9 @@ class OrganisationExportView(APIView):
         }:
             from rest_framework.exceptions import PermissionDenied
 
-            raise PermissionDenied("Only organisation owners and administrators can export all tenant data.")
+            raise PermissionDenied(
+                "Only organisation owners and administrators can export all tenant data."
+            )
         archive = build_organisation_export(organisation=organisation)
         record_event(
             action="organisation.export_downloaded",

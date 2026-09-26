@@ -1,7 +1,9 @@
-import { LOCALES, setLocale, useLocale } from "../lib/i18n";
+import { LANGUAGE_SELECTION_ENABLED, LOCALES, setLocale, useLocale } from "../lib/i18n";
 
 export function LanguageSwitcher({ className = "" }: { className?: string }) {
   const locale = useLocale();
+  if (!LANGUAGE_SELECTION_ENABLED) return null;
+
   return (
     <select
       className={`language-switcher ${className}`.trim()}

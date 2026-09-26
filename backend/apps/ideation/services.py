@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hmac
 from typing import Any
 
 from django.core.exceptions import PermissionDenied, ValidationError
@@ -146,12 +147,10 @@ def identify_participant(
     guardian_name: str = "",
     guardian_email: str = "",
     guardian_consent_given: bool = False,
+    existing_token: str = "",
+    applicant_token: str = "",
 ) -> tuple[SessionParticipant, str]:
-    """Get-or-create a lightweight identity for this session by email, returning a fresh bearer token.
-
-    When the email matches a verified ApplicantAccount, the participant record is
-    linked to it automatically, which is what lets that person's applications
-    surface together on the cross-round "My applications" portal.
+    """Create an identity, or update it only when its existing token proves ownership.
 
     When the session requires guardian consent and the declared age bracket is
     a minor one, a guardian name, guardian email, and explicit consent are
@@ -160,6 +159,13 @@ def identify_participant(
     """
     normalised_email = email.strip().lower()
     raw_token = generate_token()
+    verified_account = None
+    if applicant_token:
+        from apps.applicants.services import applicant_account_from_portal_token
+
+        verified_account = applicant_account_from_portal_token(raw_token=applicant_token)
+        if verified_account.email != normalised_email:
+            raise PermissionDenied("The signed-in applicant account does not match that email.")
 
     if session.requires_guardian_consent and age_bracket in SessionParticipant.MINOR_AGE_BRACKETS:
         if not (guardian_name.strip() and guardian_email.strip() and guardian_consent_given):
@@ -172,20 +178,23 @@ def identify_participant(
                 }
             )
 
-    from apps.applicants.models import ApplicantAccount
-
-    linked_account = ApplicantAccount.objects.filter(
-        email=normalised_email, email_verified_at__isnull=False
-    ).first()
     consent_timestamp = timezone.now() if guardian_consent_given else None
 
     try:
-        participant = SessionParticipant.objects.get(session=session, email=normalised_email)
-        participant.token_digest = digest_token(raw_token)
+        participant = SessionParticipant.objects.select_for_update().get(
+            session=session, email=normalised_email
+        )
+        if not existing_token or not hmac.compare_digest(
+            participant.token_digest,
+            digest_token(existing_token),
+        ):
+            raise PermissionDenied(
+                "That email is already registered for this session. Continue from the original browser or verify the email through the applicant portal."
+            )
         if name.strip():
             participant.name = name
-        if linked_account is not None:
-            participant.account = linked_account
+        if verified_account is not None:
+            participant.account = verified_account
         if school_name.strip():
             participant.school_name = school_name
         if age_bracket:
@@ -200,7 +209,6 @@ def identify_participant(
         participant.save(
             update_fields=[
                 "name",
-                "token_digest",
                 "account",
                 "school_name",
                 "age_bracket",
@@ -216,7 +224,7 @@ def identify_participant(
             name=name,
             email=normalised_email,
             token_digest=digest_token(raw_token),
-            account=linked_account,
+            account=verified_account,
             school_name=school_name,
             age_bracket=age_bracket,
             guardian_name=guardian_name,
@@ -227,8 +235,10 @@ def identify_participant(
         try:
             participant.save()
         except IntegrityError as exc:
-            raise IdeationServiceError({"email": "Could not register that email for this session."}) from exc
-    return participant, raw_token
+            raise IdeationServiceError(
+                {"email": "Could not register that email for this session."}
+            ) from exc
+    return participant, existing_token or raw_token
 
 
 def participant_from_token(*, session: OpenSession, raw_token: str) -> SessionParticipant:
@@ -253,6 +263,12 @@ def submit_idea(
 ) -> Idea:
     if session.status != OpenSession.Status.OPEN:
         raise IdeationServiceError("This session is not currently accepting submissions.")
+    if session.submission_deadline and session.submission_deadline <= timezone.now():
+        raise IdeationServiceError("The submission deadline has passed.")
+    if not session.team_submissions_enabled and (team_name.strip() or bool(team_members)):
+        raise IdeationServiceError(
+            {"team_members": "Team submissions are not enabled for this session."}
+        )
     idea = Idea(
         session=session,
         title=title,
@@ -266,7 +282,9 @@ def submit_idea(
     idea.full_clean(validate_unique=False, validate_constraints=False)
     idea.save()
     for member in (team_members or [])[:MAX_TEAM_MEMBERS]:
-        team_member = IdeaTeamMember(idea=idea, name=member.get("name", ""), role=member.get("role", ""))
+        team_member = IdeaTeamMember(
+            idea=idea, name=member.get("name", ""), role=member.get("role", "")
+        )
         team_member.full_clean(validate_unique=False, validate_constraints=False)
         team_member.save()
     return idea
@@ -343,7 +361,8 @@ def promote_idea_to_decision(*, actor: User, idea: Idea, decision: Decision | No
     if idea.status == Idea.Status.PROMOTED:
         raise IdeationServiceError("This idea has already been promoted.")
     if decision is None:
-        if idea.session.default_workspace_id is None:
+        workspace = idea.session.default_workspace
+        if workspace is None:
             raise IdeationServiceError(
                 "This session has no default workspace to create a new grant round in."
             )
@@ -351,13 +370,15 @@ def promote_idea_to_decision(*, actor: User, idea: Idea, decision: Decision | No
 
         decision = create_decision(
             actor=actor,
-            workspace=idea.session.default_workspace,
+            workspace=workspace,
             title=idea.title,
             purpose=idea.description,
             template_key="grant_round",
         )
     elif decision.organisation_id != idea.session.organisation_id:
-        raise IdeationServiceError({"decision": "The decision must belong to this session's organisation."})
+        raise IdeationServiceError(
+            {"decision": "The decision must belong to this session's organisation."}
+        )
     option = create_option(
         actor=actor,
         decision=decision,
@@ -375,7 +396,11 @@ def promote_idea_to_decision(*, actor: User, idea: Idea, decision: Decision | No
         object_id=str(idea.id),
         actor=actor,
         organisation=idea.session.organisation,
-        metadata={"decision_id": str(decision.id), "option_id": str(option.id), "title": idea.title},
+        metadata={
+            "decision_id": str(decision.id),
+            "option_id": str(option.id),
+            "title": idea.title,
+        },
     )
     return option
 
@@ -445,7 +470,11 @@ def session_for_organiser(*, actor: User, session_id: Any) -> OpenSession:
     )
 
 
-PUBLICLY_VISIBLE_STATUSES = {OpenSession.Status.OPEN, OpenSession.Status.CLOSED, OpenSession.Status.ARCHIVED}
+PUBLICLY_VISIBLE_STATUSES = {
+    OpenSession.Status.OPEN,
+    OpenSession.Status.CLOSED,
+    OpenSession.Status.ARCHIVED,
+}
 
 
 def public_session_by_slug(*, public_slug: str) -> OpenSession:

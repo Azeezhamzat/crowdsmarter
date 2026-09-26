@@ -24,10 +24,14 @@ def can_contribute(*, actor: User, decision: Decision) -> bool:
         return False
     if membership.role in {Membership.Role.OWNER, Membership.Role.ADMIN}:
         return True
-    return decision.participants.filter(
-        user=actor,
-        status=Participant.Status.ACTIVE,
-    ).exclude(role=Participant.Role.OBSERVER).exists()
+    return (
+        decision.participants.filter(
+            user=actor,
+            status=Participant.Status.ACTIVE,
+        )
+        .exclude(role=Participant.Role.OBSERVER)
+        .exists()
+    )
 
 
 def can_resolve(*, actor: User, entry: DiscussionEntry) -> bool:

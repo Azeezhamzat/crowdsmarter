@@ -52,9 +52,11 @@ def create_discussion_entry(
     reply_to: DiscussionEntry | None = None,
 ) -> DiscussionEntry:
     """Append one attributable discussion entry and deliver focused notifications."""
-    current = Decision.objects.select_for_update().select_related(
-        "organisation", "owner"
-    ).get(id=decision.id)
+    current = (
+        Decision.objects.select_for_update()
+        .select_related("organisation", "owner")
+        .get(id=decision.id)
+    )
     if not can_contribute(actor=actor, decision=current):
         raise PermissionDenied(
             "Only an active non-observer participant or organisation manager may contribute."
@@ -117,9 +119,11 @@ def resolve_discussion_entry(
     *, actor: User, entry: DiscussionEntry, resolution_note: str
 ) -> DiscussionEntry:
     """Resolve an open question or concern without changing its original content."""
-    current = DiscussionEntry.objects.select_for_update().select_related(
-        "decision", "decision__organisation", "author"
-    ).get(id=entry.id)
+    current = (
+        DiscussionEntry.objects.select_for_update()
+        .select_related("decision", "decision__organisation", "author")
+        .get(id=entry.id)
+    )
     if not can_resolve(actor=actor, entry=current):
         raise PermissionDenied(
             "Only the decision owner or an organisation manager may resolve this item."
@@ -136,9 +140,7 @@ def resolve_discussion_entry(
     current.resolved_by = actor
     current.resolution_note = resolution_note
     current.full_clean(validate_unique=False, validate_constraints=False)
-    current.save(
-        update_fields=["resolved_at", "resolved_by", "resolution_note", "updated_at"]
-    )
+    current.save(update_fields=["resolved_at", "resolved_by", "resolution_note", "updated_at"])
     notify_users(
         recipients=[current.author],
         organisation=current.organisation,
@@ -146,8 +148,7 @@ def resolve_discussion_entry(
         kind=Notification.Kind.COLLABORATION,
         title=f"{current.get_kind_display()} resolved",
         message=(
-            f"A {current.get_kind_display().lower()} on "
-            f"“{current.decision.title}” was resolved."
+            f"A {current.get_kind_display().lower()} on “{current.decision.title}” was resolved."
         ),
         url=f"/decisions/{current.decision_id}/collaboration",
         metadata={"discussion_entry_id": str(current.id)},

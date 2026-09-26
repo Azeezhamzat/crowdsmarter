@@ -152,6 +152,7 @@ def test_stale_outcome_command_is_rejected(decision_factory):  # type: ignore[no
         )
     assert "expected_status" in exc_info.value.message_dict
 
+
 @pytest.mark.django_db
 def test_implementation_owner_can_be_transferred(
     user_factory,
@@ -183,6 +184,4 @@ def test_implementation_owner_can_be_transferred(
     )
     assert changed.id == review.id
     assert changed.implementation_owner == replacement
-    assert AuditEvent.objects.filter(
-        action="decision.implementation_owner_changed"
-    ).exists()
+    assert AuditEvent.objects.filter(action="decision.implementation_owner_changed").exists()

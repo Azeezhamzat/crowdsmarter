@@ -52,7 +52,9 @@ def canvas_workspace_for_user(*, user, canvas_id):  # type: ignore[no-untyped-de
                     "signal_links__signal"
                 ),
             ),
-            Prefetch("stakeholders", queryset=SystemStakeholder.objects.select_related("created_by")),
+            Prefetch(
+                "stakeholders", queryset=SystemStakeholder.objects.select_related("created_by")
+            ),
             Prefetch(
                 "relationships",
                 queryset=CausalRelationship.objects.select_related(
@@ -74,7 +76,9 @@ def canvas_workspace_for_user(*, user, canvas_id):  # type: ignore[no-untyped-de
                     "originating_driver", "parent", "created_by"
                 ),
             ),
-            Prefetch("horizon_items", queryset=ThreeHorizonItem.objects.select_related("created_by")),
+            Prefetch(
+                "horizon_items", queryset=ThreeHorizonItem.objects.select_related("created_by")
+            ),
             Prefetch(
                 "scenario_sets",
                 queryset=ScenarioSet.objects.select_related(

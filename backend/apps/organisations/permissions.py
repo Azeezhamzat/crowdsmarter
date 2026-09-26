@@ -19,8 +19,11 @@ class IsOrganisationMember(BasePermission):
         view: object,
         obj: Organisation,
     ) -> bool:
+        user_id = request.user.pk
+        if user_id is None:
+            return False
         return obj.memberships.filter(
-            user=request.user,
+            user_id=user_id,
             status=Membership.Status.ACTIVE,
         ).exists()
 
@@ -34,8 +37,11 @@ class CanManageOrganisation(BasePermission):
         view: object,
         obj: Organisation,
     ) -> bool:
+        user_id = request.user.pk
+        if user_id is None:
+            return False
         membership = obj.memberships.filter(
-            user=request.user,
+            user_id=user_id,
             status=Membership.Status.ACTIVE,
         ).first()
         if membership is None:
@@ -54,8 +60,11 @@ class CanManageMembership(BasePermission):
         view: object,
         obj: Membership,
     ) -> bool:
+        user_id = request.user.pk
+        if user_id is None:
+            return False
         actor_membership = obj.organisation.memberships.filter(
-            user=request.user,
+            user_id=user_id,
             status=Membership.Status.ACTIVE,
         ).first()
         if actor_membership is None:
@@ -64,7 +73,4 @@ class CanManageMembership(BasePermission):
             return True
         if actor_membership.role == Membership.Role.OWNER:
             return True
-        return (
-            actor_membership.role == Membership.Role.ADMIN
-            and obj.role != Membership.Role.OWNER
-        )
+        return actor_membership.role == Membership.Role.ADMIN and obj.role != Membership.Role.OWNER

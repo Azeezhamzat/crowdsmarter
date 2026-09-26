@@ -5,12 +5,13 @@ import { Outlet, useLocation } from "react-router";
 const PRODUCT_NAME = "CrowdSmarter";
 
 const routeTitles: Array<[RegExp, string]> = [
-  [/^\/$/, "Free platform for group decisions and grant rounds"],
-  [/^\/request-demo\/?$/, "Request a tailored demo"],
+  [/^\/$/, "Facilitated collective decisions and grant rounds"],
+  [/^\/request-demo\/?$/, "Discuss a decision"],
   [/^\/login\/?$/, "Sign in"],
   [/^\/signup\/?$/, "Start your own commons"],
   [/^\/forgot-password\/?$/, "Reset your password"],
   [/^\/reset-password\/?$/, "Choose a new password"],
+  [/^\/verify-email-change\/?$/, "Verify your new email address"],
   [/^\/accept-invitation\/?$/, "Accept organisation invitation"],
   [/^\/s\/[^/]+\/?$/, "Open session"],
   [/^\/my-applications\/?$/, "My applications"],

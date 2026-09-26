@@ -5,9 +5,7 @@ from apps.organisations.models import Membership
 
 
 @pytest.mark.django_db
-def test_workspace_endpoints_are_tenant_isolated(
-    api_client, user_factory, workspace_factory
-):  # type: ignore[no-untyped-def]
+def test_workspace_endpoints_are_tenant_isolated(api_client, user_factory, workspace_factory):  # type: ignore[no-untyped-def]
     outsider = user_factory()
     workspace = workspace_factory()
     api_client.force_authenticate(outsider)
@@ -31,9 +29,7 @@ def test_owner_can_list_create_retrieve_and_update_workspace(
     owner = user_factory()
     organisation = organisation_factory(owner=owner)
     api_client.force_authenticate(owner)
-    collection_url = reverse(
-        "workspaces:list-create", kwargs={"organisation_id": organisation.id}
-    )
+    collection_url = reverse("workspaces:list-create", kwargs={"organisation_id": organisation.id})
 
     create_response = api_client.post(
         collection_url,
@@ -43,9 +39,7 @@ def test_owner_can_list_create_retrieve_and_update_workspace(
     assert create_response.status_code == 201
     assert api_client.get(collection_url).status_code == 200
 
-    detail_url = reverse(
-        "workspaces:detail", kwargs={"workspace_id": create_response.json()["id"]}
-    )
+    detail_url = reverse("workspaces:detail", kwargs={"workspace_id": create_response.json()["id"]})
     assert api_client.get(detail_url).status_code == 200
     patch = api_client.patch(
         detail_url,

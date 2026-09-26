@@ -5,9 +5,7 @@ from apps.audit.services import record_event
 
 
 @pytest.mark.django_db
-def test_audit_events_are_append_only(
-    user_factory, organisation_factory
-):  # type: ignore[no-untyped-def]
+def test_audit_events_are_append_only(user_factory, organisation_factory):  # type: ignore[no-untyped-def]
     actor = user_factory()
     organisation = organisation_factory(owner=actor)
     event = record_event(
@@ -41,6 +39,7 @@ def test_audit_actor_cannot_be_hard_deleted(user_factory):  # type: ignore[no-un
 
     with pytest.raises(ProtectedError):
         actor.delete()
+
 
 @pytest.mark.django_db
 def test_audit_service_serialises_common_domain_values(

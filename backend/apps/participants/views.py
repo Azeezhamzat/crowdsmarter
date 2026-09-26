@@ -41,9 +41,7 @@ class ParticipantListCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, decision_id):  # type: ignore[no-untyped-def]
-        participants = participants_for_decision(
-            user=request.user, decision_id=decision_id
-        )
+        participants = participants_for_decision(user=request.user, decision_id=decision_id)
         return Response(ParticipantSerializer(participants, many=True).data)
 
     def post(self, request, decision_id):  # type: ignore[no-untyped-def]
@@ -74,9 +72,7 @@ class ParticipantDetailView(APIView):
     permission_classes = [IsAuthenticated, CanAccessParticipant]
 
     def _get_object(self, request, participant_id):  # type: ignore[no-untyped-def]
-        participant = participant_for_user(
-            user=request.user, participant_id=participant_id
-        )
+        participant = participant_for_user(user=request.user, participant_id=participant_id)
         self.check_object_permissions(request, participant)
         return participant
 
@@ -113,15 +109,11 @@ class ParticipantConflictListCreateView(APIView):
         serializer.is_valid(raise_exception=True)
         data = dict(serializer.validated_data)
         option_id = data.pop("option_id", None)
-        option = (
-            option_for_user(user=request.user, option_id=option_id) if option_id else None
-        )
+        option = option_for_user(user=request.user, option_id=option_id) if option_id else None
         conflict = declare_conflict(
             actor=request.user, participant=participant, option=option, **data
         )
-        return Response(
-            ConflictOfInterestSerializer(conflict).data, status=status.HTTP_201_CREATED
-        )
+        return Response(ConflictOfInterestSerializer(conflict).data, status=status.HTTP_201_CREATED)
 
 
 class ConflictWithdrawView(APIView):

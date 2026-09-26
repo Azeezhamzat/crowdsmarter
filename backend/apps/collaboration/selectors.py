@@ -15,16 +15,18 @@ from apps.decisions.selectors import decision_for_user
 from .models import DiscussionEntry
 
 
-def discussion_for_decision(
-    *, user: User, decision_id: UUID
-) -> models.QuerySet[DiscussionEntry]:
+def discussion_for_decision(*, user: User, decision_id: UUID) -> models.QuerySet[DiscussionEntry]:
     decision = decision_for_user(user=user, decision_id=decision_id)
-    return DiscussionEntry.objects.filter(decision=decision).select_related(
-        "author",
-        "reply_to",
-        "reply_to__author",
-        "resolved_by",
-    ).prefetch_related("mentioned_users")
+    return (
+        DiscussionEntry.objects.filter(decision=decision)
+        .select_related(
+            "author",
+            "reply_to",
+            "reply_to__author",
+            "resolved_by",
+        )
+        .prefetch_related("mentioned_users")
+    )
 
 
 def discussion_entry_for_user(*, user: User, entry_id: UUID) -> DiscussionEntry:
@@ -35,9 +37,9 @@ def discussion_entry_for_user(*, user: User, entry_id: UUID) -> DiscussionEntry:
             "author",
             "reply_to",
             "resolved_by",
-        ).prefetch_related("mentioned_users").filter(
-            decision__in=Decision.objects.for_user(user)
-        ),
+        )
+        .prefetch_related("mentioned_users")
+        .filter(decision__in=Decision.objects.for_user(user)),
         id=entry_id,
     )
 

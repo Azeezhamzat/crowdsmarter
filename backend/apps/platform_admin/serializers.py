@@ -210,7 +210,8 @@ class PlatformOrganisationDetailSerializer(PlatformOrganisationSummarySerializer
                 "owner": {
                     "id": str(item.owner_id),
                     "email": item.owner.email,
-                    "name": f"{item.owner.first_name} {item.owner.last_name}".strip() or item.owner.email,
+                    "name": f"{item.owner.first_name} {item.owner.last_name}".strip()
+                    or item.owner.email,
                 },
                 "updated_at": item.updated_at,
             }
@@ -273,7 +274,9 @@ class PlatformOwnershipTransferSerializer(StrictSerializer):
 
 
 class PlatformOrganisationStateSerializer(StrictSerializer):
-    action = serializers.ChoiceField(choices=[("deactivate", "Deactivate"), ("reactivate", "Reactivate")])
+    action = serializers.ChoiceField(
+        choices=[("deactivate", "Deactivate"), ("reactivate", "Reactivate")]
+    )
     rationale = serializers.CharField(min_length=12, max_length=2000)
     confirmation = serializers.CharField(max_length=240)
 
@@ -360,7 +363,9 @@ class ClearAIProviderAPIKeySerializer(StrictSerializer):
 
 class PlatformDemoRequestSerializer(serializers.ModelSerializer):
     primary_need_label = serializers.CharField(source="get_primary_need_display", read_only=True)
-    organisation_size_label = serializers.CharField(source="get_organisation_size_display", read_only=True)
+    organisation_size_label = serializers.CharField(
+        source="get_organisation_size_display", read_only=True
+    )
 
     class Meta:
         model = DemoRequest

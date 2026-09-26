@@ -1,12 +1,15 @@
 import pytest
 from django.core.exceptions import PermissionDenied
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.management import call_command
 
 from apps.audit.models import AuditEvent
-from apps.foresight.models import Signal, Source
+from apps.foresight.models import Signal, Source, SourceAttachment
 from apps.foresight.services import (
+    ForesightServiceError,
     add_signal_to_watchlist,
     attach_source_file,
+    create_research_claim,
     create_signal,
     create_source,
     create_watchlist,
@@ -72,7 +75,12 @@ def test_contributor_builds_traceable_signal_workflow(
     assert signal.priority_score == 16
     assert signal.watchlists.filter(id=watchlist.id).exists()
     assert signal.decision_links.filter(decision=decision).exists()
-    assert AuditEvent.objects.filter(organisation=organisation, action__startswith="foresight.").count() == 5
+    assert (
+        AuditEvent.objects.filter(
+            organisation=organisation, action__startswith="foresight."
+        ).count()
+        == 5
+    )
 
 
 @pytest.mark.django_db
@@ -100,6 +108,66 @@ def test_private_source_attachment_records_hash_and_metadata(organisation_factor
     assert attachment.size_bytes > 0
     assert len(attachment.sha256) == 64
     assert attachment.original_name == "signal-note.txt"
+    assert attachment.malware_scan_status == SourceAttachment.ScanStatus.CLEAN
+    assert attachment.malware_scan_engine == "builtin-eicar-control"
+
+
+@pytest.mark.django_db
+def test_eicar_upload_is_rejected_before_storage(organisation_factory):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    source = create_source(
+        actor=organisation.created_by,
+        organisation=organisation,
+        title="Malware control test",
+        source_type=Source.SourceType.INTERNAL,
+        reference="Security control test",
+    )
+    upload = SimpleUploadedFile(
+        "eicar.txt",
+        b"X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*",
+        content_type="text/plain",
+    )
+
+    with pytest.raises(ForesightServiceError, match="rejected by malware scanning"):
+        attach_source_file(actor=organisation.created_by, source=source, upload=upload)
+
+    assert not SourceAttachment.objects.filter(source=source).exists()
+
+
+@pytest.mark.django_db
+def test_legacy_attachment_scan_preview_and_apply(organisation_factory):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    source = create_source(
+        actor=organisation.created_by,
+        organisation=organisation,
+        title="Legacy source",
+        source_type=Source.SourceType.INTERNAL,
+        reference="Imported before scanning",
+    )
+    attachment = SourceAttachment.objects.create(
+        source=source,
+        file=SimpleUploadedFile("legacy.txt", b"A clean legacy attachment."),
+        original_name="legacy.txt",
+        content_type="text/plain",
+        size_bytes=26,
+        sha256="a" * 64,
+        uploaded_by=organisation.created_by,
+    )
+
+    call_command("scan_source_attachments")
+    attachment.refresh_from_db()
+    assert attachment.malware_scan_status == SourceAttachment.ScanStatus.NOT_SCANNED
+
+    call_command("scan_source_attachments", "--apply")
+    attachment.refresh_from_db()
+    assert attachment.malware_scan_status == SourceAttachment.ScanStatus.CLEAN
+    assert attachment.malware_scan_engine == "builtin-eicar-control"
+    assert attachment.malware_scanned_at is not None
+
+
+def test_malware_scanner_management_check(capsys):  # type: ignore[no-untyped-def]
+    call_command("check_malware_scanner")
+    assert "MALWARE_SCANNER_CHECK=PASS" in capsys.readouterr().out
 
 
 @pytest.mark.django_db
@@ -124,4 +192,11 @@ def test_viewer_cannot_create_signal(user_factory, organisation_factory):  # typ
             maturity=Signal.Maturity.WEAK,
             impact=2,
             uncertainty=3,
+        )
+
+    with pytest.raises(PermissionDenied):
+        create_research_claim(
+            actor=viewer,
+            organisation=organisation,
+            statement="Viewers cannot create research claims.",
         )

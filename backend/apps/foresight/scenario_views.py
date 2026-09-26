@@ -58,17 +58,13 @@ class ScenarioSetListCreateView(APIView):
     def get(self, request, canvas_id):  # type: ignore[no-untyped-def]
         canvas_for_user(user=request.user, canvas_id=canvas_id)
         items = scenario_sets_for_canvas(user=request.user, canvas_id=canvas_id)
-        return Response(
-            ScenarioSetSerializer(items, many=True, context={"request": request}).data
-        )
+        return Response(ScenarioSetSerializer(items, many=True, context={"request": request}).data)
 
     def post(self, request, canvas_id):  # type: ignore[no-untyped-def]
         canvas = canvas_for_user(user=request.user, canvas_id=canvas_id)
         serializer = ScenarioSetWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        item = create_scenario_set(
-            actor=request.user, canvas=canvas, **serializer.validated_data
-        )
+        item = create_scenario_set(actor=request.user, canvas=canvas, **serializer.validated_data)
         return Response(
             ScenarioSetSerializer(item, context={"request": request}).data,
             status=status.HTTP_201_CREATED,
@@ -79,17 +75,11 @@ class ScenarioSetDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, scenario_set_id):  # type: ignore[no-untyped-def]
-        item = scenario_set_workspace_for_user(
-            user=request.user, scenario_set_id=scenario_set_id
-        )
-        return Response(
-            ScenarioSetWorkspaceSerializer(item, context={"request": request}).data
-        )
+        item = scenario_set_workspace_for_user(user=request.user, scenario_set_id=scenario_set_id)
+        return Response(ScenarioSetWorkspaceSerializer(item, context={"request": request}).data)
 
     def patch(self, request, scenario_set_id):  # type: ignore[no-untyped-def]
-        item = scenario_set_for_user(
-            user=request.user, scenario_set_id=scenario_set_id
-        )
+        item = scenario_set_for_user(user=request.user, scenario_set_id=scenario_set_id)
         serializer = ScenarioSetPatchSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         item = update_scenario_set(
@@ -97,18 +87,14 @@ class ScenarioSetDetailView(APIView):
             scenario_set=item,
             fields=dict(serializer.validated_data),
         )
-        return Response(
-            ScenarioSetSerializer(item, context={"request": request}).data
-        )
+        return Response(ScenarioSetSerializer(item, context={"request": request}).data)
 
 
 class ScenarioListCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, scenario_set_id):  # type: ignore[no-untyped-def]
-        scenario_set = scenario_set_for_user(
-            user=request.user, scenario_set_id=scenario_set_id
-        )
+        scenario_set = scenario_set_for_user(user=request.user, scenario_set_id=scenario_set_id)
         serializer = ScenarioWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         item = create_scenario(
@@ -186,9 +172,7 @@ class SignpostListCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, scenario_set_id):  # type: ignore[no-untyped-def]
-        scenario_set = scenario_set_for_user(
-            user=request.user, scenario_set_id=scenario_set_id
-        )
+        scenario_set = scenario_set_for_user(user=request.user, scenario_set_id=scenario_set_id)
         serializer = SignpostWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         validated = dict(serializer.validated_data)

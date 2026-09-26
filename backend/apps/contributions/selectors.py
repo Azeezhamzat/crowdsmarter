@@ -13,15 +13,25 @@ from django.utils import timezone
 from apps.accounts.models import User
 from apps.decisions.selectors import decision_for_user
 
-from .models import ContributionPreference, ContributionRequest, FacilitationSession, SessionParticipant
-from .policies import can_manage_contributions, has_contribution_authority
+from .models import (
+    ContributionPreference,
+    ContributionRequest,
+    FacilitationAgendaItem,
+    FacilitationSession,
+    SessionParticipant,
+)
+from .policies import has_contribution_authority
 
 
 def requests_for_decision(*, user: User, decision_id: UUID) -> models.QuerySet[ContributionRequest]:
     decision = decision_for_user(user=user, decision_id=decision_id)
-    queryset = ContributionRequest.objects.filter(decision=decision).select_related(
-        "assignee", "reviewer", "requested_by", "option", "session", "decision", "organisation"
-    ).prefetch_related("submissions__author", "reviews__reviewer")
+    queryset = (
+        ContributionRequest.objects.filter(decision=decision)
+        .select_related(
+            "assignee", "reviewer", "requested_by", "option", "session", "decision", "organisation"
+        )
+        .prefetch_related("submissions__author", "reviews__reviewer")
+    )
     if not has_contribution_authority(actor=user, decision=decision):
         queryset = queryset.exclude(status=ContributionRequest.Status.DRAFT)
     return queryset
@@ -51,18 +61,54 @@ def decision_for_user_queryset(*, user: User):
 
 def sessions_for_decision(*, user: User, decision_id: UUID) -> models.QuerySet[FacilitationSession]:
     decision = decision_for_user(user=user, decision_id=decision_id)
-    return FacilitationSession.objects.filter(decision=decision).select_related(
-        "facilitator", "created_by", "decision", "organisation"
-    ).prefetch_related("participants__user")
+    return (
+        FacilitationSession.objects.filter(decision=decision)
+        .select_related(
+            "facilitator",
+            "created_by",
+            "decision",
+            "organisation",
+            "authority_response__published_by",
+            "quality_review__reviewed_by",
+        )
+        .prefetch_related(
+            "participants__user",
+            "agenda_items__records",
+            "records__agenda_item",
+            "records__source_participant__user",
+            "records__created_by",
+        )
+    )
 
 
 def session_for_user(*, user: User, session_id: UUID) -> FacilitationSession:
     return get_object_or_404(
         FacilitationSession.objects.select_related(
-            "facilitator", "created_by", "decision", "organisation"
-        ).prefetch_related("participants__user"),
+            "facilitator",
+            "created_by",
+            "decision",
+            "organisation",
+            "authority_response__published_by",
+            "quality_review__reviewed_by",
+        ).prefetch_related(
+            "participants__user",
+            "agenda_items__records",
+            "records__agenda_item",
+            "records__source_participant__user",
+            "records__created_by",
+        ),
         id=session_id,
         decision__in=decision_for_user_queryset(user=user),
+    )
+
+
+def agenda_item_for_user(*, user: User, item_id: UUID) -> FacilitationAgendaItem:
+    return get_object_or_404(
+        FacilitationAgendaItem.objects.select_related(
+            "session__decision", "session__organisation", "created_by"
+        ),
+        id=item_id,
+        session__decision__in=decision_for_user_queryset(user=user),
     )
 
 
@@ -70,9 +116,13 @@ def personal_contribution_work(*, user: User) -> dict:
     now = timezone.now()
     requests = list(
         ContributionRequest.objects.filter(Q(assignee=user) | Q(reviewer=user))
-        .exclude(status__in=[ContributionRequest.Status.ACCEPTED, ContributionRequest.Status.CANCELLED])
+        .exclude(
+            status__in=[ContributionRequest.Status.ACCEPTED, ContributionRequest.Status.CANCELLED]
+        )
         .filter(decision__in=decision_for_user_queryset(user=user))
-        .select_related("decision", "organisation", "reviewer", "requested_by", "assignee", "session")
+        .select_related(
+            "decision", "organisation", "reviewer", "requested_by", "assignee", "session"
+        )
         .prefetch_related("submissions__author", "reviews__reviewer")
         .distinct()
         .order_by("due_at", "-priority", "created_at")[:100]
@@ -80,13 +130,26 @@ def personal_contribution_work(*, user: User) -> dict:
     return {
         "summary": {
             "total": len(requests),
-            "overdue": sum(1 for item in requests if item.assignee_id == user.id and item.due_at and item.due_at < now),
-            "returned": sum(1 for item in requests if item.status == ContributionRequest.Status.RETURNED),
-            "submitted": sum(1 for item in requests if item.status in {ContributionRequest.Status.SUBMITTED, ContributionRequest.Status.UNDER_REVIEW}),
+            "overdue": sum(
+                1
+                for item in requests
+                if item.assignee_id == user.id and item.due_at and item.due_at < now
+            ),
+            "returned": sum(
+                1 for item in requests if item.status == ContributionRequest.Status.RETURNED
+            ),
+            "submitted": sum(
+                1
+                for item in requests
+                if item.status
+                in {ContributionRequest.Status.SUBMITTED, ContributionRequest.Status.UNDER_REVIEW}
+            ),
             "awaiting_review": sum(
-                1 for item in requests
+                1
+                for item in requests
                 if item.reviewer_id == user.id
-                and item.status in {ContributionRequest.Status.SUBMITTED, ContributionRequest.Status.UNDER_REVIEW}
+                and item.status
+                in {ContributionRequest.Status.SUBMITTED, ContributionRequest.Status.UNDER_REVIEW}
             ),
         },
         "requests": requests,
@@ -106,25 +169,27 @@ def contribution_preference(*, user: User, organisation_id: UUID) -> Contributio
 
 def participation_summary(*, user: User, decision_id: UUID) -> dict:
     decision = decision_for_user(user=user, decision_id=decision_id)
-    active_participants = list(
-        decision.participants.filter(status="active").select_related("user")
-    )
+    active_participants = list(decision.participants.filter(status="active").select_related("user"))
     requests = ContributionRequest.objects.filter(decision=decision).exclude(
         status=ContributionRequest.Status.DRAFT
     )
     assigned_user_ids = set(requests.values_list("assignee_id", flat=True))
     submitted_user_ids = set(
-        requests.filter(status__in=[
-            ContributionRequest.Status.SUBMITTED,
-            ContributionRequest.Status.UNDER_REVIEW,
-            ContributionRequest.Status.ACCEPTED,
-        ]).values_list("assignee_id", flat=True)
+        requests.filter(
+            status__in=[
+                ContributionRequest.Status.SUBMITTED,
+                ContributionRequest.Status.UNDER_REVIEW,
+                ContributionRequest.Status.ACCEPTED,
+            ]
+        ).values_list("assignee_id", flat=True)
     )
     return {
         "participant_count": len(active_participants),
         "assigned_count": len(assigned_user_ids),
         "submitted_count": len(submitted_user_ids),
-        "coverage_percent": round((len(assigned_user_ids) / len(active_participants)) * 100) if active_participants else 0,
+        "coverage_percent": round((len(assigned_user_ids) / len(active_participants)) * 100)
+        if active_participants
+        else 0,
         "unassigned_participants": [
             {
                 "id": str(item.user_id),

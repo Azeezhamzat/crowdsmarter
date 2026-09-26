@@ -45,7 +45,7 @@ class AnthropicAIProvider:
             "description": shared.REVIEW_TOOL_DESCRIPTION,
             "input_schema": shared.REVIEW_PARAMETERS_SCHEMA,
         }
-        message = client.messages.create(
+        message = client.messages.create(  # type: ignore[call-overload]  # Dynamic JSON schema conforms to the provider API.
             model=self.model_identifier,
             max_tokens=4096,
             system=shared.SYSTEM_PROMPT,
@@ -60,7 +60,9 @@ class AnthropicAIProvider:
         if tool_use is None:
             raise ValueError("The AI provider did not return a structured review.")
         payload: dict[str, Any] = tool_use.input
-        return shared.build_review_output(payload=payload, snapshot=snapshot, provider_label=self.label)
+        return shared.build_review_output(
+            payload=payload, snapshot=snapshot, provider_label=self.label
+        )
 
     def summarise_analytics(self, *, metrics: dict[str, Any]) -> AnalyticsNarrative:
         client = anthropic.Anthropic(api_key=self._api_key)
@@ -69,13 +71,15 @@ class AnthropicAIProvider:
             "description": analytics_shared.NARRATIVE_TOOL_DESCRIPTION,
             "input_schema": analytics_shared.NARRATIVE_PARAMETERS_SCHEMA,
         }
-        message = client.messages.create(
+        message = client.messages.create(  # type: ignore[call-overload]  # Dynamic JSON schema conforms to the provider API.
             model=self.model_identifier,
             max_tokens=2048,
             system=analytics_shared.SYSTEM_PROMPT,
             tools=[tool],
             tool_choice={"type": "tool", "name": analytics_shared.NARRATIVE_TOOL_NAME},
-            messages=[{"role": "user", "content": analytics_shared.narrative_user_message(metrics)}],
+            messages=[
+                {"role": "user", "content": analytics_shared.narrative_user_message(metrics)}
+            ],
         )
         tool_use = next(
             (block for block in message.content if block.type == "tool_use"),
@@ -96,4 +100,6 @@ class AnthropicAIProvider:
             )
         except Exception as error:  # noqa: BLE001 - surface any failure as a diagnosable result
             return ProviderConnectionResult(ok=False, detail=str(error))
-        return ProviderConnectionResult(ok=True, detail=f"Reached the Anthropic API with model {self.model_identifier}.")
+        return ProviderConnectionResult(
+            ok=True, detail=f"Reached the Anthropic API with model {self.model_identifier}."
+        )

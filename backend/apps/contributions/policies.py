@@ -38,9 +38,11 @@ def can_receive_assignment(*, actor, decision: Decision) -> bool:
     membership = active_membership(actor=actor, decision=decision)
     if membership is None or membership.role == Membership.Role.VIEWER:
         return False
-    return decision.participants.filter(
-        user=actor, status=Participant.Status.ACTIVE
-    ).exclude(role=Participant.Role.OBSERVER).exists()
+    return (
+        decision.participants.filter(user=actor, status=Participant.Status.ACTIVE)
+        .exclude(role=Participant.Role.OBSERVER)
+        .exists()
+    )
 
 
 def can_view_request(*, actor, request) -> bool:
@@ -61,7 +63,8 @@ def can_work_on_request(*, actor, request) -> bool:
         request.decision.status in WRITABLE_STATUSES
         and request.assignee_id == actor.id
         and can_receive_assignment(actor=actor, decision=request.decision)
-        and request.status in {
+        and request.status
+        in {
             request.Status.OPEN,
             request.Status.IN_PROGRESS,
             request.Status.RETURNED,

@@ -18,13 +18,28 @@ class DisbursementConfigurationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = OrganisationDisbursementConfiguration
-        fields = ["id", "organisation_id", "provider_key", "provider_key_label", "stripe_account_id", "api_key_is_set", "created_at", "updated_at"]
+        fields = [
+            "id",
+            "organisation_id",
+            "provider_key",
+            "provider_key_label",
+            "stripe_account_id",
+            "currency",
+            "api_key_is_set",
+            "created_at",
+            "updated_at",
+        ]
         read_only_fields = fields
 
 
 class SetDisbursementProviderSerializer(StrictSerializer):
-    provider_key = serializers.ChoiceField(choices=OrganisationDisbursementConfiguration.ProviderKey.choices)
-    stripe_account_id = serializers.CharField(required=False, allow_blank=True, max_length=100, default="")
+    provider_key = serializers.ChoiceField(
+        choices=OrganisationDisbursementConfiguration.ProviderKey.choices
+    )
+    stripe_account_id = serializers.CharField(
+        required=False, allow_blank=True, max_length=100, default=""
+    )
+    currency = serializers.RegexField(regex=r"^[A-Za-z]{3}$", required=False)
 
 
 class SetDisbursementApiKeySerializer(StrictSerializer):
@@ -38,10 +53,26 @@ class DisbursementSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Disbursement
-        fields = ["id", "option_id", "amount", "provider_key", "provider_key_label", "status", "status_label", "external_reference", "note", "issued_by", "created_at"]
+        fields = [
+            "id",
+            "option_id",
+            "amount",
+            "currency",
+            "provider_key",
+            "provider_key_label",
+            "status",
+            "status_label",
+            "idempotency_key",
+            "external_reference",
+            "provider_detail",
+            "note",
+            "issued_by",
+            "created_at",
+        ]
         read_only_fields = fields
 
 
 class IssueDisbursementSerializer(StrictSerializer):
     amount = serializers.DecimalField(max_digits=14, decimal_places=2, min_value=Decimal("0.01"))
+    idempotency_key = serializers.UUIDField()
     note = serializers.CharField(required=False, allow_blank=True, max_length=4000, default="")

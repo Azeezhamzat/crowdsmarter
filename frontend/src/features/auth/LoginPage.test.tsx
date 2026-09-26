@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -20,6 +20,7 @@ function renderPage() {
 }
 
 afterEach(() => {
+  cleanup();
   vi.restoreAllMocks();
   setLocale("en");
 });
@@ -68,15 +69,22 @@ describe("LoginPage", () => {
 
     await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(3));
     const verifyCall = vi.mocked(globalThis.fetch).mock.calls.at(2);
-    expect(String(verifyCall?.[0])).toContain("/auth/mfa/verify/");
+    const verifyTarget = verifyCall?.[0];
+    const verifyUrl = typeof verifyTarget === "string"
+      ? verifyTarget
+      : verifyTarget instanceof URL
+        ? verifyTarget.href
+        : verifyTarget?.url;
+    expect(verifyUrl).toContain("/auth/mfa/verify/");
   });
 
-  it("translates the sign-in form when the language is switched", () => {
+  it("keeps the dormant Arabic catalogue testable without exposing a selector", () => {
+    setLocale("ar");
     renderPage();
-    fireEvent.change(screen.getByRole("combobox", { name: "Language" }), { target: { value: "pt" } });
 
-    expect(screen.getByRole("heading", { name: "Entrar no CrowdSmarter" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Endereço de e-mail")).toBeInTheDocument();
-    expect(screen.getByLabelText("Palavra-passe")).toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Language" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "تسجيل الدخول إلى CrowdSmarter" })).toBeInTheDocument();
+    expect(screen.getByLabelText("عنوان البريد الإلكتروني")).toBeInTheDocument();
+    expect(screen.getByLabelText("كلمة المرور")).toBeInTheDocument();
   });
 });

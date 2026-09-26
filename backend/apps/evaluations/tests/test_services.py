@@ -2,10 +2,6 @@ import pytest
 from django.core.exceptions import PermissionDenied
 
 from apps.decision_options.services import create_option
-from apps.organisations.models import Membership
-from apps.participants.models import ConflictOfInterest, Participant
-from apps.participants.services import declare_conflict
-
 from apps.evaluations.models import EvaluationExercise, EvaluationRound, PrioritisationPortfolio
 from apps.evaluations.services import (
     EvaluationServiceError,
@@ -24,6 +20,9 @@ from apps.evaluations.services import (
     transition_round,
     update_portfolio,
 )
+from apps.organisations.models import Membership
+from apps.participants.models import ConflictOfInterest, Participant
+from apps.participants.services import declare_conflict
 
 
 @pytest.mark.django_db
@@ -160,42 +159,70 @@ def test_conflicted_reviewer_response_excluded_from_scorecard_results(
     owner = organisation.created_by
     contributor = user_factory(email="contributor@example.com")
     Membership.objects.create(
-        organisation=organisation, user=contributor, role=Membership.Role.CONTRIBUTOR,
+        organisation=organisation,
+        user=contributor,
+        role=Membership.Role.CONTRIBUTOR,
         status=Membership.Status.ACTIVE,
     )
     decision = decision_factory(
-        workspace=organisation.workspaces.get(is_default=True), owner=owner,
+        workspace=organisation.workspaces.get(is_default=True),
+        owner=owner,
         title="Grant round",
     )
     contributor_participant = Participant.objects.create(
-        organisation=organisation, decision=decision, user=contributor,
-        role=Participant.Role.CONTRIBUTOR, added_by=owner,
+        organisation=organisation,
+        decision=decision,
+        user=contributor,
+        role=Participant.Role.CONTRIBUTOR,
+        added_by=owner,
     )
     conflicted_option = create_option(
-        actor=owner, decision=decision, title="Applicant with a conflict", description="Desc.",
+        actor=owner,
+        decision=decision,
+        title="Applicant with a conflict",
+        description="Desc.",
     )
     clean_option = create_option(
-        actor=owner, decision=decision, title="Applicant without a conflict", description="Desc.",
+        actor=owner,
+        decision=decision,
+        title="Applicant without a conflict",
+        description="Desc.",
     )
     declare_conflict(
-        actor=contributor, participant=contributor_participant,
-        scope=ConflictOfInterest.Scope.OPTION, option=conflicted_option,
+        actor=contributor,
+        participant=contributor_participant,
+        scope=ConflictOfInterest.Scope.OPTION,
+        option=conflicted_option,
         reason="I sit on their board.",
     )
     exercise = create_exercise(
-        actor=owner, decision=decision, owner_id=owner.id,
-        title="Reviewer scorecard", purpose="Score applications.", method="scorecard",
+        actor=owner,
+        decision=decision,
+        owner_id=owner.id,
+        title="Reviewer scorecard",
+        purpose="Score applications.",
+        method="scorecard",
         quorum_count=1,
     )
     value = create_criterion(
-        actor=owner, exercise=exercise, title="Impact", description="Expected impact.",
-        weight=1, scale_min=1, scale_max=5, higher_is_better=True, order=0,
+        actor=owner,
+        exercise=exercise,
+        title="Impact",
+        description="Expected impact.",
+        weight=1,
+        scale_min=1,
+        scale_max=5,
+        higher_is_better=True,
+        order=0,
     )
     round_item = create_round(actor=owner, exercise=exercise, title="Round one")
     transition_round(actor=owner, round=round_item, status=EvaluationRound.Status.OPEN)
 
     save_submission(
-        actor=contributor, round=round_item, confidence=4, overall_rationale="Scored both.",
+        actor=contributor,
+        round=round_item,
+        confidence=4,
+        overall_rationale="Scored both.",
         responses=[
             {"option_id": conflicted_option.id, "criterion_id": value.id, "score": 5},
             {"option_id": clean_option.id, "criterion_id": value.id, "score": 3},
@@ -224,49 +251,81 @@ def test_scorecard_result_reports_dispersion_and_disagreement_label(
     second_evaluator = user_factory(email="second@example.com")
     for user in (first_evaluator, second_evaluator):
         Membership.objects.create(
-            organisation=organisation, user=user,
-            role=Membership.Role.CONTRIBUTOR, status=Membership.Status.ACTIVE,
+            organisation=organisation,
+            user=user,
+            role=Membership.Role.CONTRIBUTOR,
+            status=Membership.Status.ACTIVE,
         )
     decision = decision_factory(
-        workspace=organisation.workspaces.get(is_default=True), owner=owner,
+        workspace=organisation.workspaces.get(is_default=True),
+        owner=owner,
         title="Choose a rollout approach",
     )
     for user in (owner, first_evaluator, second_evaluator):
         Participant.objects.get_or_create(
-            organisation=organisation, decision=decision, user=user,
+            organisation=organisation,
+            decision=decision,
+            user=user,
             defaults={"role": Participant.Role.CONTRIBUTOR, "added_by": owner},
         )
-    contested = create_option(actor=owner, decision=decision, title="Contested option", description="Divides opinion.")
-    agreed = create_option(actor=owner, decision=decision, title="Agreed option", description="Everyone agrees.")
+    contested = create_option(
+        actor=owner, decision=decision, title="Contested option", description="Divides opinion."
+    )
+    agreed = create_option(
+        actor=owner, decision=decision, title="Agreed option", description="Everyone agrees."
+    )
     exercise = create_exercise(
-        actor=owner, decision=decision, owner_id=owner.id,
-        title="Dispersion test scorecard", purpose="Check dispersion reporting.",
-        method="scorecard", anonymity="attributed", blind_results_until_close=False,
-        quorum_count=2, approval_threshold=60, objection_threshold=20,
+        actor=owner,
+        decision=decision,
+        owner_id=owner.id,
+        title="Dispersion test scorecard",
+        purpose="Check dispersion reporting.",
+        method="scorecard",
+        anonymity="attributed",
+        blind_results_until_close=False,
+        quorum_count=2,
+        approval_threshold=60,
+        objection_threshold=20,
     )
     value = create_criterion(
-        actor=owner, exercise=exercise, title="Value", description="Expected value.",
-        weight=1, scale_min=1, scale_max=5, higher_is_better=True, order=0,
+        actor=owner,
+        exercise=exercise,
+        title="Value",
+        description="Expected value.",
+        weight=1,
+        scale_min=1,
+        scale_max=5,
+        higher_is_better=True,
+        order=0,
     )
     round_item = create_round(actor=owner, exercise=exercise)
     transition_round(actor=owner, round=round_item, status=EvaluationRound.Status.OPEN)
 
     save_submission(
-        actor=owner, confidence=5, overall_rationale="Strong preference.", round=round_item,
+        actor=owner,
+        confidence=5,
+        overall_rationale="Strong preference.",
+        round=round_item,
         responses=[
             {"option_id": contested.id, "criterion_id": value.id, "score": 5},
             {"option_id": agreed.id, "criterion_id": value.id, "score": 3},
         ],
     )
     save_submission(
-        actor=first_evaluator, confidence=5, overall_rationale="Opposite preference.", round=round_item,
+        actor=first_evaluator,
+        confidence=5,
+        overall_rationale="Opposite preference.",
+        round=round_item,
         responses=[
             {"option_id": contested.id, "criterion_id": value.id, "score": 1},
             {"option_id": agreed.id, "criterion_id": value.id, "score": 3},
         ],
     )
     save_submission(
-        actor=second_evaluator, confidence=5, overall_rationale="Also agrees.", round=round_item,
+        actor=second_evaluator,
+        confidence=5,
+        overall_rationale="Also agrees.",
+        round=round_item,
         responses=[
             {"option_id": contested.id, "criterion_id": value.id, "score": 3},
             {"option_id": agreed.id, "criterion_id": value.id, "score": 3},
@@ -288,37 +347,62 @@ def test_scorecard_result_reports_dispersion_and_disagreement_label(
 
 
 @pytest.mark.django_db
-def test_tornado_orders_criteria_by_impact_on_the_leader(
-    organisation_factory, decision_factory
-):  # type: ignore[no-untyped-def]
+def test_tornado_orders_criteria_by_impact_on_the_leader(organisation_factory, decision_factory):  # type: ignore[no-untyped-def]
     organisation = organisation_factory()
     owner = organisation.created_by
     decision = decision_factory(
-        workspace=organisation.workspaces.get(is_default=True), owner=owner,
+        workspace=organisation.workspaces.get(is_default=True),
+        owner=owner,
         title="Choose a delivery model",
     )
-    leader = create_option(actor=owner, decision=decision, title="Leading option", description="Currently ahead.")
-    other = create_option(actor=owner, decision=decision, title="Other option", description="Currently behind.")
+    leader = create_option(
+        actor=owner, decision=decision, title="Leading option", description="Currently ahead."
+    )
+    other = create_option(
+        actor=owner, decision=decision, title="Other option", description="Currently behind."
+    )
     exercise = create_exercise(
-        actor=owner, decision=decision, owner_id=owner.id,
-        title="Tornado test scorecard", purpose="Check tornado ordering.",
-        method="scorecard", anonymity="attributed", blind_results_until_close=False,
-        quorum_count=1, approval_threshold=60, objection_threshold=20,
+        actor=owner,
+        decision=decision,
+        owner_id=owner.id,
+        title="Tornado test scorecard",
+        purpose="Check tornado ordering.",
+        method="scorecard",
+        anonymity="attributed",
+        blind_results_until_close=False,
+        quorum_count=1,
+        approval_threshold=60,
+        objection_threshold=20,
     )
     heavy = create_criterion(
-        actor=owner, exercise=exercise, title="Heavily weighted",
-        description="A criterion with a large weight.", weight=3,
-        scale_min=1, scale_max=5, higher_is_better=True, order=0,
+        actor=owner,
+        exercise=exercise,
+        title="Heavily weighted",
+        description="A criterion with a large weight.",
+        weight=3,
+        scale_min=1,
+        scale_max=5,
+        higher_is_better=True,
+        order=0,
     )
     light = create_criterion(
-        actor=owner, exercise=exercise, title="Lightly weighted",
-        description="A criterion with a small weight.", weight=1,
-        scale_min=1, scale_max=5, higher_is_better=True, order=1,
+        actor=owner,
+        exercise=exercise,
+        title="Lightly weighted",
+        description="A criterion with a small weight.",
+        weight=1,
+        scale_min=1,
+        scale_max=5,
+        higher_is_better=True,
+        order=1,
     )
     round_item = create_round(actor=owner, exercise=exercise)
     transition_round(actor=owner, round=round_item, status=EvaluationRound.Status.OPEN)
     save_submission(
-        actor=owner, confidence=4, overall_rationale="", round=round_item,
+        actor=owner,
+        confidence=4,
+        overall_rationale="",
+        round=round_item,
         responses=[
             {"option_id": leader.id, "criterion_id": heavy.id, "score": 5},
             {"option_id": leader.id, "criterion_id": light.id, "score": 1},
@@ -338,37 +422,62 @@ def test_tornado_orders_criteria_by_impact_on_the_leader(
 
 
 @pytest.mark.django_db
-def test_uncertainty_narrative_flags_an_unstable_ranking(
-    organisation_factory, decision_factory
-):  # type: ignore[no-untyped-def]
+def test_uncertainty_narrative_flags_an_unstable_ranking(organisation_factory, decision_factory):  # type: ignore[no-untyped-def]
     organisation = organisation_factory()
     owner = organisation.created_by
     decision = decision_factory(
-        workspace=organisation.workspaces.get(is_default=True), owner=owner,
+        workspace=organisation.workspaces.get(is_default=True),
+        owner=owner,
         title="Choose between near-tied options",
     )
-    first = create_option(actor=owner, decision=decision, title="First option", description="One profile.")
-    second = create_option(actor=owner, decision=decision, title="Second option", description="A different profile.")
+    first = create_option(
+        actor=owner, decision=decision, title="First option", description="One profile."
+    )
+    second = create_option(
+        actor=owner, decision=decision, title="Second option", description="A different profile."
+    )
     exercise = create_exercise(
-        actor=owner, decision=decision, owner_id=owner.id,
-        title="Near-tie scorecard", purpose="Check narrative instability wording.",
-        method="scorecard", anonymity="attributed", blind_results_until_close=False,
-        quorum_count=1, approval_threshold=60, objection_threshold=20,
+        actor=owner,
+        decision=decision,
+        owner_id=owner.id,
+        title="Near-tie scorecard",
+        purpose="Check narrative instability wording.",
+        method="scorecard",
+        anonymity="attributed",
+        blind_results_until_close=False,
+        quorum_count=1,
+        approval_threshold=60,
+        objection_threshold=20,
     )
     balanced = create_criterion(
-        actor=owner, exercise=exercise, title="Balanced criterion",
-        description="Both options score the same here.", weight=1,
-        scale_min=1, scale_max=5, higher_is_better=True, order=0,
+        actor=owner,
+        exercise=exercise,
+        title="Balanced criterion",
+        description="Both options score the same here.",
+        weight=1,
+        scale_min=1,
+        scale_max=5,
+        higher_is_better=True,
+        order=0,
     )
     tilted = create_criterion(
-        actor=owner, exercise=exercise, title="Tilted criterion",
-        description="The options diverge here.", weight=1,
-        scale_min=1, scale_max=5, higher_is_better=True, order=1,
+        actor=owner,
+        exercise=exercise,
+        title="Tilted criterion",
+        description="The options diverge here.",
+        weight=1,
+        scale_min=1,
+        scale_max=5,
+        higher_is_better=True,
+        order=1,
     )
     round_item = create_round(actor=owner, exercise=exercise)
     transition_round(actor=owner, round=round_item, status=EvaluationRound.Status.OPEN)
     save_submission(
-        actor=owner, confidence=4, overall_rationale="", round=round_item,
+        actor=owner,
+        confidence=4,
+        overall_rationale="",
+        round=round_item,
         responses=[
             {"option_id": first.id, "criterion_id": balanced.id, "score": 3},
             {"option_id": first.id, "criterion_id": tilted.id, "score": 3},
@@ -389,40 +498,70 @@ def test_uncertainty_narrative_notes_stability_and_disagreement(
     owner = organisation.created_by
     second_evaluator = user_factory(email="tornado-second@example.com")
     Membership.objects.create(
-        organisation=organisation, user=second_evaluator,
-        role=Membership.Role.CONTRIBUTOR, status=Membership.Status.ACTIVE,
+        organisation=organisation,
+        user=second_evaluator,
+        role=Membership.Role.CONTRIBUTOR,
+        status=Membership.Status.ACTIVE,
     )
     decision = decision_factory(
-        workspace=organisation.workspaces.get(is_default=True), owner=owner,
+        workspace=organisation.workspaces.get(is_default=True),
+        owner=owner,
         title="Choose a clear but contested leader",
     )
     Participant.objects.create(
-        organisation=organisation, decision=decision, user=second_evaluator,
-        role=Participant.Role.CONTRIBUTOR, added_by=owner,
+        organisation=organisation,
+        decision=decision,
+        user=second_evaluator,
+        role=Participant.Role.CONTRIBUTOR,
+        added_by=owner,
     )
-    leader = create_option(actor=owner, decision=decision, title="Clear leader", description="Wins comfortably.")
-    trailing = create_option(actor=owner, decision=decision, title="Clear trailer", description="Loses comfortably.")
+    leader = create_option(
+        actor=owner, decision=decision, title="Clear leader", description="Wins comfortably."
+    )
+    trailing = create_option(
+        actor=owner, decision=decision, title="Clear trailer", description="Loses comfortably."
+    )
     exercise = create_exercise(
-        actor=owner, decision=decision, owner_id=owner.id,
-        title="Stable but contested scorecard", purpose="Check narrative stability + disagreement wording.",
-        method="scorecard", anonymity="attributed", blind_results_until_close=False,
-        quorum_count=2, approval_threshold=60, objection_threshold=20,
+        actor=owner,
+        decision=decision,
+        owner_id=owner.id,
+        title="Stable but contested scorecard",
+        purpose="Check narrative stability + disagreement wording.",
+        method="scorecard",
+        anonymity="attributed",
+        blind_results_until_close=False,
+        quorum_count=2,
+        approval_threshold=60,
+        objection_threshold=20,
     )
     value = create_criterion(
-        actor=owner, exercise=exercise, title="Value", description="Expected value.",
-        weight=1, scale_min=1, scale_max=5, higher_is_better=True, order=0,
+        actor=owner,
+        exercise=exercise,
+        title="Value",
+        description="Expected value.",
+        weight=1,
+        scale_min=1,
+        scale_max=5,
+        higher_is_better=True,
+        order=0,
     )
     round_item = create_round(actor=owner, exercise=exercise)
     transition_round(actor=owner, round=round_item, status=EvaluationRound.Status.OPEN)
     save_submission(
-        actor=owner, confidence=5, overall_rationale="", round=round_item,
+        actor=owner,
+        confidence=5,
+        overall_rationale="",
+        round=round_item,
         responses=[
             {"option_id": leader.id, "criterion_id": value.id, "score": 5},
             {"option_id": trailing.id, "criterion_id": value.id, "score": 1},
         ],
     )
     save_submission(
-        actor=second_evaluator, confidence=5, overall_rationale="", round=round_item,
+        actor=second_evaluator,
+        confidence=5,
+        overall_rationale="",
+        round=round_item,
         responses=[
             {"option_id": leader.id, "criterion_id": value.id, "score": 1},
             {"option_id": trailing.id, "criterion_id": value.id, "score": 1},
@@ -437,40 +576,69 @@ def test_uncertainty_narrative_notes_stability_and_disagreement(
 
 
 @pytest.mark.django_db
-def test_vote_result_reports_dissent_rate(
-    organisation_factory, decision_factory, user_factory
-):  # type: ignore[no-untyped-def]
+def test_vote_result_reports_dissent_rate(organisation_factory, decision_factory, user_factory):  # type: ignore[no-untyped-def]
     organisation = organisation_factory()
     owner = organisation.created_by
     dissenter = user_factory(email="dissenter@example.com")
     agreer = user_factory(email="agreer@example.com")
     for user in (dissenter, agreer):
         Membership.objects.create(
-            organisation=organisation, user=user,
-            role=Membership.Role.CONTRIBUTOR, status=Membership.Status.ACTIVE,
+            organisation=organisation,
+            user=user,
+            role=Membership.Role.CONTRIBUTOR,
+            status=Membership.Status.ACTIVE,
         )
     decision = decision_factory(
-        workspace=organisation.workspaces.get(is_default=True), owner=owner,
+        workspace=organisation.workspaces.get(is_default=True),
+        owner=owner,
         title="Consent to the mobilisation plan",
     )
     for user in (dissenter, agreer):
         Participant.objects.create(
-            organisation=organisation, decision=decision, user=user,
-            role=Participant.Role.CONTRIBUTOR, added_by=owner,
+            organisation=organisation,
+            decision=decision,
+            user=user,
+            role=Participant.Role.CONTRIBUTOR,
+            added_by=owner,
         )
     option = create_option(actor=owner, decision=decision, title="Plan", description="The plan.")
     exercise = create_exercise(
-        actor=owner, decision=decision, owner_id=owner.id,
-        title="Consent round", purpose="Test dissent.", method="consent",
-        anonymity="attributed", blind_results_until_close=False,
-        quorum_count=3, approval_threshold=60, objection_threshold=20,
+        actor=owner,
+        decision=decision,
+        owner_id=owner.id,
+        title="Consent round",
+        purpose="Test dissent.",
+        method="consent",
+        anonymity="attributed",
+        blind_results_until_close=False,
+        quorum_count=3,
+        approval_threshold=60,
+        objection_threshold=20,
     )
     round_item = create_round(actor=owner, exercise=exercise)
     transition_round(actor=owner, round=round_item, status=EvaluationRound.Status.OPEN)
 
-    save_submission(actor=owner, confidence=4, overall_rationale="", round=round_item, responses=[{"option_id": option.id, "vote": "consent"}])
-    save_submission(actor=agreer, confidence=4, overall_rationale="", round=round_item, responses=[{"option_id": option.id, "vote": "consent"}])
-    save_submission(actor=dissenter, confidence=4, overall_rationale="A reasoned objection.", round=round_item, responses=[{"option_id": option.id, "vote": "object"}])
+    save_submission(
+        actor=owner,
+        confidence=4,
+        overall_rationale="",
+        round=round_item,
+        responses=[{"option_id": option.id, "vote": "consent"}],
+    )
+    save_submission(
+        actor=agreer,
+        confidence=4,
+        overall_rationale="",
+        round=round_item,
+        responses=[{"option_id": option.id, "vote": "consent"}],
+    )
+    save_submission(
+        actor=dissenter,
+        confidence=4,
+        overall_rationale="A reasoned objection.",
+        round=round_item,
+        responses=[{"option_id": option.id, "vote": "object"}],
+    )
 
     result = evaluation_results(round=round_item, viewer=owner)
     row = result["options"][0]
@@ -478,9 +646,7 @@ def test_vote_result_reports_dissent_rate(
 
 
 @pytest.mark.django_db
-def test_observer_cannot_submit_evaluation(
-    organisation_factory, decision_factory, user_factory
-):  # type: ignore[no-untyped-def]
+def test_observer_cannot_submit_evaluation(organisation_factory, decision_factory, user_factory):  # type: ignore[no-untyped-def]
     organisation = organisation_factory()
     owner = organisation.created_by
     observer = user_factory(email="observer@example.com")
@@ -498,7 +664,9 @@ def test_observer_cannot_submit_evaluation(
         role=Participant.Role.OBSERVER,
         added_by=owner,
     )
-    option = create_option(actor=owner, decision=decision, title="Option", description="One option.")
+    option = create_option(
+        actor=owner, decision=decision, title="Option", description="One option."
+    )
     exercise = create_exercise(
         actor=owner,
         decision=decision,
@@ -537,9 +705,17 @@ def test_constraint_recommendation_respects_budget_and_capacity(
         role=Membership.Role.CONTRIBUTOR,
         status=Membership.Status.ACTIVE,
     )
-    first = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner, title="Programme A")
-    second = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner, title="Programme B")
-    third = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner, title="Mandatory compliance")
+    first = decision_factory(
+        workspace=organisation.workspaces.get(is_default=True), owner=owner, title="Programme A"
+    )
+    second = decision_factory(
+        workspace=organisation.workspaces.get(is_default=True), owner=owner, title="Programme B"
+    )
+    third = decision_factory(
+        workspace=organisation.workspaces.get(is_default=True),
+        owner=owner,
+        title="Mandatory compliance",
+    )
     portfolio = create_portfolio(
         actor=owner,
         organisation=organisation,
@@ -559,13 +735,46 @@ def test_constraint_recommendation_respects_budget_and_capacity(
         higher_is_better=True,
         order=0,
     )
-    candidate_a = add_candidate(actor=owner, portfolio=portfolio, decision_id=first.id, budget_required=60, capacity_required=6, mandatory=False, rationale="")
-    candidate_b = add_candidate(actor=owner, portfolio=portfolio, decision_id=second.id, budget_required=55, capacity_required=5, mandatory=False, rationale="")
-    mandatory = add_candidate(actor=owner, portfolio=portfolio, decision_id=third.id, budget_required=20, capacity_required=2, mandatory=True, rationale="Regulatory obligation")
-    portfolio = update_portfolio(actor=owner, portfolio=portfolio, fields={"status": PrioritisationPortfolio.Status.OPEN})
+    candidate_a = add_candidate(
+        actor=owner,
+        portfolio=portfolio,
+        decision_id=first.id,
+        budget_required=60,
+        capacity_required=6,
+        mandatory=False,
+        rationale="",
+    )
+    candidate_b = add_candidate(
+        actor=owner,
+        portfolio=portfolio,
+        decision_id=second.id,
+        budget_required=55,
+        capacity_required=5,
+        mandatory=False,
+        rationale="",
+    )
+    mandatory = add_candidate(
+        actor=owner,
+        portfolio=portfolio,
+        decision_id=third.id,
+        budget_required=20,
+        capacity_required=2,
+        mandatory=True,
+        rationale="Regulatory obligation",
+    )
+    portfolio = update_portfolio(
+        actor=owner, portfolio=portfolio, fields={"status": PrioritisationPortfolio.Status.OPEN}
+    )
     for candidate, score in [(candidate_a, 90), (candidate_b, 80), (mandatory, 45)]:
         candidate.refresh_from_db()
-        save_portfolio_assessment(actor=assessor, candidate=candidate, criterion_id=criterion.id, score=score, confidence=4, rationale="Independent assessment")
+        save_portfolio_assessment(
+            actor=assessor,
+            candidate=candidate,
+            criterion_id=criterion.id,
+            score=score,
+            confidence=4,
+            rationale="Independent assessment",
+        )
     result = portfolio_recommendation(portfolio=portfolio)
     recommended = {item["decision_id"] for item in result["candidates"] if item["recommended"]}
     assert str(third.id) in recommended
@@ -573,10 +782,9 @@ def test_constraint_recommendation_respects_budget_and_capacity(
     assert str(second.id) not in recommended
     assert result["recommended_budget"] == 80
 
+
 @pytest.mark.django_db
-def test_approval_requires_complete_method_specific_ballots(
-    organisation_factory, decision_factory
-):  # type: ignore[no-untyped-def]
+def test_approval_requires_complete_method_specific_ballots(organisation_factory, decision_factory):  # type: ignore[no-untyped-def]
     organisation = organisation_factory()
     owner = organisation.created_by
     decision = decision_factory(
@@ -585,7 +793,9 @@ def test_approval_requires_complete_method_specific_ballots(
         title="Choose a mobilisation model",
     )
     first = create_option(actor=owner, decision=decision, title="Local", description="Local model")
-    second = create_option(actor=owner, decision=decision, title="Central", description="Central model")
+    second = create_option(
+        actor=owner, decision=decision, title="Central", description="Central model"
+    )
     exercise = create_exercise(
         actor=owner,
         decision=decision,
@@ -733,24 +943,47 @@ def test_ranked_choice_instant_runoff_picks_majority_winner_after_elimination(
     for index in range(2, 6):
         voter = user_factory(email=f"voter{index}@example.com")
         Membership.objects.create(
-            organisation=organisation, user=voter, role=Membership.Role.CONTRIBUTOR, status=Membership.Status.ACTIVE,
+            organisation=organisation,
+            user=voter,
+            role=Membership.Role.CONTRIBUTOR,
+            status=Membership.Status.ACTIVE,
         )
         voters.append(voter)
     decision = decision_factory(
-        workspace=organisation.workspaces.get(is_default=True), owner=owner, title="Pick one community grant",
+        workspace=organisation.workspaces.get(is_default=True),
+        owner=owner,
+        title="Pick one community grant",
     )
     for voter in voters[1:]:
         Participant.objects.create(
-            organisation=organisation, decision=decision, user=voter, role=Participant.Role.CONTRIBUTOR, added_by=owner,
+            organisation=organisation,
+            decision=decision,
+            user=voter,
+            role=Participant.Role.CONTRIBUTOR,
+            added_by=owner,
         )
-    option_a = create_option(actor=owner, decision=decision, title="Option A", description="Water access.")
-    option_b = create_option(actor=owner, decision=decision, title="Option B", description="School meals.")
-    option_c = create_option(actor=owner, decision=decision, title="Option C", description="Solar lighting.")
+    option_a = create_option(
+        actor=owner, decision=decision, title="Option A", description="Water access."
+    )
+    option_b = create_option(
+        actor=owner, decision=decision, title="Option B", description="School meals."
+    )
+    option_c = create_option(
+        actor=owner, decision=decision, title="Option C", description="Solar lighting."
+    )
 
     exercise = create_exercise(
-        actor=owner, decision=decision, owner_id=owner.id, title="Community pick", purpose="Choose one grant.",
-        method="ranked_choice", anonymity="attributed", blind_results_until_close=False, quorum_count=1,
-        approval_threshold=60, objection_threshold=20,
+        actor=owner,
+        decision=decision,
+        owner_id=owner.id,
+        title="Community pick",
+        purpose="Choose one grant.",
+        method="ranked_choice",
+        anonymity="attributed",
+        blind_results_until_close=False,
+        quorum_count=1,
+        approval_threshold=60,
+        objection_threshold=20,
     )
     round_item = create_round(actor=owner, exercise=exercise)
     transition_round(actor=owner, round=round_item, status=EvaluationRound.Status.OPEN)
@@ -763,10 +996,16 @@ def test_ranked_choice_instant_runoff_picks_majority_winner_after_elimination(
         [option_b, option_c, option_a],
         [option_c, option_a, option_b],
     ]
-    for voter, ballot in zip(voters, ballots):
+    for voter, ballot in zip(voters, ballots, strict=False):
         save_submission(
-            actor=voter, round=round_item, confidence=3, overall_rationale="",
-            responses=[{"option_id": option.id, "rank": rank} for rank, option in enumerate(ballot, start=1)],
+            actor=voter,
+            round=round_item,
+            confidence=3,
+            overall_rationale="",
+            responses=[
+                {"option_id": option.id, "rank": rank}
+                for rank, option in enumerate(ballot, start=1)
+            ],
         )
 
     result = evaluation_results(round=round_item, viewer=owner)
@@ -781,33 +1020,50 @@ def test_ranked_choice_instant_runoff_picks_majority_winner_after_elimination(
 
 
 @pytest.mark.django_db
-def test_ranked_choice_rejects_incomplete_or_repeated_ranks(
-    organisation_factory, decision_factory
-):  # type: ignore[no-untyped-def]
+def test_ranked_choice_rejects_incomplete_or_repeated_ranks(organisation_factory, decision_factory):  # type: ignore[no-untyped-def]
     organisation = organisation_factory()
     owner = organisation.created_by
     decision = decision_factory(
-        workspace=organisation.workspaces.get(is_default=True), owner=owner, title="Pick a grant",
+        workspace=organisation.workspaces.get(is_default=True),
+        owner=owner,
+        title="Pick a grant",
     )
     first = create_option(actor=owner, decision=decision, title="First", description="d")
     second = create_option(actor=owner, decision=decision, title="Second", description="d")
     exercise = create_exercise(
-        actor=owner, decision=decision, owner_id=owner.id, title="Ranked pick", purpose="p",
-        method="ranked_choice", anonymity="attributed", blind_results_until_close=False, quorum_count=1,
-        approval_threshold=60, objection_threshold=20,
+        actor=owner,
+        decision=decision,
+        owner_id=owner.id,
+        title="Ranked pick",
+        purpose="p",
+        method="ranked_choice",
+        anonymity="attributed",
+        blind_results_until_close=False,
+        quorum_count=1,
+        approval_threshold=60,
+        objection_threshold=20,
     )
     round_item = create_round(actor=owner, exercise=exercise)
     transition_round(actor=owner, round=round_item, status=EvaluationRound.Status.OPEN)
 
     with pytest.raises(EvaluationServiceError):
         save_submission(
-            actor=owner, round=round_item, confidence=3, overall_rationale="",
+            actor=owner,
+            round=round_item,
+            confidence=3,
+            overall_rationale="",
             responses=[{"option_id": first.id, "rank": 1}, {"option_id": second.id, "rank": 1}],
         )
     with pytest.raises(EvaluationServiceError):
         save_submission(
-            actor=owner, round=round_item, confidence=3, overall_rationale="",
-            responses=[{"option_id": first.id, "vote": "approve"}, {"option_id": second.id, "rank": 2}],
+            actor=owner,
+            round=round_item,
+            confidence=3,
+            overall_rationale="",
+            responses=[
+                {"option_id": first.id, "vote": "approve"},
+                {"option_id": second.id, "rank": 2},
+            ],
         )
 
 
@@ -819,20 +1075,38 @@ def test_blind_applicant_identity_hides_titles_until_managers_or_close(
     owner = organisation.created_by
     contributor = user_factory(email="blind-reviewer@example.com")
     Membership.objects.create(
-        organisation=organisation, user=contributor, role=Membership.Role.CONTRIBUTOR, status=Membership.Status.ACTIVE,
+        organisation=organisation,
+        user=contributor,
+        role=Membership.Role.CONTRIBUTOR,
+        status=Membership.Status.ACTIVE,
     )
     decision = decision_factory(
-        workspace=organisation.workspaces.get(is_default=True), owner=owner, title="Blind review round",
+        workspace=organisation.workspaces.get(is_default=True),
+        owner=owner,
+        title="Blind review round",
     )
     Participant.objects.create(
-        organisation=organisation, decision=decision, user=contributor, role=Participant.Role.CONTRIBUTOR, added_by=owner,
+        organisation=organisation,
+        decision=decision,
+        user=contributor,
+        role=Participant.Role.CONTRIBUTOR,
+        added_by=owner,
     )
-    first = create_option(actor=owner, decision=decision, title="Alpha Farms Cooperative", description="d")
-    second = create_option(actor=owner, decision=decision, title="Beta Youth Trust", description="d")
+    create_option(actor=owner, decision=decision, title="Alpha Farms Cooperative", description="d")
+    create_option(actor=owner, decision=decision, title="Beta Youth Trust", description="d")
     exercise = create_exercise(
-        actor=owner, decision=decision, owner_id=owner.id, title="Blind scorecard", purpose="p",
-        method="scorecard", anonymity="attributed", blind_results_until_close=False, blind_applicant_identity=True,
-        quorum_count=1, approval_threshold=60, objection_threshold=20,
+        actor=owner,
+        decision=decision,
+        owner_id=owner.id,
+        title="Blind scorecard",
+        purpose="p",
+        method="scorecard",
+        anonymity="attributed",
+        blind_results_until_close=False,
+        blind_applicant_identity=True,
+        quorum_count=1,
+        approval_threshold=60,
+        objection_threshold=20,
     )
 
     manager_view = scoring_options_for_exercise(exercise=exercise, viewer=owner)

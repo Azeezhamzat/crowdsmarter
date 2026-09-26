@@ -13,9 +13,7 @@ from apps.decisions.selectors import decision_for_user
 from .models import ConflictOfInterest, Participant
 
 
-def participants_for_decision(
-    *, user: User, decision_id: UUID
-) -> models.QuerySet[Participant]:
+def participants_for_decision(*, user: User, decision_id: UUID) -> models.QuerySet[Participant]:
     """List active participants after establishing decision access."""
     decision = decision_for_user(user=user, decision_id=decision_id)
     return Participant.objects.filter(
@@ -46,7 +44,10 @@ def conflict_for_user(*, user: User, conflict_id: UUID) -> ConflictOfInterest:
     """Fetch a conflict declaration without revealing another tenant's records."""
     return get_object_or_404(
         ConflictOfInterest.objects.select_related(
-            "participant__decision", "participant__decision__organisation", "participant__user", "option"
+            "participant__decision",
+            "participant__decision__organisation",
+            "participant__user",
+            "option",
         ).filter(organisation__in=user_organisations(user)),
         id=conflict_id,
     )

@@ -6,14 +6,14 @@ import hashlib
 import hmac
 import secrets
 from dataclasses import dataclass
+from datetime import timedelta
 
 from django.conf import settings
-from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth.tokens import default_token_generator
 from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
@@ -24,9 +24,8 @@ from apps.organisations.models import Organisation
 from apps.platform_admin.contact import notification_sender_email
 
 from . import totp
-from .models import MFABackupCode, TOTPDevice
-
-User = get_user_model()
+from .crypto import decrypt_totp_secret, encrypt_totp_secret
+from .models import EmailChangeRequest, MFABackupCode, TOTPDevice, User
 
 _BACKUP_CODE_COUNT = 10
 _BACKUP_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # no 0/O/1/I ambiguity
@@ -38,6 +37,10 @@ class MFAServiceError(ValidationError):
 
 class SignupServiceError(ValidationError):
     """Expected self-serve signup failure."""
+
+
+class EmailChangeServiceError(ValidationError):
+    """Expected failure in the verified email-change workflow."""
 
 
 def _unique_organisation_slug(*, name: str) -> str:
@@ -72,7 +75,9 @@ def sign_up(
         raise SignupServiceError(
             {"email": "An account already exists for this email. Sign in instead."}
         )
-    candidate = User(email=normalised_email, first_name=first_name.strip(), last_name=last_name.strip())
+    candidate = User(
+        email=normalised_email, first_name=first_name.strip(), last_name=last_name.strip()
+    )
     validate_password(password, user=candidate)
     user = User.objects.create_user(
         email=normalised_email,
@@ -153,6 +158,159 @@ def request_password_reset(*, email: str) -> PasswordResetDispatch:
     )
 
 
+@dataclass(frozen=True)
+class EmailChangeDispatch:
+    """Outcome of sending a verification link to a proposed email address."""
+
+    delivered: bool
+    development_url: str | None = None
+
+
+def _digest_email_change_token(token: str) -> str:
+    """Return a domain-separated keyed digest; never persist a bearer token."""
+
+    return hmac.new(
+        key=settings.SECRET_KEY.encode("utf-8"),
+        msg=f"email-change:{token}".encode(),
+        digestmod=hashlib.sha256,
+    ).hexdigest()
+
+
+def request_email_change(*, user: User, new_email: str) -> EmailChangeDispatch:
+    """Send a short-lived verification link to a replacement email address."""
+
+    normalised_email = new_email.strip().lower()
+    if normalised_email == user.email.strip().lower():
+        raise EmailChangeServiceError({"new_email": "Enter a different email address."})
+    if User.objects.filter(email__iexact=normalised_email).exclude(pk=user.pk).exists():
+        raise EmailChangeServiceError(
+            {"new_email": "That email address is already used by another account."}
+        )
+
+    raw_token = secrets.token_urlsafe(32)
+    now = timezone.now()
+    with transaction.atomic():
+        locked_user = User.objects.select_for_update().get(pk=user.pk)
+        EmailChangeRequest.objects.filter(
+            user=locked_user,
+            completed_at__isnull=True,
+            invalidated_at__isnull=True,
+        ).update(invalidated_at=now)
+        EmailChangeRequest.objects.create(
+            user=locked_user,
+            new_email=normalised_email,
+            token_digest=_digest_email_change_token(raw_token),
+            expires_at=now + timedelta(seconds=settings.EMAIL_CHANGE_TOKEN_TTL_SECONDS),
+        )
+        record_event(
+            action="account.email_change_requested",
+            object_type="accounts.User",
+            object_id=str(locked_user.id),
+            actor=locked_user,
+            metadata={"new_email": normalised_email},
+        )
+
+    base_url = settings.FRONTEND_BASE_URL.rstrip("/")
+    verification_url = f"{base_url}/verify-email-change#token={raw_token}"
+    delivered_count = send_mail(
+        subject="Verify your new CrowdSmarter email address",
+        message=(
+            "A change to this email address was requested for a CrowdSmarter account.\n\n"
+            f"Open this link and confirm the change:\n{verification_url}\n\n"
+            "The link is single-use and expires in 30 minutes. If you did not request "
+            "this, do not open the link."
+        ),
+        from_email=notification_sender_email(),
+        recipient_list=[normalised_email],
+        fail_silently=True,
+    )
+    send_mail(
+        subject="A CrowdSmarter email change was requested",
+        message=(
+            f"Someone requested changing your CrowdSmarter sign-in email from {user.email} "
+            f"to {normalised_email}.\n\n"
+            "Your sign-in email has not changed. If this was not you, change your password "
+            "and contact CrowdSmarter support."
+        ),
+        from_email=notification_sender_email(),
+        recipient_list=[user.email],
+        fail_silently=True,
+    )
+    return EmailChangeDispatch(
+        delivered=delivered_count > 0,
+        development_url=verification_url if settings.DEBUG else None,
+    )
+
+
+def confirm_email_change(*, token: str) -> User:
+    """Consume a verified token and atomically replace the account email."""
+
+    digest = _digest_email_change_token(token.strip())
+    try:
+        with transaction.atomic():
+            email_request = (
+                EmailChangeRequest.objects.select_for_update()
+                .select_related("user")
+                .get(token_digest=digest)
+            )
+            now = timezone.now()
+            if (
+                email_request.completed_at is not None
+                or email_request.invalidated_at is not None
+                or email_request.expires_at <= now
+            ):
+                raise EmailChangeServiceError(
+                    "This email-change link is invalid, expired, or has already been used."
+                )
+            user = User.objects.select_for_update().get(pk=email_request.user_id)
+            if (
+                User.objects.filter(email__iexact=email_request.new_email)
+                .exclude(pk=user.pk)
+                .exists()
+            ):
+                raise EmailChangeServiceError(
+                    "That email address is no longer available. Request another change."
+                )
+            old_email = user.email
+            user.email = email_request.new_email
+            user.full_clean(exclude=["password"])
+            user.save(update_fields=["email"])
+            email_request.completed_at = now
+            email_request.save(update_fields=["completed_at", "updated_at"])
+            EmailChangeRequest.objects.filter(
+                user=user,
+                completed_at__isnull=True,
+                invalidated_at__isnull=True,
+            ).exclude(pk=email_request.pk).update(invalidated_at=now)
+            record_event(
+                action="account.email_changed",
+                object_type="accounts.User",
+                object_id=str(user.id),
+                actor=user,
+                metadata={"old_email": old_email, "new_email": user.email},
+            )
+    except EmailChangeRequest.DoesNotExist as exc:
+        raise EmailChangeServiceError(
+            "This email-change link is invalid, expired, or has already been used."
+        ) from exc
+    except IntegrityError as exc:
+        raise EmailChangeServiceError(
+            "That email address is no longer available. Request another change."
+        ) from exc
+
+    send_mail(
+        subject="Your CrowdSmarter email address was changed",
+        message=(
+            f"Your CrowdSmarter sign-in email was changed from {old_email} to {user.email}.\n\n"
+            "If you did not make this change, contact CrowdSmarter support immediately."
+        ),
+        from_email=notification_sender_email(),
+        recipient_list=[old_email],
+        fail_silently=True,
+    )
+    return user
+
+
 @transaction.atomic
 def update_profile(*, user: User, first_name: str, last_name: str) -> User:
     """Update editable personal profile fields and audit the change."""
@@ -229,11 +387,12 @@ def begin_mfa_enrollment(*, user: User) -> MFAEnrollment:
     if existing and existing.is_confirmed:
         raise MFAServiceError("Two-factor authentication is already enabled.")
     secret = totp.generate_secret()
+    encrypted_secret = encrypt_totp_secret(secret)
     if existing:
-        existing.secret = secret
-        existing.save(update_fields=["secret", "updated_at"])
+        existing.secret_encrypted = encrypted_secret
+        existing.save(update_fields=["secret_encrypted", "updated_at"])
     else:
-        TOTPDevice.objects.create(user=user, secret=secret)
+        TOTPDevice.objects.create(user=user, secret_encrypted=encrypted_secret)
     record_event(
         action="account.mfa_enrollment_started",
         object_type="accounts.User",
@@ -260,7 +419,11 @@ def confirm_mfa_enrollment(*, user: User, code: str) -> list[str]:
         raise MFAServiceError("Start enrollment before confirming a code.") from exc
     if device.is_confirmed:
         raise MFAServiceError("Two-factor authentication is already enabled.")
-    if not totp.verify_totp(secret=device.secret, code=code):
+    try:
+        secret = decrypt_totp_secret(device.secret_encrypted)
+    except ValueError as exc:
+        raise MFAServiceError("The enrollment secret is unavailable; restart enrollment.") from exc
+    if not totp.verify_totp(secret=secret, code=code):
         raise MFAServiceError({"code": "That code is incorrect or has expired."})
     device.confirmed_at = timezone.now()
     device.save(update_fields=["confirmed_at", "updated_at"])
@@ -297,12 +460,14 @@ def disable_mfa(*, user: User) -> None:
 def verify_mfa_code(*, user: User, code: str) -> bool:
     """Accept a live TOTP code, or consume an unused backup code as a fallback."""
     try:
-        device = TOTPDevice.objects.select_for_update().get(
-            user=user, confirmed_at__isnull=False
-        )
+        device = TOTPDevice.objects.select_for_update().get(user=user, confirmed_at__isnull=False)
     except TOTPDevice.DoesNotExist:
         return False
-    if totp.verify_totp(secret=device.secret, code=code):
+    try:
+        secret = decrypt_totp_secret(device.secret_encrypted)
+    except ValueError:
+        return False
+    if totp.verify_totp(secret=secret, code=code):
         return True
     digest = _digest_backup_code(normalise_backup_code(code))
     updated = MFABackupCode.objects.filter(

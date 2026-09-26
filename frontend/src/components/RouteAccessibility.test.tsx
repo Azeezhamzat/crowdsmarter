@@ -25,7 +25,7 @@ describe("RouteAccessibility", () => {
     );
 
     expect(screen.getByRole("link", { name: /skip to main content/i })).toHaveAttribute("href", "#main-content");
-    expect(document.title).toBe("Free platform for group decisions and grant rounds - CrowdSmarter");
+    expect(document.title).toBe("Facilitated collective decisions and grant rounds - CrowdSmarter");
 
     fireEvent.click(screen.getByRole("button", { name: /go to sign in/i }));
 

@@ -177,11 +177,32 @@ A manually synchronised RSS or Atom feed belonging to one organisation. It recor
 
 ### Source
 
-An attributable input for foresight and decision evidence. It records source type, author, publisher, publication date, URL or reference, credibility assessment and rationale, lifecycle status, optional supersession, feed provenance, and creator. A source can support multiple signals and evidence records.
+An attributable input for foresight and decision evidence. It records source
+type, author, publisher, publication/access/review dates, jurisdiction, live
+and archived URLs or reference, verification time, credibility assessment and
+rationale, lifecycle status, optional supersession, feed provenance, and
+creator. A source can support multiple signals, evidence records, and research
+claims.
 
 ### SourceAttachment
 
 A private file linked to one source. It preserves the original file name, verified MIME type, size, SHA-256 digest, uploader, and storage reference. Storage paths use generated identifiers rather than customer-supplied names. Files are tenant-authorised at download time and included in customer exports when available.
+
+### ResearchClaim and ResearchClaimSource
+
+`ResearchClaim` is a reviewable proposition that can change the product,
+facilitation, operations, or a linked decision. It preserves the evidence
+state, build/integrate/defer/avoid/monitor recommendation, evidence summary,
+limitations, assumptions, reversal condition, expected outcome, accountable
+owner, review date, and lifecycle. Its evidence score is the explicit sum of
+authority (0–3), directness (0–3), recency (0–2), and triangulation (0–2).
+
+`ResearchClaimSource` is the through record connecting a claim and source. It
+states whether the source supports, contradicts, or only contextualises the
+claim, preserves the analyst's relationship note and actor, rejects
+cross-tenant linkage, and allows only one current relationship per claim/source
+pair. It never rewrites the source itself or automatically changes the claim's
+state.
 
 ### Signal
 
@@ -249,14 +270,17 @@ A versioned human judgement over a bounded checklist. Answers are `yes`, `partly
 
 A structured versioned synthesis containing context, options, evidence, uncertainty, stakeholder, scenario, evaluation, risk, unresolved-issue, proposed-judgement, condition, and implementation sections. A decision may have one draft and one current approved summary. Approval requires a proposed judgement plus human approval attribution. Approved and superseded summaries are immutable.
 
-## Phase 15.1 public demo requests
+## Phase 15.1 public decision enquiries
 
-`DemoRequest` is deliberately outside the organisation aggregate. It records a prospective contact's name, work email, organisation, role, organisation-size band, primary need, optional decision context, contact consent, operational status, and timestamps. It has no membership, decision, or tenant relationship and cannot create any of them. Status changes are limited to Django administration in this release.
+`DemoRequest` is the compatibility name for a decision enquiry and is deliberately outside the organisation aggregate. It records a prospective contact's name, work email, organisation, role, organisation-size band, decision difficulty, decision context, contact consent, operational status, and timestamps. The current public form requires a short decision context; the API retains its compatible optional field. The record has no membership, decision, or tenant relationship and cannot create any of them. Status changes are limited to protected administration.
 
 ## Contribution orchestration
 
-- `FacilitationSession`: one bounded workshop attached to one decision, with an attributable facilitator and forward-only state.
+- `FacilitationSession`: one bounded workshop attached to one decision, with an attributable facilitator, explicit accessibility and consent/attribution arrangements, and forward-only state.
+- `FacilitationAgendaItem`: one ordered, timed activity with a purpose, method, facilitator prompt, expected output, and immutable execution timestamps. A database constraint permits only one active item per session.
 - `SessionParticipant`: an invited organisation member, workshop role, and attendance state.
+- `FacilitationRecord`: an append-only, provenance-aware output that may be linked to the agenda item that produced it without changing the source participant record.
+- `FacilitationQualityReview`: the facilitator's post-closure one-to-one review across inclusion, boundary clarity, neutrality, meaningful participation, and follow-through, plus what worked, what must improve, and unresolved risks.
 - `ContributionRequest`: the bounded requested output, assignee, optional reviewer, optional option/session links, priority, due date, and governed workflow state.
 - `ContributionSubmission`: one mutable assignee draft or an immutable submitted revision with a per-request sequence.
 - `ContributionReview`: an append-only review outcome and guidance linked to a submitted revision.

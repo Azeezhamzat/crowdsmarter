@@ -26,7 +26,9 @@ def methods_for_organisation(*, user, organisation_id):  # type: ignore[no-untyp
     return queryset.filter(status=DecisionMethod.Status.APPROVED).prefetch_related(
         Prefetch(
             "versions",
-            queryset=DecisionMethodVersion.objects.filter(status=DecisionMethodVersion.Status.APPROVED),
+            queryset=DecisionMethodVersion.objects.filter(
+                status=DecisionMethodVersion.Status.APPROVED
+            ),
         )
     )
 
@@ -39,41 +41,50 @@ def approved_methods_for_organisation(*, user, organisation_id):  # type: ignore
 
 def method_for_user(*, user, method_id):  # type: ignore[no-untyped-def]
     manageable_orgs = Membership.objects.filter(
-        user=user, status=Membership.Status.ACTIVE,
+        user=user,
+        status=Membership.Status.ACTIVE,
         role__in=[Membership.Role.OWNER, Membership.Role.ADMIN],
     ).values("organisation_id")
-    queryset = DecisionMethod.objects.select_related(
-        "organisation", "current_version", "created_by"
-    ).filter(
-        organisation__memberships__user=user,
-        organisation__memberships__status=Membership.Status.ACTIVE,
-    ).filter(
-        Q(status=DecisionMethod.Status.APPROVED) | Q(organisation_id__in=manageable_orgs)
-    ).distinct()
+    queryset = (
+        DecisionMethod.objects.select_related("organisation", "current_version", "created_by")
+        .filter(
+            organisation__memberships__user=user,
+            organisation__memberships__status=Membership.Status.ACTIVE,
+        )
+        .filter(Q(status=DecisionMethod.Status.APPROVED) | Q(organisation_id__in=manageable_orgs))
+        .distinct()
+    )
     method = get_object_or_404(queryset, id=method_id)
     membership = _membership(user=user, organisation=method.organisation)
     versions = DecisionMethodVersion.objects.all()
     if not membership or membership.role not in {Membership.Role.OWNER, Membership.Role.ADMIN}:
         versions = versions.filter(status=DecisionMethodVersion.Status.APPROVED)
-    return DecisionMethod.objects.filter(id=method.id).select_related(
-        "organisation", "current_version", "created_by"
-    ).prefetch_related(Prefetch("versions", queryset=versions)).get()
+    return (
+        DecisionMethod.objects.filter(id=method.id)
+        .select_related("organisation", "current_version", "created_by")
+        .prefetch_related(Prefetch("versions", queryset=versions))
+        .get()
+    )
 
 
 def version_for_user(*, user, version_id):  # type: ignore[no-untyped-def]
     manageable_orgs = Membership.objects.filter(
-        user=user, status=Membership.Status.ACTIVE,
+        user=user,
+        status=Membership.Status.ACTIVE,
         role__in=[Membership.Role.OWNER, Membership.Role.ADMIN],
     ).values("organisation_id")
     return get_object_or_404(
         DecisionMethodVersion.objects.select_related(
             "method", "organisation", "created_by", "approved_by"
-        ).filter(
+        )
+        .filter(
             organisation__memberships__user=user,
             organisation__memberships__status=Membership.Status.ACTIVE,
-        ).filter(
+        )
+        .filter(
             Q(status=DecisionMethodVersion.Status.APPROVED) | Q(organisation_id__in=manageable_orgs)
-        ).distinct(),
+        )
+        .distinct(),
         id=version_id,
     )
 

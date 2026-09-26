@@ -20,7 +20,9 @@ def test_owner_creates_and_retires_a_criterion(decision_factory):  # type: ignor
 
     assert criterion.order == 1
 
-    update_criterion(actor=decision.owner, criterion=criterion, fields={"status": Criterion.Status.RETIRED})
+    update_criterion(
+        actor=decision.owner, criterion=criterion, fields={"status": Criterion.Status.RETIRED}
+    )
     criterion.refresh_from_db()
 
     assert criterion.status == Criterion.Status.RETIRED
@@ -33,12 +35,20 @@ def test_criteria_are_ordered_by_creation_when_order_not_given(
 ):  # type: ignore[no-untyped-def]
     decision = decision_factory(status=Decision.Status.UNDER_REVIEW)
     first = create_criterion(
-        actor=decision.owner, decision=decision, title="Cost",
-        description="Total cost.", direction=Criterion.Direction.MINIMIZE, weight=40,
+        actor=decision.owner,
+        decision=decision,
+        title="Cost",
+        description="Total cost.",
+        direction=Criterion.Direction.MINIMIZE,
+        weight=40,
     )
     second = create_criterion(
-        actor=decision.owner, decision=decision, title="Speed",
-        description="Time to implement.", direction=Criterion.Direction.MINIMIZE, weight=20,
+        actor=decision.owner,
+        decision=decision,
+        title="Speed",
+        description="Time to implement.",
+        direction=Criterion.Direction.MINIMIZE,
+        weight=20,
     )
 
     assert first.order == 1

@@ -1,25 +1,25 @@
-# CrowdSmarter Portuguese translations.
+# CrowdSmarter Arabic translations.
 # AI-assisted, not yet reviewed by a native speaker - see docs/i18n.md.
 msgid ""
 msgstr ""
 "Project-Id-Version: CrowdSmarter\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2026-08-22 08:44+0000\n"
-"PO-Revision-Date: 2026-08-22 08:44+0000\n"
+"PO-Revision-Date: 2026-08-30 00:00+0100\n"
 "Last-Translator: AI-assisted, unreviewed\n"
-"Language-Team: pt\n"
-"Language: pt\n"
+"Language-Team: ar\n"
+"Language: ar\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+"Plural-Forms: nplurals=6; plural=n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 && n%100<=10 ? 3 : n%100>=11 && n%100<=99 ? 4 : 5;\n"
 
-#: apps/invitations/services.py:253
+#: apps/invitations/services.py:259
 #, python-format
 msgid "Invitation to join %(organisation)s on CrowdSmarter"
-msgstr "Convite para se juntar a %(organisation)s no CrowdSmarter"
+msgstr "دعوة للانضمام إلى %(organisation)s على CrowdSmarter"
 
-#: apps/invitations/services.py:257
+#: apps/invitations/services.py:263
 #, python-format
 msgid ""
 "You have been invited to join %(organisation)s as %(role)s.\n"
@@ -30,10 +30,10 @@ msgid ""
 "This link expires at %(expires)s.\n"
 "If you were not expecting this invitation, you can ignore this email."
 msgstr ""
-"Foi convidado(a) a juntar-se a %(organisation)s como %(role)s.\n"
+"تمت دعوتك للانضمام إلى %(organisation)s بصفتك %(role)s.\n"
 "\n"
-"Aceite o convite e crie ou associe a sua conta aqui:\n"
+"اقبل الدعوة وأنشئ حسابك أو اربطه من هنا:\n"
 "%(url)s\n"
 "\n"
-"Este link expira em %(expires)s.\n"
-"Se não estava à espera deste convite, pode ignorar este e-mail."
+"تنتهي صلاحية هذا الرابط في %(expires)s.\n"
+"إذا لم تكن تتوقع هذه الدعوة، فيمكنك تجاهل هذه الرسالة."

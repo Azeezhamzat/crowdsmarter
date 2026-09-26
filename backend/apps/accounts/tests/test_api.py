@@ -1,4 +1,5 @@
 import pytest
+from django.core import mail
 from django.core.cache import cache
 from django.test import override_settings
 from django.urls import reverse
@@ -99,11 +100,13 @@ def test_inactive_account_uses_same_generic_login_error(
 
 
 @pytest.mark.django_db
-@override_settings(REST_FRAMEWORK={
-    "DEFAULT_AUTHENTICATION_CLASSES": ["rest_framework.authentication.SessionAuthentication"],
-    "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
-    "DEFAULT_THROTTLE_RATES": {"login": "1/min", "anon": "100/min", "user": "100/min"},
-})
+@override_settings(
+    REST_FRAMEWORK={
+        "DEFAULT_AUTHENTICATION_CLASSES": ["rest_framework.authentication.SessionAuthentication"],
+        "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
+        "DEFAULT_THROTTLE_RATES": {"login": "1/min", "anon": "100/min", "user": "100/min"},
+    }
+)
 def test_login_is_rate_limited(user_factory, monkeypatch):  # type: ignore[no-untyped-def]
     from apps.accounts.throttles import LoginRateThrottle
 
@@ -173,6 +176,114 @@ def test_password_change_requires_current_password_and_preserves_session(user_fa
     assert client.get(reverse("accounts:me")).status_code == 200
     user.refresh_from_db()
     assert user.check_password("A-new-secure-password-456")
+
+
+@pytest.mark.django_db
+@override_settings(
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    FRONTEND_BASE_URL="http://localhost:5173",
+    DEBUG=True,
+)
+def test_email_change_requires_password_and_verified_single_use_link(user_factory):  # type: ignore[no-untyped-def]
+    from apps.accounts.models import EmailChangeRequest
+    from apps.audit.models import AuditEvent
+
+    user = user_factory(email="old@example.com", password="Current-password-123")
+    client = APIClient(enforce_csrf_checks=True)
+    client.force_login(user)
+    csrf_token = client.get(reverse("accounts:csrf")).cookies["csrftoken"].value
+
+    rejected = client.post(
+        reverse("accounts:email-change-request"),
+        {"new_email": "new@example.com", "current_password": "wrong"},
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+    assert rejected.status_code == 400
+    assert EmailChangeRequest.objects.count() == 0
+
+    requested = client.post(
+        reverse("accounts:email-change-request"),
+        {"new_email": " NEW@example.com ", "current_password": "Current-password-123"},
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+    assert requested.status_code == 202
+    user.refresh_from_db()
+    assert user.email == "old@example.com"
+    assert [message.to for message in mail.outbox] == [["new@example.com"], ["old@example.com"]]
+    assert AuditEvent.objects.filter(action="account.email_change_requested").exists()
+
+    verification_url = requested.json()["development_verification_url"]
+    token = verification_url.split("#token=", 1)[1]
+    assert token not in EmailChangeRequest.objects.get().token_digest
+    confirmed = client.post(
+        reverse("accounts:email-change-confirm"),
+        {"token": token},
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+    assert confirmed.status_code == 200
+    assert confirmed.json()["email"] == "new@example.com"
+    user.refresh_from_db()
+    assert user.email == "new@example.com"
+    assert EmailChangeRequest.objects.get().completed_at is not None
+    assert AuditEvent.objects.filter(action="account.email_changed").exists()
+
+    reused = client.post(
+        reverse("accounts:email-change-confirm"),
+        {"token": token},
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+    assert reused.status_code == 400
+    assert "already been used" in str(reused.json()["detail"])
+
+
+@pytest.mark.django_db
+@override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend", DEBUG=True)
+def test_email_change_rejects_used_address_and_supersedes_prior_link(user_factory):  # type: ignore[no-untyped-def]
+    from apps.accounts.models import EmailChangeRequest
+
+    user = user_factory(email="old@example.com", password="Current-password-123")
+    user_factory(email="taken@example.com")
+    client = APIClient(enforce_csrf_checks=True)
+    client.force_login(user)
+    csrf_token = client.get(reverse("accounts:csrf")).cookies["csrftoken"].value
+
+    taken = client.post(
+        reverse("accounts:email-change-request"),
+        {"new_email": "taken@example.com", "current_password": "Current-password-123"},
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+    assert taken.status_code == 400
+
+    first = client.post(
+        reverse("accounts:email-change-request"),
+        {"new_email": "first@example.com", "current_password": "Current-password-123"},
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+    second = client.post(
+        reverse("accounts:email-change-request"),
+        {"new_email": "second@example.com", "current_password": "Current-password-123"},
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+    assert first.status_code == second.status_code == 202
+    requests = list(EmailChangeRequest.objects.order_by("created_at"))
+    assert requests[0].invalidated_at is not None
+    assert requests[1].invalidated_at is None
+
+    first_token = first.json()["development_verification_url"].split("#token=", 1)[1]
+    stale = client.post(
+        reverse("accounts:email-change-confirm"),
+        {"token": first_token},
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+    assert stale.status_code == 400
 
 
 @pytest.mark.django_db

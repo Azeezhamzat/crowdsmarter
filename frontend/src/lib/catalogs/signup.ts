@@ -1,14 +1,14 @@
 import { defineCatalog } from "../i18n";
 
 /**
- * French and Portuguese strings are AI-assisted and have not been reviewed
+ * French and Arabic strings are AI-assisted and have not been reviewed
  * by a native speaker - see docs/i18n.md before treating them as final copy.
  */
 export const signupCatalog = defineCatalog({
   en: {
-    eyebrow: "Free, no invitation required",
+    eyebrow: "Create a governed space",
     heading: "Start your own commons.",
-    lead: "Anyone can start a free, governed space for a group to anticipate what is coming and decide together, openly and with a real record. No sales call, no institution required.",
+    lead: "Create a governed space for a group to anticipate what is coming and decide together, openly and with a real record.",
     nameLabel: "Your name",
     emailLabel: "Email address",
     passwordLabel: "Password",
@@ -21,9 +21,9 @@ export const signupCatalog = defineCatalog({
     signInLink: "Sign in",
   },
   fr: {
-    eyebrow: "Gratuit, sans invitation",
+    eyebrow: "Créer un espace gouverné",
     heading: "Créez votre propre commun.",
-    lead: "Toute personne peut créer gratuitement un espace gouverné permettant à un groupe d'anticiper l'avenir et de décider ensemble, ouvertement et avec un vrai historique. Aucun appel commercial, aucune institution requise.",
+    lead: "Créez un espace gouverné permettant à un groupe d'anticiper l'avenir et de décider ensemble, ouvertement et avec un véritable historique.",
     nameLabel: "Votre nom",
     emailLabel: "Adresse e-mail",
     passwordLabel: "Mot de passe",
@@ -35,19 +35,19 @@ export const signupCatalog = defineCatalog({
     alreadyHaveAccount: "Vous avez déjà un compte ?",
     signInLink: "Se connecter",
   },
-  pt: {
-    eyebrow: "Gratuito, sem necessidade de convite",
-    heading: "Crie o seu próprio comum.",
-    lead: "Qualquer pessoa pode criar gratuitamente um espaço governado para um grupo antecipar o que vem a seguir e decidir em conjunto, de forma aberta e com um registo real. Sem chamada comercial, sem necessidade de instituição.",
-    nameLabel: "O seu nome",
-    emailLabel: "Endereço de e-mail",
-    passwordLabel: "Palavra-passe",
-    passwordHint: "Pelo menos 8 caracteres. Esta conta é sua, não é partilhada com os membros do seu comum.",
-    commonsNameLabel: "Dê um nome ao seu comum",
-    commonsNameHint: "Este é o nome do grupo ou iniciativa que está a criar, por exemplo \"Comum de Resiliência Climática de Riverside\".",
-    submitButton: "Criar o meu comum",
-    submittingButton: "A criar o seu comum…",
-    alreadyHaveAccount: "Já tem uma conta?",
-    signInLink: "Entrar",
+  ar: {
+    eyebrow: "أنشئ مساحة محكومة",
+    heading: "أنشئ مساحتك المشتركة.",
+    lead: "أنشئ مساحة محكومة تساعد مجموعةً على استشراف ما هو قادم واتخاذ القرار معاً، بشفافية ومع سجل حقيقي.",
+    nameLabel: "اسمك",
+    emailLabel: "عنوان البريد الإلكتروني",
+    passwordLabel: "كلمة المرور",
+    passwordHint: "8 أحرف على الأقل. هذا حسابك الشخصي، ولا تتم مشاركته مع أعضاء مساحتك المشتركة.",
+    commonsNameLabel: "اختر اسماً لمساحتك المشتركة",
+    commonsNameHint: "هذا اسم المجموعة أو المبادرة التي تنشئها، على سبيل المثال «مساحة ريفرسايد المشتركة للمرونة المناخية».",
+    submitButton: "أنشئ مساحتي المشتركة",
+    submittingButton: "جارٍ إنشاء مساحتك المشتركة…",
+    alreadyHaveAccount: "لديك حساب بالفعل؟",
+    signInLink: "تسجيل الدخول",
   },
 });

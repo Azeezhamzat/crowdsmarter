@@ -8,7 +8,6 @@ from apps.participants.models import Participant
 
 from .models import Decision
 
-
 MANAGER_ROLES = {Membership.Role.OWNER, Membership.Role.ADMIN}
 CREATOR_ROLES = MANAGER_ROLES | {Membership.Role.CONTRIBUTOR}
 EDITABLE_STATUSES = {Decision.Status.DRAFT, Decision.Status.FRAMING}
@@ -71,7 +70,6 @@ def has_finalisation_authority(*, actor: User, decision: Decision) -> bool:
 
 def can_finalise_decision(*, actor: User, decision: Decision) -> bool:
     """Return whether authority and lifecycle state permit finalisation now."""
-    return (
-        decision.status == Decision.Status.READY_FOR_DECISION
-        and has_finalisation_authority(actor=actor, decision=decision)
+    return decision.status == Decision.Status.READY_FOR_DECISION and has_finalisation_authority(
+        actor=actor, decision=decision
     )

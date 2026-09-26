@@ -34,11 +34,15 @@ class MappingServiceError(ValidationError):
 
 def _active_member(*, organisation: Organisation, user_id: Any) -> User:
     try:
-        return Membership.objects.select_related("user").get(
-            organisation=organisation,
-            user_id=user_id,
-            status=Membership.Status.ACTIVE,
-        ).user
+        return (
+            Membership.objects.select_related("user")
+            .get(
+                organisation=organisation,
+                user_id=user_id,
+                status=Membership.Status.ACTIVE,
+            )
+            .user
+        )
     except Membership.DoesNotExist as exc:
         raise MappingServiceError({"owner_id": "Choose an active organisation member."}) from exc
 
@@ -84,8 +88,12 @@ def create_canvas(*, actor: User, organisation: Organisation, **fields: Any) -> 
 
 
 @transaction.atomic
-def update_canvas(*, actor: User, canvas: ForesightCanvas, fields: dict[str, Any]) -> ForesightCanvas:
-    canvas = ForesightCanvas.objects.select_for_update().select_related("organisation").get(id=canvas.id)
+def update_canvas(
+    *, actor: User, canvas: ForesightCanvas, fields: dict[str, Any]
+) -> ForesightCanvas:
+    canvas = (
+        ForesightCanvas.objects.select_for_update().select_related("organisation").get(id=canvas.id)
+    )
     if not _can_edit_canvas(actor=actor, canvas=canvas):
         raise PermissionDenied("You cannot edit this foresight canvas.")
     if canvas.status == ForesightCanvas.Status.ARCHIVED:
@@ -137,7 +145,9 @@ def create_driver(*, actor: User, canvas: ForesightCanvas, **fields: Any) -> Dri
 
 @transaction.atomic
 def update_driver(*, actor: User, driver: Driver, fields: dict[str, Any]) -> Driver:
-    driver = Driver.objects.select_for_update().select_related("canvas__organisation").get(id=driver.id)
+    driver = (
+        Driver.objects.select_for_update().select_related("canvas__organisation").get(id=driver.id)
+    )
     if not can_manage_record(
         actor=actor,
         organisation=driver.canvas.organisation,
@@ -149,9 +159,7 @@ def update_driver(*, actor: User, driver: Driver, fields: dict[str, Any]) -> Dri
         raise MappingServiceError("Archived foresight canvases are read-only.")
     owner_id = fields.pop("owner_id", None)
     if owner_id is not None:
-        driver.owner = _active_member(
-            organisation=driver.canvas.organisation, user_id=owner_id
-        )
+        driver.owner = _active_member(organisation=driver.canvas.organisation, user_id=owner_id)
     for key, value in fields.items():
         setattr(driver, key, value)
     driver.full_clean(validate_unique=False, validate_constraints=False)
@@ -175,7 +183,9 @@ def link_signal_to_driver(
     try:
         signal = Signal.objects.get(id=signal_id, organisation=driver.canvas.organisation)
     except Signal.DoesNotExist as exc:
-        raise MappingServiceError({"signal_id": "The signal does not belong to this organisation."}) from exc
+        raise MappingServiceError(
+            {"signal_id": "The signal does not belong to this organisation."}
+        ) from exc
     link, created = DriverSignal.objects.get_or_create(
         driver=driver,
         signal=signal,
@@ -205,9 +215,7 @@ def create_stakeholder(*, actor: User, canvas: ForesightCanvas, **fields: Any) -
         item.full_clean(validate_unique=False, validate_constraints=False)
         item.save()
     except IntegrityError as exc:
-        raise MappingServiceError(
-            {"name": "A stakeholder with this name already exists."}
-        ) from exc
+        raise MappingServiceError({"name": "A stakeholder with this name already exists."}) from exc
     record_event(
         action="foresight.stakeholder.created",
         object_type="foresight_system_stakeholder",
@@ -220,11 +228,16 @@ def create_stakeholder(*, actor: User, canvas: ForesightCanvas, **fields: Any) -
 
 
 @transaction.atomic
-def create_relationship(*, actor: User, canvas: ForesightCanvas, **fields: Any) -> CausalRelationship:
+def create_relationship(
+    *, actor: User, canvas: ForesightCanvas, **fields: Any
+) -> CausalRelationship:
     _require_contributor(actor=actor, canvas=canvas)
     source_id = fields.pop("source_driver_id")
     target_id = fields.pop("target_driver_id")
-    drivers = {str(item.id): item for item in Driver.objects.filter(canvas=canvas, id__in=[source_id, target_id])}
+    drivers = {
+        str(item.id): item
+        for item in Driver.objects.filter(canvas=canvas, id__in=[source_id, target_id])
+    }
     try:
         source = drivers[str(source_id)]
         target = drivers[str(target_id)]
@@ -306,7 +319,9 @@ def create_feedback_loop(
 
 
 @transaction.atomic
-def create_consequence(*, actor: User, canvas: ForesightCanvas, **fields: Any) -> FuturesWheelConsequence:
+def create_consequence(
+    *, actor: User, canvas: ForesightCanvas, **fields: Any
+) -> FuturesWheelConsequence:
     _require_contributor(actor=actor, canvas=canvas)
     driver_id = fields.pop("originating_driver_id", None)
     parent_id = fields.pop("parent_id", None)
@@ -316,15 +331,21 @@ def create_consequence(*, actor: User, canvas: ForesightCanvas, **fields: Any) -
         try:
             driver = Driver.objects.get(id=driver_id, canvas=canvas)
         except Driver.DoesNotExist as exc:
-            raise MappingServiceError({"originating_driver_id": "Choose a driver from this canvas."}) from exc
+            raise MappingServiceError(
+                {"originating_driver_id": "Choose a driver from this canvas."}
+            ) from exc
     if parent_id:
         try:
             parent = FuturesWheelConsequence.objects.get(id=parent_id, canvas=canvas)
         except FuturesWheelConsequence.DoesNotExist as exc:
-            raise MappingServiceError({"parent_id": "Choose a consequence from this canvas."}) from exc
+            raise MappingServiceError(
+                {"parent_id": "Choose a consequence from this canvas."}
+            ) from exc
         fields["order"] = parent.order + 1
         if fields["order"] > 3:
-            raise MappingServiceError({"parent_id": "The futures wheel supports three consequence orders."})
+            raise MappingServiceError(
+                {"parent_id": "The futures wheel supports three consequence orders."}
+            )
     else:
         fields["order"] = 1
     item = FuturesWheelConsequence(
@@ -370,7 +391,9 @@ def create_horizon_item(*, actor: User, canvas: ForesightCanvas, **fields: Any) 
 
 
 @transaction.atomic
-def create_implication(*, actor: User, canvas: ForesightCanvas, **fields: Any) -> StrategicImplication:
+def create_implication(
+    *, actor: User, canvas: ForesightCanvas, **fields: Any
+) -> StrategicImplication:
     _require_contributor(actor=actor, canvas=canvas)
     owner_id = fields.pop("owner_id", actor.id)
     decision_id = fields.pop("linked_decision_id", None)
@@ -380,10 +403,14 @@ def create_implication(*, actor: User, canvas: ForesightCanvas, **fields: Any) -
         try:
             decision = Decision.objects.get(id=decision_id, organisation=canvas.organisation)
         except Decision.DoesNotExist as exc:
-            raise MappingServiceError({"linked_decision_id": "Choose a decision from this organisation."}) from exc
+            raise MappingServiceError(
+                {"linked_decision_id": "Choose a decision from this organisation."}
+            ) from exc
     drivers = list(Driver.objects.filter(canvas=canvas, id__in=driver_ids))
     if len(drivers) != len(set(driver_ids)):
-        raise MappingServiceError({"driver_ids": "Every selected driver must belong to this canvas."})
+        raise MappingServiceError(
+            {"driver_ids": "Every selected driver must belong to this canvas."}
+        )
     item = StrategicImplication(
         canvas=canvas,
         owner=_active_member(organisation=canvas.organisation, user_id=owner_id),
@@ -413,9 +440,11 @@ def create_implication(*, actor: User, canvas: ForesightCanvas, **fields: Any) -
 def update_implication(
     *, actor: User, implication: StrategicImplication, fields: dict[str, Any]
 ) -> StrategicImplication:
-    implication = StrategicImplication.objects.select_for_update().select_related(
-        "canvas__organisation"
-    ).get(id=implication.id)
+    implication = (
+        StrategicImplication.objects.select_for_update()
+        .select_related("canvas__organisation")
+        .get(id=implication.id)
+    )
     if not can_manage_record(
         actor=actor,
         organisation=implication.canvas.organisation,

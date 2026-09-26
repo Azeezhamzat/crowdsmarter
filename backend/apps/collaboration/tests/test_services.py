@@ -11,9 +11,7 @@ from apps.participants.models import Participant
 
 
 @pytest.mark.django_db
-def test_participant_adds_attributable_question_and_mentions_member(
-    user_factory, decision_factory
-):  # type: ignore[no-untyped-def]
+def test_participant_adds_attributable_question_and_mentions_member(user_factory, decision_factory):  # type: ignore[no-untyped-def]
     decision = decision_factory(status=Decision.Status.OPEN_FOR_CONTRIBUTION)
     contributor = user_factory()
     mentioned = user_factory()

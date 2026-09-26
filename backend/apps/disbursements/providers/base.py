@@ -32,7 +32,14 @@ class DisbursementProvider(Protocol):
     key: str
     label: str
 
-    def issue_payout(self, *, amount, reference_hint: str = "") -> DisbursementResult:
+    def issue_payout(
+        self,
+        *,
+        amount,
+        currency: str,
+        idempotency_key: str,
+        reference_hint: str = "",
+    ) -> DisbursementResult:
         """Move (or record) a payment for a funded application. Never raises for a provider-side failure."""
 
     def test_connection(self) -> ProviderConnectionResult:

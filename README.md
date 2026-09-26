@@ -2,27 +2,43 @@
 
 Created by Azeez Adewale Hamzat.
 
-CrowdSmarter is a free platform for a group to make decisions together in the
-open: gather evidence, weigh options, and keep a record of who decided what
-and why. Anyone can start a commons in minutes, with no invitation, no card,
-and no sales call. The same platform runs participatory, evidence-linked
-grant rounds for funders, from open call through judged review to a recorded
-funding decision.
+CrowdSmarter is a facilitation-led practice for groups making consequential
+decisions together. It helps people frame the decision, bring the right
+participants and evidence into the room, work through disagreement, and reach
+an accountable outcome.
+
+A supporting platform is one part of that work. It keeps evidence,
+participation, judgement, commitments, and outcomes connected, and can support
+participatory grant rounds from open call through review to a recorded funding
+decision. The platform serves the facilitated process; it is not the whole of
+CrowdSmarter.
 
 The approach draws on commons governance, participatory grantmaking, and
 collective-intelligence research. AI assistance is optional, provider-neutral,
 reviewable, and never makes the decision itself; a human always does.
 
-## Two ways in
+## How CrowdSmarter can help
 
-- **Start a commons, free.** Sign up, invite your group with one link, and
-  run a decision from open contribution through to a recorded outcome. No
-  institution or sales conversation required.
-- **Run a guided grant round.** Funders and institutions can bring a funded
-  round to run as a charter programme: eligibility, judged or blind review,
-  disbursement, and a reusable template for the next round.
+- **Facilitate a collective decision.** Shape a process around the decision,
+  the people affected, the available evidence, and where authority sits.
+- **Run a facilitated grant round.** Apply the approach to eligibility,
+  judged or blind review, funding decisions, and learning for the next round.
+- **Use the supporting platform where it adds value.** Keep contributions,
+  evidence, disagreement, decisions, and follow-through connected without
+  allowing the software to dictate the process.
 
-## What it does
+The working service definition is in
+[`docs/facilitation-offer.md`](docs/facilitation-offer.md). The evidence plan
+for testing its need and usefulness is in
+[`docs/facilitation-validation-plan.md`](docs/facilitation-validation-plan.md).
+The current internet-research method and dated product baseline are in
+[`docs/research/`](docs/research/).
+The capability maturity bar and ordered upgrade workstreams are in the
+[`global competition programme`](docs/global-competition-programme.md).
+Reusable discovery and pilot records are in
+[`docs/facilitation-field-kit/`](docs/facilitation-field-kit/README.md).
+
+## What the facilitation and platform support together
 
 - Guided decision templates (general decisions, grant rounds, idea
   competitions and hackathons, and open-ended "anticipatory commons" rounds),
@@ -31,6 +47,12 @@ reviewable, and never makes the decision itself; a human always does.
   own application across rounds, without needing an account.
 - Structured contribution: evidence, assumptions, risks, and immutable
   versioned stakeholder positions.
+- Hybrid facilitation delivery: explicit influence boundaries, timed
+  run-of-show activities, live facilitator prompts, agenda-linked outputs,
+  accessibility and consent preparation, in-person and remote capture
+  channels, participant-input provenance, missing perspectives, confidential
+  or anonymous attribution, post-session quality review, authority responses,
+  and print-ready session reports.
 - Independent, optionally blind or anonymous evaluation rounds (scorecards,
   Delphi, approval, consent, ranked-choice), with minority reports preserved
   and reviewer conflicts of interest excluded transparently.
@@ -40,6 +62,9 @@ reviewable, and never makes the decision itself; a human always does.
   the next decision.
 - Systems and futures foresight: sourced signals, watchlists, systems
   canvases, scenario worlds, and adaptive signposts linked to real decisions.
+- Decision-grade internet research: scored claims, supporting and contrary
+  sources, limitations, reversal conditions, review dates, and explicit
+  build/integrate/defer/avoid/monitor recommendations.
 - Grant-round specifics: eligibility screening, applicant-blind review,
   conflict-of-interest exclusion, budget rollups, disbursement (manual by
   default, Stripe-ready), and organisation verification (manual by default,
@@ -48,15 +73,17 @@ reviewable, and never makes the decision itself; a human always does.
   notifications, and a small set of explainable decision-flow analytics.
 - Organisation administration: invitations, membership history, ownership
   transfer, governed decision methods, and platform-wide tenant support.
-- Available in English, French, and Portuguese.
+- English is the current product language. French and Arabic localisation
+  infrastructure is retained but not exposed while its need and complete scope
+  are evaluated.
 
 Every material lifecycle action is attributable, transactionally validated,
 recorded in immutable history, and appended to the tenant audit log.
 
 ## Domains
 
-- `accounts`: identity, authentication, MFA, profile self-service, and
-  self-serve signup;
+- `accounts`: identity, authentication, MFA, verified email changes, profile
+  self-service, and self-serve signup;
 - `organisations`: tenant boundary, invitations, memberships, ownership, and
   deactivation/deletion safeguards;
 - `invitations`: organisation-controlled onboarding with expiring, revocable
@@ -73,14 +100,14 @@ recorded in immutable history, and appended to the tenant audit log.
   submissions;
 - `applicants`: a persistent, passwordless identity for people applying
   across multiple rounds, and their cross-round application history;
-- `foresight`: sources, STEEP signals, watchlists, systems canvases,
-  scenarios, and adaptive signposts;
+- `foresight`: source provenance, research claims, STEEP signals, watchlists,
+  systems canvases, scenarios, and adaptive signposts;
 - `evaluations`: blind and peer-anonymous evaluation, Delphi rounds,
   ranked-choice voting, and constrained portfolio assessment;
 - `decision_analysis`: comparative read models, contradiction and gap
   registers, and human-approved executive synthesis;
-- `contributions`: named contributions, private drafts, review, and
-  facilitation;
+- `contributions`: named contributions, private drafts, review, live hybrid
+  facilitation run-of-show, attributable records, and authority feedback loops;
 - `disbursements`: pluggable payout providers for funded grant options;
 - `org_enrichment`: pluggable organisation lookup and verification;
 - `billing`: packaging tiers and per-organisation subscription limits;
@@ -95,13 +122,13 @@ recorded in immutable history, and appended to the tenant audit log.
 - `collaboration`: append-only discussion, mentions, and resolution;
 - `portfolio`: personal work and organisation portfolio read models;
 - `exports`: organisation archives and portable decision dossiers;
-- `demo_requests`: rate-limited demonstration requests for funders and
-  institutions;
+- `demo_requests`: rate-limited decision and facilitation enquiries from
+  prospective partners (the internal name is retained for compatibility);
 - `audit`: append-only material-change records;
 - `platform_admin`: service-wide oversight and governed tenant support;
 - `core`: shared infrastructure and API exception translation.
 
-## One integrated product and public site
+## One supporting application and public site
 
 The React application serves both surfaces:
 
@@ -145,6 +172,27 @@ Redis and Celery remain optional for synchronous workflows:
 ```bash
 docker compose --profile workers up -d worker scheduler
 ```
+
+Optional local monitoring (Grafana at `http://localhost:3000`) is started with:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.observability.yml \
+  --profile observability up -d
+```
+
+Operational and security drills:
+
+```bash
+./scripts/backup-restore-drill.sh
+docker compose exec backend python manage.py retention_report --json
+docker compose exec backend python manage.py scan_source_attachments
+docker compose exec backend python manage.py check_malware_scanner
+docker compose exec backend python manage.py check_email_configuration
+```
+
+See `docs/operations/` for the monitoring, malware, restore, and email
+runbooks. `docs/internal-security-privacy-review-2026-08-30.md` records the
+remaining external review and production-evidence requirements.
 
 ## Quality commands
 

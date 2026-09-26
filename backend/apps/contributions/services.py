@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from datetime import timedelta
+from typing import TypedDict
 from uuid import UUID
 
 from django.conf import settings
@@ -27,6 +28,10 @@ from .models import (
     ContributionRequest,
     ContributionReview,
     ContributionSubmission,
+    FacilitationAgendaItem,
+    FacilitationAuthorityResponse,
+    FacilitationQualityReview,
+    FacilitationRecord,
     FacilitationSession,
     SessionParticipant,
 )
@@ -36,6 +41,7 @@ from .policies import (
     can_receive_assignment,
     can_review_request,
     can_work_on_request,
+    has_contribution_authority,
 )
 
 logger = logging.getLogger(__name__)
@@ -43,6 +49,26 @@ logger = logging.getLogger(__name__)
 
 class ContributionServiceError(ValidationError):
     """Expected contribution workflow validation failure."""
+
+
+class SessionParticipantInput(TypedDict):
+    user_id: UUID
+    role: str
+
+
+class ExternalSessionParticipantInput(TypedDict):
+    external_label: str
+    role: str
+    stakeholder_group: str
+
+
+class AgendaItemInput(TypedDict, total=False):
+    title: str
+    purpose: str
+    method: str
+    facilitator_prompt: str
+    output_prompt: str
+    planned_minutes: int
 
 
 def _active_member(*, decision: Decision, user_id: UUID) -> User:
@@ -53,7 +79,9 @@ def _active_member(*, decision: Decision, user_id: UUID) -> User:
             organisation_memberships__status=Membership.Status.ACTIVE,
         )
     except User.DoesNotExist as exc:
-        raise ContributionServiceError("The selected person is not an active organisation member.") from exc
+        raise ContributionServiceError(
+            "The selected person is not an active organisation member."
+        ) from exc
     return user
 
 
@@ -62,6 +90,18 @@ def _active_participant(*, decision: Decision, user_id: UUID) -> User:
     if not can_receive_assignment(actor=user, decision=decision):
         raise ContributionServiceError(
             "Assignments require an active non-observer decision participant."
+        )
+    return user
+
+
+def _session_participant(*, decision: Decision, user_id: UUID) -> User:
+    user = _active_member(decision=decision, user_id=user_id)
+    if not decision.participants.filter(
+        user=user,
+        status=Participant.Status.ACTIVE,
+    ).exists():
+        raise ContributionServiceError(
+            "Facilitation requires an active participant in this decision."
         )
     return user
 
@@ -103,9 +143,13 @@ def create_request(
     session=None,
     open_immediately: bool = True,
 ) -> ContributionRequest:
-    current = Decision.objects.select_for_update().select_related("organisation").get(id=decision.id)
+    current = (
+        Decision.objects.select_for_update().select_related("organisation").get(id=decision.id)
+    )
     if not can_manage_contributions(actor=actor, decision=current):
-        raise PermissionDenied("Only accountable decision authorities may create contribution requests.")
+        raise PermissionDenied(
+            "Only accountable decision authorities may create contribution requests."
+        )
     assignee = _active_participant(decision=current, user_id=assignee_id)
     reviewer = _reviewer(decision=current, user_id=reviewer_id)
     if reviewer and reviewer.id == assignee.id:
@@ -113,7 +157,9 @@ def create_request(
     if option and option.decision_id != current.id:
         raise ContributionServiceError("The selected option does not belong to this decision.")
     if session and session.decision_id != current.id:
-        raise ContributionServiceError("The selected facilitation session does not belong to this decision.")
+        raise ContributionServiceError(
+            "The selected facilitation session does not belong to this decision."
+        )
 
     now = timezone.now()
     request = ContributionRequest(
@@ -129,7 +175,9 @@ def create_request(
         instructions=instructions,
         priority=priority,
         due_at=due_at,
-        status=ContributionRequest.Status.OPEN if open_immediately else ContributionRequest.Status.DRAFT,
+        status=ContributionRequest.Status.OPEN
+        if open_immediately
+        else ContributionRequest.Status.DRAFT,
         opened_at=now if open_immediately else None,
     )
     request.full_clean(validate_unique=False, validate_constraints=False)
@@ -159,9 +207,11 @@ def update_request(
     *, actor: User, request: ContributionRequest, changes: dict
 ) -> ContributionRequest:
     """Revise an active assignment without rewriting submitted contribution history."""
-    current = ContributionRequest.objects.select_for_update(of=("self",)).select_related(
-        "decision", "organisation", "assignee", "reviewer"
-    ).get(id=request.id)
+    current = (
+        ContributionRequest.objects.select_for_update(of=("self",))
+        .select_related("decision", "organisation", "assignee", "reviewer")
+        .get(id=request.id)
+    )
     if not can_manage_contributions(actor=actor, decision=current.decision):
         raise PermissionDenied("Only accountable decision authorities may update this request.")
     editable_statuses = {
@@ -214,7 +264,10 @@ def update_request(
             title="Contribution reassigned",
             message=f"{actor.email} reassigned “{current.title}” to {current.assignee.email}.",
             url=f"/decisions/{current.decision_id}/contributions#request-{current.id}",
-            metadata={"contribution_request_id": str(current.id), "new_assignee_id": str(current.assignee_id)},
+            metadata={
+                "contribution_request_id": str(current.id),
+                "new_assignee_id": str(current.assignee_id),
+            },
             dedup_key=f"contribution-reassigned-from:{current.id}:{original_assignee.id}:{current.updated_at.isoformat()}",
         )
         _notify_assignment(
@@ -248,7 +301,10 @@ def _notify_assignment(
         title="Contribution requested",
         message=f"{actor.email} assigned “{request.title}” on “{request.decision.title}”.",
         url=f"/decisions/{request.decision_id}/contributions#request-{request.id}",
-        metadata={"contribution_request_id": str(request.id), "due_at": request.due_at.isoformat() if request.due_at else None},
+        metadata={
+            "contribution_request_id": str(request.id),
+            "due_at": request.due_at.isoformat() if request.due_at else None,
+        },
         dedup_key=f"contribution-request-{event_key}:{request.id}",
     )
     preference = ContributionPreference.objects.filter(
@@ -277,9 +333,11 @@ def _notify_assignment(
 
 @transaction.atomic
 def open_request(*, actor: User, request: ContributionRequest) -> ContributionRequest:
-    current = ContributionRequest.objects.select_for_update().select_related(
-        "decision", "organisation", "assignee"
-    ).get(id=request.id)
+    current = (
+        ContributionRequest.objects.select_for_update()
+        .select_related("decision", "organisation", "assignee")
+        .get(id=request.id)
+    )
     if not can_manage_contributions(actor=actor, decision=current.decision):
         raise PermissionDenied("Only accountable decision authorities may open this request.")
     if current.status != ContributionRequest.Status.DRAFT:
@@ -302,7 +360,11 @@ def open_request(*, actor: User, request: ContributionRequest) -> ContributionRe
 
 @transaction.atomic
 def start_request(*, actor: User, request: ContributionRequest) -> ContributionRequest:
-    current = ContributionRequest.objects.select_for_update().select_related("decision", "organisation").get(id=request.id)
+    current = (
+        ContributionRequest.objects.select_for_update()
+        .select_related("decision", "organisation")
+        .get(id=request.id)
+    )
     if not can_work_on_request(actor=actor, request=current):
         raise PermissionDenied("Only the assigned contributor may start this request.")
     if current.status not in {ContributionRequest.Status.OPEN, ContributionRequest.Status.RETURNED}:
@@ -324,7 +386,11 @@ def start_request(*, actor: User, request: ContributionRequest) -> ContributionR
 def save_draft(
     *, actor: User, request: ContributionRequest, body: str, references: str = ""
 ) -> ContributionSubmission:
-    current = ContributionRequest.objects.select_for_update().select_related("decision", "organisation").get(id=request.id)
+    current = (
+        ContributionRequest.objects.select_for_update()
+        .select_related("decision", "organisation")
+        .get(id=request.id)
+    )
     if not can_work_on_request(actor=actor, request=current):
         raise PermissionDenied("Only the assigned contributor may save this draft.")
     draft = ContributionSubmission.objects.filter(
@@ -333,7 +399,12 @@ def save_draft(
         status=ContributionSubmission.Status.DRAFT,
     ).first()
     if draft is None:
-        sequence = (ContributionSubmission.objects.filter(request=current).aggregate(value=Max("sequence"))["value"] or 0) + 1
+        sequence = (
+            ContributionSubmission.objects.filter(request=current).aggregate(value=Max("sequence"))[
+                "value"
+            ]
+            or 0
+        ) + 1
         draft = ContributionSubmission(
             organisation=current.organisation,
             decision=current.decision,
@@ -357,7 +428,11 @@ def save_draft(
         object_id=str(draft.id),
         actor=actor,
         organisation=current.organisation,
-        metadata={"decision_id": str(current.decision_id), "request_id": str(current.id), "sequence": draft.sequence},
+        metadata={
+            "decision_id": str(current.decision_id),
+            "request_id": str(current.id),
+            "sequence": draft.sequence,
+        },
     )
     return draft
 
@@ -366,9 +441,11 @@ def save_draft(
 def submit_request(
     *, actor: User, request: ContributionRequest, body: str | None = None, references: str = ""
 ) -> ContributionSubmission:
-    current = ContributionRequest.objects.select_for_update(of=("self",)).select_related(
-        "decision", "organisation", "reviewer", "requested_by"
-    ).get(id=request.id)
+    current = (
+        ContributionRequest.objects.select_for_update(of=("self",))
+        .select_related("decision", "organisation", "reviewer", "requested_by")
+        .get(id=request.id)
+    )
     if not can_work_on_request(actor=actor, request=current):
         raise PermissionDenied("Only the assigned contributor may submit this request.")
     draft = ContributionSubmission.objects.filter(
@@ -378,7 +455,9 @@ def submit_request(
     ).first()
     if draft is None:
         if not body or not body.strip():
-            raise ContributionServiceError("Save or provide a substantive response before submitting.")
+            raise ContributionServiceError(
+                "Save or provide a substantive response before submitting."
+            )
         draft = save_draft(actor=actor, request=current, body=body, references=references)
         draft = ContributionSubmission.objects.select_for_update().get(id=draft.id)
     elif body is not None:
@@ -392,7 +471,9 @@ def submit_request(
     current.submitted_at = draft.submitted_at
     current.reviewed_at = None
     current.completed_at = None
-    current.save(update_fields=["status", "submitted_at", "reviewed_at", "completed_at", "updated_at"])
+    current.save(
+        update_fields=["status", "submitted_at", "reviewed_at", "completed_at", "updated_at"]
+    )
     recipients = [current.reviewer or current.requested_by]
     notify_users(
         recipients=recipients,
@@ -412,14 +493,22 @@ def submit_request(
         object_id=str(draft.id),
         actor=actor,
         organisation=current.organisation,
-        metadata={"decision_id": str(current.decision_id), "request_id": str(current.id), "sequence": draft.sequence},
+        metadata={
+            "decision_id": str(current.decision_id),
+            "request_id": str(current.id),
+            "sequence": draft.sequence,
+        },
     )
     return draft
 
 
 @transaction.atomic
 def start_review(*, actor: User, request: ContributionRequest) -> ContributionRequest:
-    current = ContributionRequest.objects.select_for_update().select_related("decision", "organisation").get(id=request.id)
+    current = (
+        ContributionRequest.objects.select_for_update()
+        .select_related("decision", "organisation")
+        .get(id=request.id)
+    )
     if not can_review_request(actor=actor, request=current):
         raise PermissionDenied("You are not authorised to review this contribution.")
     if current.status != ContributionRequest.Status.SUBMITTED:
@@ -441,14 +530,23 @@ def start_review(*, actor: User, request: ContributionRequest) -> ContributionRe
 def review_submission(
     *, actor: User, request: ContributionRequest, outcome: str, note: str
 ) -> ContributionReview:
-    current = ContributionRequest.objects.select_for_update().select_related(
-        "decision", "organisation", "assignee"
-    ).get(id=request.id)
+    current = (
+        ContributionRequest.objects.select_for_update()
+        .select_related("decision", "organisation", "assignee")
+        .get(id=request.id)
+    )
     if not can_review_request(actor=actor, request=current):
         raise PermissionDenied("You are not authorised to review this contribution.")
-    if current.status not in {ContributionRequest.Status.SUBMITTED, ContributionRequest.Status.UNDER_REVIEW}:
+    if current.status not in {
+        ContributionRequest.Status.SUBMITTED,
+        ContributionRequest.Status.UNDER_REVIEW,
+    }:
         raise ContributionServiceError("Only a submitted contribution can be reviewed.")
-    submission = current.submissions.filter(status=ContributionSubmission.Status.SUBMITTED).order_by("-sequence").first()
+    submission = (
+        current.submissions.filter(status=ContributionSubmission.Status.SUBMITTED)
+        .order_by("-sequence")
+        .first()
+    )
     if submission is None:
         raise ContributionServiceError("No submitted revision is available for review.")
     if outcome not in ContributionReview.Outcome.values:
@@ -483,7 +581,11 @@ def review_submission(
         title=f"Contribution {review.get_outcome_display().lower()}",
         message=f"{actor.email} reviewed “{current.title}”: {review.note}",
         url=f"/decisions/{current.decision_id}/contributions#request-{current.id}",
-        metadata={"contribution_request_id": str(current.id), "review_id": str(review.id), "outcome": outcome},
+        metadata={
+            "contribution_request_id": str(current.id),
+            "review_id": str(review.id),
+            "outcome": outcome,
+        },
         dedup_key=f"contribution-review:{review.id}",
     )
     record_event(
@@ -492,16 +594,24 @@ def review_submission(
         object_id=str(review.id),
         actor=actor,
         organisation=current.organisation,
-        metadata={"decision_id": str(current.decision_id), "request_id": str(current.id), "submission_id": str(submission.id)},
+        metadata={
+            "decision_id": str(current.decision_id),
+            "request_id": str(current.id),
+            "submission_id": str(submission.id),
+        },
     )
     return review
 
 
 @transaction.atomic
-def cancel_request(*, actor: User, request: ContributionRequest, reason: str) -> ContributionRequest:
-    current = ContributionRequest.objects.select_for_update().select_related(
-        "decision", "organisation", "assignee"
-    ).get(id=request.id)
+def cancel_request(
+    *, actor: User, request: ContributionRequest, reason: str
+) -> ContributionRequest:
+    current = (
+        ContributionRequest.objects.select_for_update()
+        .select_related("decision", "organisation", "assignee")
+        .get(id=request.id)
+    )
     if not can_manage_contributions(actor=actor, decision=current.decision):
         raise PermissionDenied("Only accountable decision authorities may cancel this request.")
     if current.is_terminal:
@@ -533,13 +643,34 @@ def cancel_request(*, actor: User, request: ContributionRequest, reason: str) ->
 
 @transaction.atomic
 def create_session(
-    *, actor: User, decision: Decision, title: str, objective: str, agenda: str = "",
-    participation_guidance: str = "", facilitator_id: UUID | None = None,
-    starts_at=None, ends_at=None, participant_ids: list[UUID] | None = None,
+    *,
+    actor: User,
+    decision: Decision,
+    title: str,
+    objective: str,
+    agenda: str = "",
+    participation_guidance: str = "",
+    influence_boundary: str = "",
+    fixed_constraints: str = "",
+    participation_channels: list[str] | None = None,
+    missing_perspectives: str = "",
+    accessibility_arrangements: str = "",
+    consent_boundary: str = "",
+    facilitator_id: UUID | None = None,
+    starts_at=None,
+    ends_at=None,
+    participant_ids: list[UUID] | None = None,
+    participants: list[SessionParticipantInput] | None = None,
+    external_participants: list[ExternalSessionParticipantInput] | None = None,
+    agenda_items: list[AgendaItemInput] | None = None,
 ) -> FacilitationSession:
-    current = Decision.objects.select_for_update().select_related("organisation").get(id=decision.id)
+    current = (
+        Decision.objects.select_for_update().select_related("organisation").get(id=decision.id)
+    )
     if not can_manage_contributions(actor=actor, decision=current):
-        raise PermissionDenied("Only accountable decision authorities may create facilitation sessions.")
+        raise PermissionDenied(
+            "Only accountable decision authorities may create facilitation sessions."
+        )
     facilitator = _reviewer(decision=current, user_id=facilitator_id or actor.id)
     assert facilitator is not None
     session = FacilitationSession(
@@ -549,6 +680,12 @@ def create_session(
         objective=objective,
         agenda=agenda,
         participation_guidance=participation_guidance,
+        influence_boundary=influence_boundary,
+        fixed_constraints=fixed_constraints,
+        participation_channels=participation_channels or [],
+        missing_perspectives=missing_perspectives,
+        accessibility_arrangements=accessibility_arrangements,
+        consent_boundary=consent_boundary,
         facilitator=facilitator,
         starts_at=starts_at,
         ends_at=ends_at,
@@ -556,16 +693,65 @@ def create_session(
     )
     session.full_clean(validate_unique=False, validate_constraints=False)
     session.save()
-    for user_id in list(dict.fromkeys(participant_ids or [])):
-        user = _active_participant(decision=current, user_id=user_id)
-        SessionParticipant.objects.create(
+    for order, agenda_input in enumerate(agenda_items or [], start=1):
+        agenda_item = FacilitationAgendaItem(
+            session=session,
+            created_by=actor,
+            order=order,
+            **agenda_input,
+        )
+        agenda_item.full_clean(validate_unique=False, validate_constraints=False)
+        agenda_item.save()
+    participant_inputs: list[SessionParticipantInput] = list(participants or [])
+    participant_inputs.extend(
+        {"user_id": user_id, "role": SessionParticipant.Role.PARTICIPANT}
+        for user_id in participant_ids or []
+    )
+    seen_user_ids: set[UUID] = set()
+    for participant_input in participant_inputs:
+        user_id = participant_input["user_id"]
+        if user_id in seen_user_ids:
+            continue
+        seen_user_ids.add(user_id)
+        user = _session_participant(decision=current, user_id=user_id)
+        role = participant_input.get("role", SessionParticipant.Role.PARTICIPANT)
+        if role not in SessionParticipant.Role.values:
+            raise ContributionServiceError("Select a valid facilitation participant role.")
+        participant = SessionParticipant(
             session=session,
             organisation=current.organisation,
             user=user,
+            role=role,
             added_by=actor,
         )
+        participant.full_clean(validate_unique=False, validate_constraints=False)
+        participant.save()
+    seen_external_labels: set[str] = set()
+    for external_input in external_participants or []:
+        label = external_input["external_label"].strip()
+        label_key = label.casefold()
+        if label_key in seen_external_labels:
+            continue
+        seen_external_labels.add(label_key)
+        role = external_input.get("role", SessionParticipant.Role.PARTICIPANT)
+        if role not in SessionParticipant.Role.values:
+            raise ContributionServiceError("Select a valid offline participant role.")
+        participant = SessionParticipant(
+            session=session,
+            organisation=current.organisation,
+            external_label=label,
+            stakeholder_group=external_input.get("stakeholder_group", ""),
+            role=role,
+            added_by=actor,
+        )
+        participant.full_clean(validate_unique=False, validate_constraints=False)
+        participant.save()
     notify_users(
-        recipients=[item.user for item in session.participants.select_related("user")],
+        recipients=[
+            item.user
+            for item in session.participants.select_related("user")
+            if item.user is not None
+        ],
         organisation=current.organisation,
         decision=current,
         kind=Notification.Kind.ASSIGNMENT,
@@ -582,21 +768,398 @@ def create_session(
         object_id=str(session.id),
         actor=actor,
         organisation=current.organisation,
-        metadata={"decision_id": str(current.id), "participant_count": session.participants.count()},
+        metadata={
+            "decision_id": str(current.id),
+            "participant_count": session.participants.count(),
+            "agenda_item_count": session.agenda_items.count(),
+        },
     )
     return session
 
 
 @transaction.atomic
-def update_session_status(*, actor: User, session: FacilitationSession, status: str) -> FacilitationSession:
-    current = FacilitationSession.objects.select_for_update().select_related("decision", "organisation").get(id=session.id)
+def create_agenda_item(
+    *, actor: User, session: FacilitationSession, **fields
+) -> FacilitationAgendaItem:
+    current = (
+        FacilitationSession.objects.select_for_update()
+        .select_related("decision", "organisation")
+        .get(id=session.id)
+    )
     if current.decision.status not in WRITABLE_STATUSES:
-        raise ContributionServiceError("Facilitation history is read-only after the decision leaves contribution and review.")
-    if not can_manage_contributions(actor=actor, decision=current.decision) and current.facilitator_id != actor.id:
-        raise PermissionDenied("Only the facilitator or accountable authority may update this session.")
+        raise ContributionServiceError(
+            "The run-of-show is read-only after the decision leaves contribution and review."
+        )
+    if current.status not in {FacilitationSession.Status.PLANNED, FacilitationSession.Status.OPEN}:
+        raise ContributionServiceError("Agenda items can only be added before a session closes.")
+    if (
+        not can_manage_contributions(actor=actor, decision=current.decision)
+        and current.facilitator_id != actor.id
+    ):
+        raise PermissionDenied(
+            "Only the facilitator or accountable authority may change the run-of-show."
+        )
+    next_order = (current.agenda_items.aggregate(value=Max("order"))["value"] or 0) + 1
+    item = FacilitationAgendaItem(
+        session=current,
+        created_by=actor,
+        order=next_order,
+        **fields,
+    )
+    item.full_clean(validate_unique=False, validate_constraints=False)
+    item.save()
+    record_event(
+        action="contributions.facilitation_agenda_item_created",
+        object_type="facilitation_agenda_item",
+        object_id=str(item.id),
+        actor=actor,
+        organisation=current.organisation,
+        metadata={"decision_id": str(current.decision_id), "session_id": str(current.id)},
+    )
+    return item
+
+
+@transaction.atomic
+def update_agenda_item_status(
+    *, actor: User, item: FacilitationAgendaItem, action: str
+) -> FacilitationAgendaItem:
+    current = (
+        FacilitationAgendaItem.objects.select_for_update()
+        .select_related("session__decision", "session__organisation")
+        .get(id=item.id)
+    )
+    session = current.session
+    if session.decision.status not in WRITABLE_STATUSES:
+        raise ContributionServiceError(
+            "The run-of-show is read-only after the decision leaves contribution and review."
+        )
+    if (
+        not can_manage_contributions(actor=actor, decision=session.decision)
+        and session.facilitator_id != actor.id
+    ):
+        raise PermissionDenied("Only the facilitator or accountable authority may run the agenda.")
+    if action == "start":
+        if session.status != FacilitationSession.Status.OPEN:
+            raise ContributionServiceError("Open the session before starting an agenda item.")
+        if current.status != FacilitationAgendaItem.Status.QUEUED:
+            raise ContributionServiceError("Only a queued agenda item can be started.")
+        if session.agenda_items.filter(status=FacilitationAgendaItem.Status.ACTIVE).exists():
+            raise ContributionServiceError(
+                "Complete or skip the active agenda item before starting another."
+            )
+        current.status = FacilitationAgendaItem.Status.ACTIVE
+        current.started_at = timezone.now()
+        current.ended_at = None
+    elif action == "complete":
+        if current.status != FacilitationAgendaItem.Status.ACTIVE:
+            raise ContributionServiceError("Only the active agenda item can be completed.")
+        current.status = FacilitationAgendaItem.Status.COMPLETED
+        current.ended_at = timezone.now()
+    elif action == "skip":
+        if session.status != FacilitationSession.Status.OPEN:
+            raise ContributionServiceError("Agenda items can only be skipped in an open session.")
+        if current.status not in {
+            FacilitationAgendaItem.Status.QUEUED,
+            FacilitationAgendaItem.Status.ACTIVE,
+        }:
+            raise ContributionServiceError("Only a queued or active agenda item can be skipped.")
+        current.status = FacilitationAgendaItem.Status.SKIPPED
+        current.ended_at = timezone.now()
+    elif action == "reset":
+        if session.status not in {
+            FacilitationSession.Status.PLANNED,
+            FacilitationSession.Status.OPEN,
+        }:
+            raise ContributionServiceError("A closed session's agenda history is immutable.")
+        if current.status != FacilitationAgendaItem.Status.SKIPPED:
+            raise ContributionServiceError(
+                "Only a skipped agenda item can be returned to the queue."
+            )
+        current.status = FacilitationAgendaItem.Status.QUEUED
+        current.started_at = None
+        current.ended_at = None
+    else:
+        raise ContributionServiceError("Select a valid agenda action.")
+    current.full_clean(validate_unique=False, validate_constraints=False)
+    current.save(update_fields=["status", "started_at", "ended_at", "updated_at"])
+    record_event(
+        action=f"contributions.facilitation_agenda_item_{action}",
+        object_type="facilitation_agenda_item",
+        object_id=str(current.id),
+        actor=actor,
+        organisation=session.organisation,
+        metadata={"decision_id": str(session.decision_id), "session_id": str(session.id)},
+    )
+    return current
+
+
+@transaction.atomic
+def create_facilitation_record(
+    *,
+    actor: User,
+    session: FacilitationSession,
+    kind: str,
+    body: str,
+    channel: str,
+    origin: str,
+    attribution: str,
+    source_participant_id: UUID | None = None,
+    agenda_item_id: UUID | None = None,
+    speaker_label: str = "",
+    permission_to_quote: bool = False,
+    follow_up_owner: str = "",
+) -> FacilitationRecord:
+    current = (
+        FacilitationSession.objects.select_for_update()
+        .select_related("decision", "organisation")
+        .get(id=session.id)
+    )
+    if current.decision.status not in WRITABLE_STATUSES:
+        raise ContributionServiceError(
+            "Facilitation records are read-only after the decision leaves contribution and review."
+        )
+    if current.status not in {
+        FacilitationSession.Status.OPEN,
+        FacilitationSession.Status.CLOSED,
+    }:
+        raise ContributionServiceError("Open the session before recording participant input.")
+    if (
+        not can_manage_contributions(actor=actor, decision=current.decision)
+        and current.facilitator_id != actor.id
+    ):
+        raise PermissionDenied(
+            "Only the facilitator or accountable authority may capture session records."
+        )
+    source_participant = None
+    if source_participant_id:
+        try:
+            source_participant = current.participants.get(id=source_participant_id)
+        except SessionParticipant.DoesNotExist as exc:
+            raise ContributionServiceError(
+                "The selected source participant does not belong to this session."
+            ) from exc
+    agenda_item = None
+    if agenda_item_id:
+        try:
+            agenda_item = current.agenda_items.get(id=agenda_item_id)
+        except FacilitationAgendaItem.DoesNotExist as exc:
+            raise ContributionServiceError(
+                "The selected agenda item does not belong to this session."
+            ) from exc
+    record = FacilitationRecord(
+        organisation=current.organisation,
+        decision=current.decision,
+        session=current,
+        kind=kind,
+        body=body,
+        channel=channel,
+        origin=origin,
+        attribution=attribution,
+        source_participant=source_participant,
+        agenda_item=agenda_item,
+        speaker_label=speaker_label,
+        permission_to_quote=permission_to_quote,
+        follow_up_owner=follow_up_owner,
+        created_by=actor,
+    )
+    record.full_clean(validate_unique=False, validate_constraints=False)
+    record.save()
+    record_event(
+        action="contributions.facilitation_record_created",
+        object_type="facilitation_record",
+        object_id=str(record.id),
+        actor=actor,
+        organisation=current.organisation,
+        metadata={
+            "decision_id": str(current.decision_id),
+            "session_id": str(current.id),
+            "kind": record.kind,
+            "channel": record.channel,
+            "origin": record.origin,
+            "attribution": record.attribution,
+            "agenda_item_id": str(record.agenda_item_id) if record.agenda_item_id else None,
+        },
+    )
+    return record
+
+
+@transaction.atomic
+def save_facilitation_authority_response(
+    *,
+    actor: User,
+    session: FacilitationSession,
+    what_we_heard: str,
+    what_changed: str,
+    what_did_not_change: str,
+    rationale: str,
+    next_steps: str,
+    publish: bool = False,
+) -> FacilitationAuthorityResponse:
+    current = (
+        FacilitationSession.objects.select_for_update()
+        .select_related("decision", "organisation")
+        .get(id=session.id)
+    )
+    if not has_contribution_authority(actor=actor, decision=current.decision):
+        raise PermissionDenied("Only an accountable decision authority may issue this response.")
+    if current.status == FacilitationSession.Status.CANCELLED:
+        raise ContributionServiceError("A cancelled session cannot receive an authority response.")
+    if publish and current.status != FacilitationSession.Status.CLOSED:
+        raise ContributionServiceError(
+            "Close the session before publishing its authority response."
+        )
+
+    response = (
+        FacilitationAuthorityResponse.objects.select_for_update().filter(session=current).first()
+    )
+    if response and response.status == FacilitationAuthorityResponse.Status.PUBLISHED:
+        raise ContributionServiceError(
+            "The published authority response is immutable. Record a formal correction separately."
+        )
+    if response is None:
+        response = FacilitationAuthorityResponse(
+            organisation=current.organisation,
+            decision=current.decision,
+            session=current,
+        )
+    response.what_we_heard = what_we_heard
+    response.what_changed = what_changed
+    response.what_did_not_change = what_did_not_change
+    response.rationale = rationale
+    response.next_steps = next_steps
+    response.status = (
+        FacilitationAuthorityResponse.Status.PUBLISHED
+        if publish
+        else FacilitationAuthorityResponse.Status.DRAFT
+    )
+    response.published_at = timezone.now() if publish else None
+    response.published_by = actor if publish else None
+    response.full_clean(validate_unique=False, validate_constraints=False)
+    response.save()
+
+    action = "published" if publish else "draft_saved"
+    record_event(
+        action=f"contributions.facilitation_response_{action}",
+        object_type="facilitation_authority_response",
+        object_id=str(response.id),
+        actor=actor,
+        organisation=current.organisation,
+        metadata={
+            "decision_id": str(current.decision_id),
+            "session_id": str(current.id),
+        },
+    )
+    if publish:
+        notify_users(
+            recipients=[
+                item.user
+                for item in current.participants.select_related("user")
+                if item.user is not None
+            ],
+            organisation=current.organisation,
+            decision=current.decision,
+            kind=Notification.Kind.ASSIGNMENT,
+            title="Facilitation response published",
+            message=f"The accountable authority responded to “{current.title}”.",
+            url=f"/decisions/{current.decision_id}/contributions#session-{current.id}",
+            metadata={
+                "facilitation_session_id": str(current.id),
+                "authority_response_id": str(response.id),
+            },
+            dedup_key_prefix=f"facilitation-response:{response.id}",
+            exclude_user_id=actor.id,
+        )
+    return response
+
+
+@transaction.atomic
+def save_facilitation_quality_review(
+    *,
+    actor: User,
+    session: FacilitationSession,
+    inclusion_score: int,
+    clarity_score: int,
+    neutrality_score: int,
+    participation_score: int,
+    follow_through_score: int,
+    what_worked: str,
+    improve_next_time: str,
+    unresolved_risks: str = "",
+) -> FacilitationQualityReview:
+    current = (
+        FacilitationSession.objects.select_for_update()
+        .select_related("decision", "organisation")
+        .get(id=session.id)
+    )
+    if current.status != FacilitationSession.Status.CLOSED:
+        raise ContributionServiceError("Close the session before recording its quality review.")
+    if (
+        not can_manage_contributions(actor=actor, decision=current.decision)
+        and current.facilitator_id != actor.id
+    ):
+        raise PermissionDenied(
+            "Only the facilitator or accountable authority may review session quality."
+        )
+    review = FacilitationQualityReview.objects.select_for_update().filter(session=current).first()
+    before = None
+    if review is None:
+        review = FacilitationQualityReview(session=current, reviewed_by=actor)
+    else:
+        before = {
+            "overall_score": review.overall_score,
+            "reviewed_by_id": str(review.reviewed_by_id),
+        }
+    review.inclusion_score = inclusion_score
+    review.clarity_score = clarity_score
+    review.neutrality_score = neutrality_score
+    review.participation_score = participation_score
+    review.follow_through_score = follow_through_score
+    review.what_worked = what_worked
+    review.improve_next_time = improve_next_time
+    review.unresolved_risks = unresolved_risks
+    review.reviewed_by = actor
+    review.reviewed_at = timezone.now()
+    review.full_clean(validate_unique=False, validate_constraints=False)
+    review.save()
+    record_event(
+        action="contributions.facilitation_quality_review_saved",
+        object_type="facilitation_quality_review",
+        object_id=str(review.id),
+        actor=actor,
+        organisation=current.organisation,
+        metadata={
+            "decision_id": str(current.decision_id),
+            "session_id": str(current.id),
+            "overall_score": review.overall_score,
+            "before": before,
+        },
+    )
+    return review
+
+
+@transaction.atomic
+def update_session_status(
+    *, actor: User, session: FacilitationSession, status: str
+) -> FacilitationSession:
+    current = (
+        FacilitationSession.objects.select_for_update()
+        .select_related("decision", "organisation")
+        .get(id=session.id)
+    )
+    if current.decision.status not in WRITABLE_STATUSES:
+        raise ContributionServiceError(
+            "Facilitation history is read-only after the decision leaves contribution and review."
+        )
+    if (
+        not can_manage_contributions(actor=actor, decision=current.decision)
+        and current.facilitator_id != actor.id
+    ):
+        raise PermissionDenied(
+            "Only the facilitator or accountable authority may update this session."
+        )
     if status not in FacilitationSession.Status.values:
         raise ContributionServiceError("Select a valid session status.")
-    transitions = {
+    transitions: dict[str, set[str]] = {
         FacilitationSession.Status.PLANNED: {
             FacilitationSession.Status.OPEN,
             FacilitationSession.Status.CANCELLED,
@@ -611,6 +1174,17 @@ def update_session_status(*, actor: User, session: FacilitationSession, status: 
     if status not in transitions[current.status]:
         raise ContributionServiceError(
             f"A {current.get_status_display().lower()} session cannot move to {status}."
+        )
+    if (
+        status
+        in {
+            FacilitationSession.Status.CLOSED,
+            FacilitationSession.Status.CANCELLED,
+        }
+        and current.agenda_items.filter(status=FacilitationAgendaItem.Status.ACTIVE).exists()
+    ):
+        raise ContributionServiceError(
+            "Complete or skip the active agenda item before closing or cancelling the session."
         )
     current.status = status
     current.closed_at = timezone.now() if status == FacilitationSession.Status.CLOSED else None
@@ -629,8 +1203,12 @@ def update_session_status(*, actor: User, session: FacilitationSession, status: 
 
 @transaction.atomic
 def update_preference(
-    *, preference: ContributionPreference, digest_cadence: str, email_enabled: bool,
-    due_reminders_enabled: bool, reminder_days_before: int,
+    *,
+    preference: ContributionPreference,
+    digest_cadence: str,
+    email_enabled: bool,
+    due_reminders_enabled: bool,
+    reminder_days_before: int,
 ) -> ContributionPreference:
     current = ContributionPreference.objects.select_for_update().get(id=preference.id)
     current.digest_cadence = digest_cadence
@@ -638,10 +1216,15 @@ def update_preference(
     current.due_reminders_enabled = due_reminders_enabled
     current.reminder_days_before = reminder_days_before
     current.full_clean(validate_unique=False, validate_constraints=False)
-    current.save(update_fields=[
-        "digest_cadence", "email_enabled", "due_reminders_enabled",
-        "reminder_days_before", "updated_at",
-    ])
+    current.save(
+        update_fields=[
+            "digest_cadence",
+            "email_enabled",
+            "due_reminders_enabled",
+            "reminder_days_before",
+            "updated_at",
+        ]
+    )
     return current
 
 
@@ -649,7 +1232,9 @@ def deliver_due_reminders(*, now=None) -> int:
     """Create deduplicated in-app reminders for due-soon and overdue assignments."""
     current_time = now or timezone.now()
     delivered = 0
-    preferences = ContributionPreference.objects.filter(due_reminders_enabled=True).select_related("user", "organisation")
+    preferences = ContributionPreference.objects.filter(due_reminders_enabled=True).select_related(
+        "user", "organisation"
+    )
     for preference in preferences:
         deadline = current_time + timedelta(days=preference.reminder_days_before)
         requests = ContributionRequest.objects.filter(
@@ -664,6 +1249,9 @@ def deliver_due_reminders(*, now=None) -> int:
             ],
         )
         for request in requests.select_related("decision"):
+            due_at = request.due_at
+            if due_at is None:
+                continue
             day_key = current_time.date().isoformat()
             before = Notification.objects.filter(
                 recipient=preference.user,
@@ -674,10 +1262,13 @@ def deliver_due_reminders(*, now=None) -> int:
                 organisation=request.organisation,
                 decision=request.decision,
                 kind=Notification.Kind.REVIEW_DUE,
-                title="Contribution overdue" if request.due_at < current_time else "Contribution due soon",
-                message=f"“{request.title}” is due {request.due_at.strftime('%d %b %Y %H:%M UTC')}.",
+                title="Contribution overdue" if due_at < current_time else "Contribution due soon",
+                message=f"“{request.title}” is due {due_at.strftime('%d %b %Y %H:%M UTC')}.",
                 url=f"/decisions/{request.decision_id}/contributions#request-{request.id}",
-                metadata={"contribution_request_id": str(request.id), "due_at": request.due_at.isoformat()},
+                metadata={
+                    "contribution_request_id": str(request.id),
+                    "due_at": due_at.isoformat(),
+                },
                 dedup_key=f"contribution-due:{request.id}:{day_key}",
             )
             if not before:
@@ -691,18 +1282,29 @@ def deliver_email_digests(*, now=None) -> int:
     delivered = 0
     preferences = ContributionPreference.objects.filter(
         email_enabled=True,
-        digest_cadence__in=[ContributionPreference.DigestCadence.DAILY, ContributionPreference.DigestCadence.WEEKLY],
+        digest_cadence__in=[
+            ContributionPreference.DigestCadence.DAILY,
+            ContributionPreference.DigestCadence.WEEKLY,
+        ],
         user__is_active=True,
     ).select_related("user", "organisation")
     for preference in preferences:
-        interval = timedelta(days=1 if preference.digest_cadence == ContributionPreference.DigestCadence.DAILY else 7)
+        interval = timedelta(
+            days=1 if preference.digest_cadence == ContributionPreference.DigestCadence.DAILY else 7
+        )
         if preference.last_digest_at and current_time - preference.last_digest_at < interval:
             continue
         requests = list(
             ContributionRequest.objects.filter(
                 organisation=preference.organisation,
                 assignee=preference.user,
-            ).exclude(status__in=[ContributionRequest.Status.ACCEPTED, ContributionRequest.Status.CANCELLED])
+            )
+            .exclude(
+                status__in=[
+                    ContributionRequest.Status.ACCEPTED,
+                    ContributionRequest.Status.CANCELLED,
+                ]
+            )
             .select_related("decision")
             .order_by("due_at", "-priority")[:50]
         )
@@ -742,15 +1344,26 @@ def deliver_email_digests(*, now=None) -> int:
 
 
 @transaction.atomic
-def update_session_attendance(*, actor: User, participant: SessionParticipant, attendance: str) -> SessionParticipant:
-    current = SessionParticipant.objects.select_for_update().select_related(
-        "session__decision", "session__organisation", "user"
-    ).get(id=participant.id)
+def update_session_attendance(
+    *, actor: User, participant: SessionParticipant, attendance: str
+) -> SessionParticipant:
+    current = (
+        SessionParticipant.objects.select_for_update()
+        .select_related("session__decision", "session__organisation", "user")
+        .get(id=participant.id)
+    )
     session = current.session
     if session.decision.status not in WRITABLE_STATUSES:
-        raise ContributionServiceError("Facilitation attendance is read-only after the decision leaves contribution and review.")
-    if not can_manage_contributions(actor=actor, decision=session.decision) and session.facilitator_id != actor.id:
-        raise PermissionDenied("Only the facilitator or accountable authority may record attendance.")
+        raise ContributionServiceError(
+            "Facilitation attendance is read-only after the decision leaves contribution and review."
+        )
+    if (
+        not can_manage_contributions(actor=actor, decision=session.decision)
+        and session.facilitator_id != actor.id
+    ):
+        raise PermissionDenied(
+            "Only the facilitator or accountable authority may record attendance."
+        )
     if attendance not in SessionParticipant.Attendance.values:
         raise ContributionServiceError("Select a valid attendance state.")
     current.attendance = attendance

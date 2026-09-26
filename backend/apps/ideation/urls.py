@@ -20,9 +20,17 @@ app_name = "ideation"
 
 urlpatterns = [
     # Public, reachable via the shareable link only.
-    path("public/sessions/<str:public_slug>/", OpenSessionPublicDetailView.as_view(), name="public-detail"),
+    path(
+        "public/sessions/<str:public_slug>/",
+        OpenSessionPublicDetailView.as_view(),
+        name="public-detail",
+    ),
     path("public/sessions/<str:public_slug>/join/", SessionJoinView.as_view(), name="public-join"),
-    path("public/sessions/<str:public_slug>/ideas/", SessionIdeaCreateView.as_view(), name="public-idea-create"),
+    path(
+        "public/sessions/<str:public_slug>/ideas/",
+        SessionIdeaCreateView.as_view(),
+        name="public-idea-create",
+    ),
     path(
         "public/sessions/<str:public_slug>/ideas/<uuid:idea_id>/vote/",
         SessionIdeaVoteView.as_view(),
@@ -39,8 +47,14 @@ urlpatterns = [
         OrganisationSessionListCreateView.as_view(),
         name="organisation-list-create",
     ),
-    path("sessions/<uuid:session_id>/", OpenSessionOrganiserDetailView.as_view(), name="organiser-detail"),
-    path("sessions/<uuid:session_id>/state/", OpenSessionStateView.as_view(), name="organiser-state"),
+    path(
+        "sessions/<uuid:session_id>/",
+        OpenSessionOrganiserDetailView.as_view(),
+        name="organiser-detail",
+    ),
+    path(
+        "sessions/<uuid:session_id>/state/", OpenSessionStateView.as_view(), name="organiser-state"
+    ),
     path(
         "sessions/<uuid:session_id>/ideas/<uuid:idea_id>/shortlist/",
         IdeaShortlistView.as_view(),

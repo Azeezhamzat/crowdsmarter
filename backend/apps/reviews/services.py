@@ -13,9 +13,9 @@ from apps.audit.services import record_event
 from apps.decisions.models import Decision
 from apps.decisions.policies import can_transition_decision
 from apps.decisions.services import append_transition_record
-from apps.organisations.models import Membership
 from apps.notifications.models import Notification
 from apps.notifications.services import create_notification
+from apps.organisations.models import Membership
 
 from .models import DecisionReview
 
@@ -26,11 +26,15 @@ class ReviewServiceError(ValidationError):
 
 def _active_member(*, organisation_id: Any, user_id: Any) -> User:
     try:
-        return Membership.objects.select_related("user").get(
-            organisation_id=organisation_id,
-            user_id=user_id,
-            status=Membership.Status.ACTIVE,
-        ).user
+        return (
+            Membership.objects.select_related("user")
+            .get(
+                organisation_id=organisation_id,
+                user_id=user_id,
+                status=Membership.Status.ACTIVE,
+            )
+            .user
+        )
     except Membership.DoesNotExist as exc:
         raise ReviewServiceError(
             {"implementation_owner_id": "Select an active organisation member."}
@@ -38,9 +42,11 @@ def _active_member(*, organisation_id: Any, user_id: Any) -> User:
 
 
 def _locked_decision(*, decision: Decision, expected_status: str, actor: User) -> Decision:
-    current = Decision.objects.select_for_update().select_related(
-        "organisation", "owner"
-    ).get(id=decision.id)
+    current = (
+        Decision.objects.select_for_update()
+        .select_related("organisation", "owner")
+        .get(id=decision.id)
+    )
     if not can_transition_decision(actor=actor, decision=current):
         raise PermissionDenied("You do not hold lifecycle authority for this decision.")
     if current.status != expected_status:
@@ -73,9 +79,7 @@ def record_commitment(
         actor=actor,
     )
     if current.status != Decision.Status.DECISION_FINALISED:
-        raise ReviewServiceError(
-            "Commitment can be recorded only after the decision is finalised."
-        )
+        raise ReviewServiceError("Commitment can be recorded only after the decision is finalised.")
     if not hasattr(current, "finalisation"):
         raise ReviewServiceError(
             "The immutable human finalisation record is required before commitment."
@@ -159,16 +163,12 @@ def start_implementation(
     except DecisionReview.DoesNotExist as exc:
         raise ReviewServiceError("Record the commitment before implementation.") from exc
     if not rationale.strip():
-        raise ReviewServiceError(
-            {"rationale": "Record why implementation is ready to begin."}
-        )
+        raise ReviewServiceError({"rationale": "Record why implementation is ready to begin."})
     review.implementation_plan = implementation_plan.strip()
     review.implementation_started_by = actor
     review.implementation_started_at = timezone.now()
     if not review.implementation_plan:
-        raise ReviewServiceError(
-            {"implementation_plan": "Record the implementation plan."}
-        )
+        raise ReviewServiceError({"implementation_plan": "Record the implementation plan."})
     review.full_clean(validate_unique=False, validate_constraints=False)
     review.save(
         update_fields=[
@@ -217,14 +217,10 @@ def open_outcome_review(
     except DecisionReview.DoesNotExist as exc:
         raise ReviewServiceError("The execution record is missing.") from exc
     if not rationale.strip():
-        raise ReviewServiceError(
-            {"rationale": "Record why the work is ready for outcome review."}
-        )
+        raise ReviewServiceError({"rationale": "Record why the work is ready for outcome review."})
     review.implementation_summary = implementation_summary.strip()
     if not review.implementation_summary:
-        raise ReviewServiceError(
-            {"implementation_summary": "Summarise what was implemented."}
-        )
+        raise ReviewServiceError({"implementation_summary": "Summarise what was implemented."})
     review.full_clean(validate_unique=False, validate_constraints=False)
     review.save(update_fields=["implementation_summary", "updated_at"])
     append_transition_record(
@@ -320,9 +316,11 @@ def change_implementation_owner(
     *, actor: User, decision: Decision, implementation_owner_id: Any
 ) -> DecisionReview:
     """Transfer post-decision accountability to another active tenant member."""
-    current = Decision.objects.select_for_update().select_related(
-        "organisation", "owner"
-    ).get(id=decision.id)
+    current = (
+        Decision.objects.select_for_update()
+        .select_related("organisation", "owner")
+        .get(id=decision.id)
+    )
     if not can_transition_decision(actor=actor, decision=current):
         raise PermissionDenied("You cannot transfer implementation ownership.")
     if current.status == Decision.Status.ARCHIVED:

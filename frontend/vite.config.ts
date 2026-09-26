@@ -1,4 +1,4 @@
-/// <reference types="vitest/config" />
+import type {} from "vitest/config";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { defaultExclude } from "vitest/config";

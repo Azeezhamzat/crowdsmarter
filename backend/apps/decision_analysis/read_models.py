@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from statistics import mean
+from typing import Any
 
 from django.utils import timezone
 
@@ -12,7 +13,12 @@ from apps.decision_options.models import DecisionOption
 from apps.evaluations.models import EvaluationRound, MinorityReport
 from apps.evaluations.services import evaluation_results
 from apps.evidence.models import Evidence
-from apps.foresight.models import SignalDecisionLink, Source, StrategicImplication, WindTunnelAssessment
+from apps.foresight.models import (
+    SignalDecisionLink,
+    Source,
+    StrategicImplication,
+    WindTunnelAssessment,
+)
 from apps.participants.models import Participant
 from apps.positions.models import Position
 from apps.risks.models import Risk
@@ -22,22 +28,35 @@ from .policies import can_contribute_analysis, can_manage_analysis
 
 
 def _latest_positions(decision):
-    latest = {}
-    for position in Position.objects.filter(
-        decision=decision, participant__status=Participant.Status.ACTIVE
-    ).select_related("participant", "preferred_option").order_by("participant_id", "-version"):
+    latest: dict[Any, Any] = {}
+    for position in (
+        Position.objects.filter(decision=decision, participant__status=Participant.Status.ACTIVE)
+        .select_related("participant", "preferred_option")
+        .order_by("participant_id", "-version")
+    ):
         latest.setdefault(position.participant_id, position)
     return list(latest.values())
 
 
 def decision_analysis_workspace(*, decision, viewer) -> dict:
-    options = list(DecisionOption.objects.filter(decision=decision, status=DecisionOption.Status.ACTIVE).order_by("title"))
-    evidence = list(Evidence.objects.filter(decision=decision, status=Evidence.Status.ACTIVE).select_related("source"))
-    assumptions = list(Assumption.objects.filter(decision=decision, status=Assumption.Status.ACTIVE))
+    options = list(
+        DecisionOption.objects.filter(
+            decision=decision, status=DecisionOption.Status.ACTIVE
+        ).order_by("title")
+    )
+    evidence = list(
+        Evidence.objects.filter(decision=decision, status=Evidence.Status.ACTIVE).select_related(
+            "source"
+        )
+    )
+    assumptions = list(
+        Assumption.objects.filter(decision=decision, status=Assumption.Status.ACTIVE)
+    )
     risks = list(Risk.objects.filter(decision=decision).exclude(status=Risk.Status.CLOSED))
     issues = list(DecisionIssue.objects.filter(decision=decision).select_related("owner", "option"))
     positions = _latest_positions(decision)
     today = timezone.localdate()
+    item: Any
 
     evidence_by_option = defaultdict(list)
     assumptions_by_option = defaultdict(list)
@@ -63,11 +82,15 @@ def decision_analysis_workspace(*, decision, viewer) -> dict:
     for item in assessments:
         wind[item.option_id].append(item)
 
-    closed_rounds = EvaluationRound.objects.filter(
-        exercise__decision=decision,
-        status=EvaluationRound.Status.CLOSED,
-    ).select_related("exercise").order_by("exercise_id", "-number")
-    latest_round_by_exercise = {}
+    closed_rounds = (
+        EvaluationRound.objects.filter(
+            exercise__decision=decision,
+            status=EvaluationRound.Status.CLOSED,
+        )
+        .select_related("exercise")
+        .order_by("exercise_id", "-number")
+    )
+    latest_round_by_exercise: dict[Any, Any] = {}
     for round_item in closed_rounds:
         latest_round_by_exercise.setdefault(round_item.exercise_id, round_item)
     evaluation_by_option = defaultdict(list)
@@ -107,22 +130,35 @@ def decision_analysis_workspace(*, decision, viewer) -> dict:
                 "tradeoffs": option.tradeoffs,
                 "is_status_quo": option.is_status_quo,
                 "evidence": {
-                    "supporting": sum(item.stance == Evidence.Stance.SUPPORTS for item in option_evidence),
-                    "challenging": sum(item.stance == Evidence.Stance.CHALLENGES for item in option_evidence),
+                    "supporting": sum(
+                        item.stance == Evidence.Stance.SUPPORTS for item in option_evidence
+                    ),
+                    "challenging": sum(
+                        item.stance == Evidence.Stance.CHALLENGES for item in option_evidence
+                    ),
                     "mixed": sum(item.stance == Evidence.Stance.MIXED for item in option_evidence),
-                    "context": sum(item.stance == Evidence.Stance.CONTEXT for item in option_evidence),
-                    "high_strength": sum(item.strength == Evidence.Strength.HIGH for item in option_evidence),
-                    "structured_sources": sum(item.source_id is not None for item in option_evidence),
+                    "context": sum(
+                        item.stance == Evidence.Stance.CONTEXT for item in option_evidence
+                    ),
+                    "high_strength": sum(
+                        item.strength == Evidence.Strength.HIGH for item in option_evidence
+                    ),
+                    "structured_sources": sum(
+                        item.source_id is not None for item in option_evidence
+                    ),
                     "high_credibility_sources": sum(
-                        item.source_id is not None and item.source.credibility == Source.Credibility.HIGH
+                        item.source_id is not None
+                        and item.source.credibility == Source.Credibility.HIGH
                         for item in option_evidence
                     ),
                     "unassessed_sources": sum(
-                        item.source_id is not None and item.source.credibility == Source.Credibility.UNASSESSED
+                        item.source_id is not None
+                        and item.source.credibility == Source.Credibility.UNASSESSED
                         for item in option_evidence
                     ),
                     "superseded_sources": sum(
-                        item.source_id is not None and item.source.status == Source.Status.SUPERSEDED
+                        item.source_id is not None
+                        and item.source.status == Source.Status.SUPERSEDED
                         for item in option_evidence
                     ),
                     "withdrawn_sources": sum(
@@ -136,9 +172,17 @@ def decision_analysis_workspace(*, decision, viewer) -> dict:
                 },
                 "assumptions": {
                     "total": len(option_assumptions),
-                    "unverified": sum(item.verification_status == Assumption.VerificationStatus.UNVERIFIED for item in option_assumptions),
-                    "invalidated": sum(item.verification_status == Assumption.VerificationStatus.INVALIDATED for item in option_assumptions),
-                    "low_confidence": sum(item.confidence == Assumption.Confidence.LOW for item in option_assumptions),
+                    "unverified": sum(
+                        item.verification_status == Assumption.VerificationStatus.UNVERIFIED
+                        for item in option_assumptions
+                    ),
+                    "invalidated": sum(
+                        item.verification_status == Assumption.VerificationStatus.INVALIDATED
+                        for item in option_assumptions
+                    ),
+                    "low_confidence": sum(
+                        item.confidence == Assumption.Confidence.LOW for item in option_assumptions
+                    ),
                     "overdue_review": sum(
                         item.review_date is not None and item.review_date < today
                         for item in option_assumptions
@@ -155,21 +199,43 @@ def decision_analysis_workspace(*, decision, viewer) -> dict:
                     ),
                 },
                 "stakeholders": {
-                    "support": sum(item.recommendation in {Position.Recommendation.SUPPORT, Position.Recommendation.SUPPORT_WITH_CONDITIONS} for item in option_positions),
-                    "conditional": sum(item.recommendation == Position.Recommendation.SUPPORT_WITH_CONDITIONS for item in option_positions),
-                    "high_confidence": sum(item.confidence == Position.Confidence.HIGH for item in option_positions),
+                    "support": sum(
+                        item.recommendation
+                        in {
+                            Position.Recommendation.SUPPORT,
+                            Position.Recommendation.SUPPORT_WITH_CONDITIONS,
+                        }
+                        for item in option_positions
+                    ),
+                    "conditional": sum(
+                        item.recommendation == Position.Recommendation.SUPPORT_WITH_CONDITIONS
+                        for item in option_positions
+                    ),
+                    "high_confidence": sum(
+                        item.confidence == Position.Confidence.HIGH for item in option_positions
+                    ),
                 },
                 "scenarios": {
                     "assessment_count": len(option_wind),
                     "average_robustness": round(mean(scores), 2) if scores else None,
                     "minimum_robustness": round(min(scores), 2) if scores else None,
-                    "vulnerability_count": sum(bool(item.vulnerabilities.strip()) for item in option_wind),
+                    "vulnerability_count": sum(
+                        bool(item.vulnerabilities.strip()) for item in option_wind
+                    ),
                     "mitigation_count": sum(bool(item.mitigations.strip()) for item in option_wind),
                 },
                 "evaluations": evaluation_by_option[str(option.id)],
                 "issues": {
-                    "open": sum(item.status in {DecisionIssue.Status.OPEN, DecisionIssue.Status.IN_PROGRESS} for item in option_issues),
-                    "critical": sum(item.severity == DecisionIssue.Severity.CRITICAL and item.status in {DecisionIssue.Status.OPEN, DecisionIssue.Status.IN_PROGRESS} for item in option_issues),
+                    "open": sum(
+                        item.status in {DecisionIssue.Status.OPEN, DecisionIssue.Status.IN_PROGRESS}
+                        for item in option_issues
+                    ),
+                    "critical": sum(
+                        item.severity == DecisionIssue.Severity.CRITICAL
+                        and item.status
+                        in {DecisionIssue.Status.OPEN, DecisionIssue.Status.IN_PROGRESS}
+                        for item in option_issues
+                    ),
                 },
             }
         )
@@ -179,8 +245,12 @@ def decision_analysis_workspace(*, decision, viewer) -> dict:
     general_risks = risks_by_option[None]
     general_issues = issues_by_option[None]
     signals = SignalDecisionLink.objects.filter(decision=decision).select_related("signal")
-    implications = StrategicImplication.objects.filter(linked_decision=decision).select_related("canvas", "owner")
-    minority_reports = MinorityReport.objects.filter(exercise__decision=decision, status=MinorityReport.Status.PUBLISHED).select_related("exercise", "author")
+    implications = StrategicImplication.objects.filter(linked_decision=decision).select_related(
+        "canvas", "owner"
+    )
+    minority_reports = MinorityReport.objects.filter(
+        exercise__decision=decision, status=MinorityReport.Status.PUBLISHED
+    ).select_related("exercise", "author")
     can_manage = can_manage_analysis(actor=viewer, decision=decision)
     review_queryset = DecisionQualityReview.objects.filter(decision=decision).exclude(
         status=DecisionQualityReview.Status.SUPERSEDED
@@ -207,9 +277,17 @@ def decision_analysis_workspace(*, decision, viewer) -> dict:
             "evidence": len(general_evidence),
             "assumptions": len(general_assumptions),
             "risks": len(general_risks),
-            "open_issues": sum(item.status in {DecisionIssue.Status.OPEN, DecisionIssue.Status.IN_PROGRESS} for item in general_issues),
-            "do_not_support_any": sum(item.recommendation == Position.Recommendation.DO_NOT_SUPPORT_ANY for item in positions),
-            "abstentions": sum(item.recommendation == Position.Recommendation.ABSTAIN for item in positions),
+            "open_issues": sum(
+                item.status in {DecisionIssue.Status.OPEN, DecisionIssue.Status.IN_PROGRESS}
+                for item in general_issues
+            ),
+            "do_not_support_any": sum(
+                item.recommendation == Position.Recommendation.DO_NOT_SUPPORT_ANY
+                for item in positions
+            ),
+            "abstentions": sum(
+                item.recommendation == Position.Recommendation.ABSTAIN for item in positions
+            ),
         },
         "foresight": {
             "linked_signals": [
@@ -235,13 +313,23 @@ def decision_analysis_workspace(*, decision, viewer) -> dict:
                 for item in implications
             ],
         },
-        "quality_review": None if latest_review is None else {
-            "id": str(latest_review.id), "version": latest_review.version, "status": latest_review.status,
-            "judgement": latest_review.judgement, "blockers": latest_review.blockers,
-            "conditions": latest_review.conditions, "published_at": latest_review.published_at,
+        "quality_review": None
+        if latest_review is None
+        else {
+            "id": str(latest_review.id),
+            "version": latest_review.version,
+            "status": latest_review.status,
+            "judgement": latest_review.judgement,
+            "blockers": latest_review.blockers,
+            "conditions": latest_review.conditions,
+            "published_at": latest_review.published_at,
         },
-        "executive_summary": None if latest_summary is None else {
-            "id": str(latest_summary.id), "version": latest_summary.version, "status": latest_summary.status,
+        "executive_summary": None
+        if latest_summary is None
+        else {
+            "id": str(latest_summary.id),
+            "version": latest_summary.version,
+            "status": latest_summary.status,
             "proposed_judgement": latest_summary.proposed_judgement,
             "approved_at": latest_summary.approved_at,
         },
@@ -259,8 +347,15 @@ def decision_analysis_workspace(*, decision, viewer) -> dict:
         ],
         "issue_summary": {
             "total": len(issues),
-            "open": sum(item.status in {DecisionIssue.Status.OPEN, DecisionIssue.Status.IN_PROGRESS} for item in issues),
-            "critical": sum(item.severity == DecisionIssue.Severity.CRITICAL and item.status in {DecisionIssue.Status.OPEN, DecisionIssue.Status.IN_PROGRESS} for item in issues),
+            "open": sum(
+                item.status in {DecisionIssue.Status.OPEN, DecisionIssue.Status.IN_PROGRESS}
+                for item in issues
+            ),
+            "critical": sum(
+                item.severity == DecisionIssue.Severity.CRITICAL
+                and item.status in {DecisionIssue.Status.OPEN, DecisionIssue.Status.IN_PROGRESS}
+                for item in issues
+            ),
         },
         "capabilities": {
             "can_manage": can_manage,

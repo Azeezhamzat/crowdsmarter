@@ -321,6 +321,13 @@ def test_delivery_sends_acceptance_link_without_persisting_token(
 
 
 @pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("locale", "subject_text", "body_text"),
+    [
+        ("fr", "Invitation à rejoindre", "Acceptez l'invitation"),
+        ("ar", "دعوة للانضمام", "اقبل الدعوة"),
+    ],
+)
 @override_settings(
     EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
     FRONTEND_BASE_URL="http://localhost:5173",
@@ -330,6 +337,9 @@ def test_delivery_translates_subject_and_body_under_active_locale(
     mailoutbox,
     user_factory,
     organisation_factory,
+    locale,
+    subject_text,
+    body_text,
 ):  # type: ignore[no-untyped-def]
     from django.utils import translation
 
@@ -342,11 +352,11 @@ def test_delivery_translates_subject_and_body_under_active_locale(
         role=Membership.Role.CONTRIBUTOR,
     )
 
-    with translation.override("fr"):
+    with translation.override(locale):
         deliver_invitation(invitation=invitation, raw_token=raw_token, actor=owner)
 
-    assert "Invitation à rejoindre" in mailoutbox[0].subject
-    assert "Acceptez l'invitation" in mailoutbox[0].body
+    assert subject_text in mailoutbox[0].subject
+    assert body_text in mailoutbox[0].body
 
 
 @pytest.mark.django_db

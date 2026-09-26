@@ -59,9 +59,7 @@ def test_ai_review_is_attributable_reviewable_and_does_not_change_decision(
 
 
 @pytest.mark.django_db
-def test_viewer_cannot_request_ai_review(
-    api_client, user_factory, decision_factory
-):  # type: ignore[no-untyped-def]
+def test_viewer_cannot_request_ai_review(api_client, user_factory, decision_factory):  # type: ignore[no-untyped-def]
     decision = decision_factory(status=Decision.Status.UNDER_REVIEW)
     viewer = user_factory()
     Membership.objects.create(
@@ -77,9 +75,7 @@ def test_viewer_cannot_request_ai_review(
 
 
 @pytest.mark.django_db
-def test_ai_review_is_tenant_isolated(
-    api_client, user_factory, decision_factory
-):  # type: ignore[no-untyped-def]
+def test_ai_review_is_tenant_isolated(api_client, user_factory, decision_factory):  # type: ignore[no-untyped-def]
     decision = decision_factory(status=Decision.Status.UNDER_REVIEW)
     review = AIReview.objects.create(
         organisation=decision.organisation,
@@ -99,9 +95,7 @@ def test_ai_review_is_tenant_isolated(
 
 
 @pytest.mark.django_db
-def test_completed_ai_review_can_be_dismissed_with_a_reason(
-    api_client, decision_factory
-):  # type: ignore[no-untyped-def]
+def test_completed_ai_review_can_be_dismissed_with_a_reason(api_client, decision_factory):  # type: ignore[no-untyped-def]
     decision = decision_factory(status=Decision.Status.UNDER_REVIEW)
     api_client.force_authenticate(decision.owner)
     create_url = reverse("ai_assistance:list-create", kwargs={"decision_id": decision.id})
@@ -128,9 +122,7 @@ def test_completed_ai_review_can_be_dismissed_with_a_reason(
 
 
 @pytest.mark.django_db
-def test_ai_review_request_rejects_unknown_input(
-    api_client, decision_factory
-):  # type: ignore[no-untyped-def]
+def test_ai_review_request_rejects_unknown_input(api_client, decision_factory):  # type: ignore[no-untyped-def]
     decision = decision_factory(status=Decision.Status.UNDER_REVIEW)
     api_client.force_authenticate(decision.owner)
     url = reverse("ai_assistance:list-create", kwargs={"decision_id": decision.id})
@@ -150,9 +142,7 @@ class FailingProvider:
 def test_provider_failure_is_safe_and_does_not_change_the_decision(
     api_client, decision_factory, monkeypatch
 ):  # type: ignore[no-untyped-def]
-    monkeypatch.setattr(
-        "apps.ai_assistance.services.get_provider", lambda: FailingProvider()
-    )
+    monkeypatch.setattr("apps.ai_assistance.services.get_provider", lambda: FailingProvider())
     decision = decision_factory(status=Decision.Status.UNDER_REVIEW)
     original_status = decision.status
     api_client.force_authenticate(decision.owner)

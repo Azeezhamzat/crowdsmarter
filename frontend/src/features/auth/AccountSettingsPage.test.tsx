@@ -1,14 +1,15 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { AccountSettingsPage } from "./AccountSettingsPage";
-import { beginMfaEnrollment, confirmMfaEnrollment, getMfaStatus } from "./api";
+import { beginMfaEnrollment, confirmMfaEnrollment, getMfaStatus, requestEmailChange } from "./api";
 
 vi.mock("./api", () => ({
   fetchCurrentUser: vi.fn().mockResolvedValue({ id: "user-1", email: "person@example.com", first_name: "Amina", last_name: "Yusuf", is_staff: true }),
   updateProfile: vi.fn(),
   changePassword: vi.fn(),
+  requestEmailChange: vi.fn(),
   getMfaStatus: vi.fn().mockResolvedValue({ is_enabled: false }),
   beginMfaEnrollment: vi.fn(),
   confirmMfaEnrollment: vi.fn(),
@@ -21,7 +22,7 @@ function renderPage() {
 }
 
 describe("AccountSettingsPage", () => {
-  it("keeps email read-only and validates password confirmation", async () => {
+  it("shows the current email and validates password confirmation", async () => {
     renderPage();
     expect(await screen.findByDisplayValue("person@example.com")).toHaveAttribute("readonly");
     expect(screen.getByRole("link", { name: /open system administration/i })).toHaveAttribute("href", "http://localhost:8000/admin/");
@@ -31,6 +32,28 @@ describe("AccountSettingsPage", () => {
     fireEvent.change(screen.getByLabelText("Confirm new password"), { target: { value: "different" } });
     fireEvent.click(screen.getByRole("button", { name: "Change password" }));
     expect(await screen.findByText("Passwords do not match.")).toBeInTheDocument();
+  });
+
+  it("requests verification before changing the sign-in email", async () => {
+    vi.mocked(requestEmailChange).mockResolvedValue({
+      detail: "Check the new email address for a verification link.",
+      development_verification_url: "http://localhost:5173/verify-email-change#token=abc123",
+    });
+    renderPage();
+
+    fireEvent.change(await screen.findByLabelText("New email address"), { target: { value: "new@example.com" } });
+    fireEvent.change(screen.getByLabelText("Confirm with current password"), { target: { value: "Current-password-123" } });
+    fireEvent.click(screen.getByRole("button", { name: "Verify new email" }));
+
+    await waitFor(() => expect(vi.mocked(requestEmailChange).mock.calls[0]?.[0]).toEqual({
+      new_email: "new@example.com",
+      current_password: "Current-password-123",
+    }));
+    expect(await screen.findByText(/current email remains active until you confirm/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /open the verification link/i })).toHaveAttribute(
+      "href",
+      "http://localhost:5173/verify-email-change#token=abc123",
+    );
   });
 
   it("walks through enrolling two-factor authentication", async () => {

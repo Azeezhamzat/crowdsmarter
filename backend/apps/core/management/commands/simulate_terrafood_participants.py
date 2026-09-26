@@ -38,11 +38,11 @@ from __future__ import annotations
 import random
 from datetime import timedelta
 
-from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils import timezone
 
+from apps.accounts.models import User
 from apps.assumptions.services import create_assumption
 from apps.collaboration.models import DiscussionEntry
 from apps.collaboration.services import create_discussion_entry
@@ -54,7 +54,12 @@ from apps.decisions.finalisation import finalise_decision
 from apps.decisions.models import Decision
 from apps.decisions.services import create_decision, transition_decision
 from apps.evaluations.models import EvaluationExercise, EvaluationRound
-from apps.evaluations.services import create_exercise, create_round, save_submission, transition_round
+from apps.evaluations.services import (
+    create_exercise,
+    create_round,
+    save_submission,
+    transition_round,
+)
 from apps.evidence.services import create_evidence
 from apps.ideation.models import Idea, OpenSession
 from apps.ideation.services import cast_vote, post_comment, submit_idea
@@ -64,11 +69,14 @@ from apps.participants.models import Participant
 from apps.participants.services import add_participant, declare_conflict, withdraw_conflict
 from apps.positions.models import Position
 from apps.positions.services import submit_position
-from apps.reviews.services import complete_outcome_review, open_outcome_review, record_commitment, start_implementation
+from apps.reviews.services import (
+    complete_outcome_review,
+    open_outcome_review,
+    record_commitment,
+    start_implementation,
+)
 from apps.risks.services import create_risk
 from apps.workspaces.models import Workspace
-
-User = get_user_model()
 
 ORG_SLUG = "terrafood-futures-institute-sim"
 LIFECYCLE_DECISION_TITLE = "Consolidate the 2027 regional partner network"
@@ -152,7 +160,9 @@ class Command(BaseCommand):
     help = "Simulate 20 TerraFood Futures Institute members participating at every decision-lifecycle stage."
 
     def add_arguments(self, parser):
-        parser.add_argument("--dry-run", action="store_true", help="Roll back all changes at the end.")
+        parser.add_argument(
+            "--dry-run", action="store_true", help="Roll back all changes at the end."
+        )
 
     def handle(self, *args, **options):
         dry_run = options["dry_run"]
@@ -214,7 +224,11 @@ class Command(BaseCommand):
         return people[:ADMIN_COUNT]
 
     def _role_for(self, i: int) -> str:
-        return [Participant.Role.DECISION_MAKER, Participant.Role.REVIEWER, Participant.Role.CONTRIBUTOR][i % 3]
+        return [
+            Participant.Role.DECISION_MAKER,
+            Participant.Role.REVIEWER,
+            Participant.Role.CONTRIBUTOR,
+        ][i % 3]
 
     def _ensure_participants(
         self, *, decision: Decision, people: list[User], actor: User, role_for
@@ -238,7 +252,9 @@ class Command(BaseCommand):
     def _stage_anticipate(self, org: Organisation, people: list[User]) -> None:
         self.stdout.write(self.style.MIGRATE_HEADING("Stage 1/5 - Anticipate (ideation)"))
         session = OpenSession.objects.get(
-            organisation=org, status=OpenSession.Status.OPEN, decision__isnull=False,
+            organisation=org,
+            status=OpenSession.Status.OPEN,
+            decision__isnull=False,
             title__icontains="2026 Community Impact Grant Round",
         )
         ideas: list[Idea] = []
@@ -260,7 +276,9 @@ class Command(BaseCommand):
             other_idea = ideas[index - 1]
             cast_vote(idea=other_idea, user=person)
             post_comment(idea=other_idea, user=person, body=random.choice(DISCUSSION_NOTES))
-        self.stdout.write(f"  {len(ideas)} ideas submitted; every person voted and commented on a peer's idea.")
+        self.stdout.write(
+            f"  {len(ideas)} ideas submitted; every person voted and commented on a peer's idea."
+        )
 
     # ------------------------------------------------------ decision creation
 
@@ -271,7 +289,9 @@ class Command(BaseCommand):
         if workspace is None:
             workspace = Workspace.objects.filter(organisation=org).order_by("created_at").first()
         if workspace is None:
-            raise CommandError(f"Organisation '{org.slug}' has no workspace to create a decision in.")
+            raise CommandError(
+                f"Organisation '{org.slug}' has no workspace to create a decision in."
+            )
 
         decision = create_decision(
             actor=admin0,
@@ -290,7 +310,9 @@ class Command(BaseCommand):
 
         # All 20 must be added while the decision is still draft - this is the
         # only window the real participant-management policy allows.
-        self._ensure_participants(decision=decision, people=people, actor=admin0, role_for=self._role_for)
+        self._ensure_participants(
+            decision=decision, people=people, actor=admin0, role_for=self._role_for
+        )
 
         transition_decision(
             actor=admin0,
@@ -306,13 +328,17 @@ class Command(BaseCommand):
             rationale="All 20 stakeholders are onboarded; opening for ordinary contribution.",
         )
         decision.refresh_from_db()
-        self.stdout.write(f"  Decision '{decision.title}' created with all {len(people)} participants, now open for contribution.")
+        self.stdout.write(
+            f"  Decision '{decision.title}' created with all {len(people)} participants, now open for contribution."
+        )
         return decision
 
     # ------------------------------------------------------------- 2. Deliberate
 
     def _stage_deliberate(self, decision: Decision, people: list[User], touched: dict) -> None:
-        self.stdout.write(self.style.MIGRATE_HEADING("Stage 2/5 - Deliberate (open for contribution)"))
+        self.stdout.write(
+            self.style.MIGRATE_HEADING("Stage 2/5 - Deliberate (open for contribution)")
+        )
         admin0, admin1 = self._admins(people)
 
         for person in people:
@@ -385,7 +411,9 @@ class Command(BaseCommand):
             request=request,
             body="Consultation notes summarised: strong support for transparent terms, concern about timelines.",
         )
-        review_submission(actor=reviewer, request=request, outcome="accepted", note="Clear and useful, thank you.")
+        review_submission(
+            actor=reviewer, request=request, outcome="accepted", note="Clear and useful, thank you."
+        )
 
         self.stdout.write(
             f"  {len(people)} discussion entries; "
@@ -407,7 +435,11 @@ class Command(BaseCommand):
         self.stdout.write(self.style.MIGRATE_HEADING("Stage 3/5 - Decide (under review)"))
         admin0, admin1 = self._admins(people)
 
-        active_options = list(decision.options.filter(status=DecisionOption.Status.ACTIVE).order_by("created_at", "id"))
+        active_options = list(
+            decision.options.filter(status=DecisionOption.Status.ACTIVE).order_by(
+                "created_at", "id"
+            )
+        )
         if not active_options:
             raise CommandError(f"Decision '{decision.title}' has no active options to decide over.")
 
@@ -418,7 +450,9 @@ class Command(BaseCommand):
             submit_position(
                 actor=person,
                 decision=decision,
-                preferred_option_id=None if recommendation == "abstain" else random.choice(active_options).id,
+                preferred_option_id=None
+                if recommendation == "abstain"
+                else random.choice(active_options).id,
                 recommendation=recommendation,
                 rationale=random.choice(POSITION_BODIES),
                 confidence=random.choice(["low", "medium", "medium", "high"]),
@@ -445,7 +479,7 @@ class Command(BaseCommand):
             random.shuffle(ranks)
             responses = [
                 {"option_id": option.id, "rank": rank, "rationale": random.choice(RANK_RATIONALES)}
-                for option, rank in zip(active_options, ranks)
+                for option, rank in zip(active_options, ranks, strict=False)
             ]
             save_submission(
                 actor=person,
@@ -455,7 +489,12 @@ class Command(BaseCommand):
                 responses=responses,
                 submit=True,
             )
-        transition_round(actor=admin0, round=round_, status=EvaluationRound.Status.CLOSED, feedback_summary="All 20 stakeholders returned a complete ballot.")
+        transition_round(
+            actor=admin0,
+            round=round_,
+            status=EvaluationRound.Status.CLOSED,
+            feedback_summary="All 20 stakeholders returned a complete ballot.",
+        )
 
         # Evidence + a non-invalidated assumption, required before review can complete.
         create_evidence(
@@ -574,7 +613,9 @@ class Command(BaseCommand):
                 body=random.choice(LESSON_NOTES),
             )
             touched["learn"].add(person.id)
-        for admin_person, category in zip(self._admins(people), ["process", "stakeholder"]):
+        for admin_person, category in zip(
+            self._admins(people), ["process", "stakeholder"], strict=False
+        ):
             create_lesson(
                 actor=admin_person,
                 decision=decision,
@@ -592,12 +633,16 @@ class Command(BaseCommand):
         self, org: Organisation, decision: Decision, people: list[User], touched: dict
     ) -> None:
         anticipate = Decision.objects.get(
-            organisation=org, status=Decision.Status.DRAFT, title__icontains="2026 Community Impact Grant Round"
+            organisation=org,
+            status=Decision.Status.DRAFT,
+            title__icontains="2026 Community Impact Grant Round",
         )
 
         gaps = []
         for person in people:
-            if not Idea.objects.filter(session__decision=anticipate, submitted_by_user=person).exists():
+            if not Idea.objects.filter(
+                session__decision=anticipate, submitted_by_user=person
+            ).exists():
                 gaps.append((person.email, "anticipate"))
             if person.id not in touched["deliberate"]:
                 gaps.append((person.email, "deliberate"))
@@ -609,4 +654,8 @@ class Command(BaseCommand):
                 gaps.append((person.email, "learn"))
         if gaps:
             raise CommandError(f"Coverage gaps found (person, stage): {gaps}")
-        self.stdout.write(self.style.SUCCESS("Verified: all 20 people have a real interaction at every one of the 5 stages."))
+        self.stdout.write(
+            self.style.SUCCESS(
+                "Verified: all 20 people have a real interaction at every one of the 5 stages."
+            )
+        )

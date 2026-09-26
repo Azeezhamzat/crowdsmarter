@@ -1,7 +1,7 @@
 {
   "name": "CrowdSmarter",
   "short_name": "CrowdSmarter",
-  "description": "Foresight. Collective intelligence. Decisions.",
+  "description": "Facilitation for accountable collective decisions, supported by a connected platform.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#FFFDF8",

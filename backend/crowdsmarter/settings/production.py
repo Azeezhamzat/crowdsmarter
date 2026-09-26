@@ -10,6 +10,10 @@ DEBUG = False
 
 if not SECRET_KEY:  # noqa: F405
     raise ImproperlyConfigured("DJANGO_SECRET_KEY must be set in production.")
+if not MFA_ENCRYPTION_KEY:  # noqa: F405
+    raise ImproperlyConfigured("MFA_ENCRYPTION_KEY must be set in production.")
+if MFA_ENCRYPTION_KEY == SECRET_KEY:  # noqa: F405
+    raise ImproperlyConfigured("MFA_ENCRYPTION_KEY must be distinct from DJANGO_SECRET_KEY.")
 if not os.getenv("DJANGO_ALLOWED_HOSTS"):
     raise ImproperlyConfigured("DJANGO_ALLOWED_HOSTS must be set in production.")
 if not os.getenv("DATABASE_URL"):

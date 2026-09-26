@@ -138,10 +138,7 @@ class Position(UUIDTimeStampedModel):
                 errors["organisation"] = "The participant must share the organisation."
             if self.submitted_by_id != self.participant.user_id:
                 errors["submitted_by"] = "A participant may submit only their own position."
-            if (
-                self._state.adding
-                and self.participant_role != self.participant.role
-            ):
+            if self._state.adding and self.participant_role != self.participant.role:
                 errors["participant_role"] = (
                     "The recorded role must match the participant role at submission."
                 )

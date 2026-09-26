@@ -18,8 +18,11 @@ class CanManageInvitations(BasePermission):
         obj: Organisation | OrganisationInvitation,
     ) -> bool:
         organisation = obj.organisation if isinstance(obj, OrganisationInvitation) else obj
+        user_id = request.user.pk
+        if user_id is None:
+            return False
         membership = organisation.memberships.filter(
-            user=request.user,
+            user_id=user_id,
             status=Membership.Status.ACTIVE,
         ).first()
         if membership is None or organisation.status != Organisation.Status.ACTIVE:

@@ -2,10 +2,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   createSignal,
+  createResearchClaim,
   getForesightOverview,
   linkSignalToDecision,
+  linkSourceToResearchClaim,
   syncFeed,
   uploadSourceAttachment,
+  updateResearchClaim,
   createForesightCanvas,
   createScenarioSet,
   assessScenarioOption,
@@ -21,6 +24,11 @@ function jsonResponse(payload: unknown): Response {
     status: 200,
     headers: { "content-type": "application/json" },
   });
+}
+
+function parseRequestBody(body: BodyInit | null | undefined): unknown {
+  expect(typeof body).toBe("string");
+  return JSON.parse(typeof body === "string" ? body : "{}");
 }
 
 describe("foresight API contracts", () => {
@@ -66,14 +74,54 @@ describe("foresight API contracts", () => {
       "This may change the option assumptions.",
     );
 
-    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toMatchObject({
+    expect(parseRequestBody(fetchMock.mock.calls[0]?.[1]?.body)).toMatchObject({
       summary: "What is happening now",
       future_implication: "Why it may matter later",
     });
-    expect(JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body))).toEqual({
+    expect(parseRequestBody(fetchMock.mock.calls[1]?.[1]?.body)).toEqual({
       decision_id: "decision-1",
       relevance: "This may change the option assumptions.",
     });
+  });
+
+  it("keeps research claims, scoring, and contrary evidence explicit", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(jsonResponse({ id: "claim-1" }))
+      .mockResolvedValueOnce(jsonResponse({ id: "claim-1" }))
+      .mockResolvedValueOnce(jsonResponse({ id: "claim-1" }));
+
+    await createResearchClaim("organisation-1", {
+      statement: "Hybrid participation reduces access barriers.",
+      state: "plausible",
+      authority_score: 3,
+      directness_score: 2,
+      recency_score: 2,
+      triangulation_score: 1,
+      reversal_conditions: "A pilot shows no improvement in participation diversity.",
+    });
+    await linkSourceToResearchClaim("claim-1", {
+      source_id: "source-1",
+      relationship: "contradicts",
+      note: "Documents barriers that remain after hybrid delivery.",
+    });
+    await updateResearchClaim("claim-1", { recommendation: "monitor" });
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      "/api/v1/organisations/organisation-1/foresight/research-claims/",
+    );
+    expect(parseRequestBody(fetchMock.mock.calls[0]?.[1]?.body)).toMatchObject({
+      statement: "Hybrid participation reduces access barriers.",
+      authority_score: 3,
+      reversal_conditions: "A pilot shows no improvement in participation diversity.",
+    });
+    expect(parseRequestBody(fetchMock.mock.calls[1]?.[1]?.body)).toEqual({
+      source_id: "source-1",
+      relationship: "contradicts",
+      note: "Documents barriers that remain after hybrid delivery.",
+    });
+    expect(fetchMock.mock.calls[2]?.[0]).toBe(
+      "/api/v1/foresight/research-claims/claim-1/",
+    );
   });
 
   it("creates systems canvases through a tenant-scoped command", async () => {

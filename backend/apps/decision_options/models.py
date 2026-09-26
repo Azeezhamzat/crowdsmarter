@@ -49,16 +49,23 @@ class DecisionOption(UUIDTimeStampedModel):
     tradeoffs = models.TextField(blank=True)
     is_status_quo = models.BooleanField(default=False)
     estimated_cost = models.DecimalField(
-        max_digits=14, decimal_places=2, null=True, blank=True,
+        max_digits=14,
+        decimal_places=2,
+        null=True,
+        blank=True,
         help_text="Estimated cost in the organisation's reporting currency.",
     )
     cost_notes = models.TextField(blank=True)
     resource_notes = models.TextField(blank=True)
     implementation_time_estimate = models.CharField(
-        max_length=120, blank=True, help_text="Plain-language estimate, e.g. '3-6 months'.",
+        max_length=120,
+        blank=True,
+        help_text="Plain-language estimate, e.g. '3-6 months'.",
     )
     reversibility = models.CharField(
-        max_length=30, choices=Reversibility.choices, blank=True,
+        max_length=30,
+        choices=Reversibility.choices,
+        blank=True,
     )
     is_experiment = models.BooleanField(
         default=False,
@@ -66,11 +73,16 @@ class DecisionOption(UUIDTimeStampedModel):
     )
     experiment_notes = models.TextField(blank=True)
     depends_on = models.ManyToManyField(
-        "self", symmetrical=False, related_name="required_by", blank=True,
+        "self",
+        symmetrical=False,
+        related_name="required_by",
+        blank=True,
         help_text="Options that must also be adopted for this option to work.",
     )
     mutually_exclusive_with = models.ManyToManyField(
-        "self", symmetrical=True, blank=True,
+        "self",
+        symmetrical=True,
+        blank=True,
         help_text="Options that cannot be selected together with this one.",
     )
     status = models.CharField(
@@ -116,7 +128,10 @@ class DecisionOption(UUIDTimeStampedModel):
         default=OutcomeStatus.PENDING,
     )
     awarded_amount = models.DecimalField(
-        max_digits=14, decimal_places=2, null=True, blank=True,
+        max_digits=14,
+        decimal_places=2,
+        null=True,
+        blank=True,
         help_text="Amount funded, only meaningful once outcome_status is 'funded'.",
     )
     outcome_note = models.TextField(blank=True)
@@ -137,15 +152,15 @@ class DecisionOption(UUIDTimeStampedModel):
                 name="decision_option_title_not_empty",
             ),
             models.CheckConstraint(
-                condition=models.Q(status__in=['active', 'withdrawn']),
+                condition=models.Q(status__in=["active", "withdrawn"]),
                 name="decision_option_status_valid",
             ),
             models.CheckConstraint(
-                condition=models.Q(eligibility_status__in=['pending', 'eligible', 'ineligible']),
+                condition=models.Q(eligibility_status__in=["pending", "eligible", "ineligible"]),
                 name="decision_option_eligibility_status_valid",
             ),
             models.CheckConstraint(
-                condition=models.Q(outcome_status__in=['pending', 'funded', 'declined']),
+                condition=models.Q(outcome_status__in=["pending", "funded", "declined"]),
                 name="decision_option_outcome_status_valid",
             ),
             models.UniqueConstraint(
@@ -193,7 +208,10 @@ class DecisionOption(UUIDTimeStampedModel):
             self.eligibility_decided_at or self.eligibility_decided_by_id
         ):
             raise ValidationError("Pending eligibility cannot contain decision metadata.")
-        if self.eligibility_status != self.EligibilityStatus.PENDING and not self.eligibility_decided_at:
+        if (
+            self.eligibility_status != self.EligibilityStatus.PENDING
+            and not self.eligibility_decided_at
+        ):
             raise ValidationError("A decided eligibility status requires a decision timestamp.")
         if self.outcome_status == self.OutcomeStatus.PENDING and (
             self.outcome_decided_at or self.outcome_decided_by_id or self.awarded_amount is not None
@@ -242,7 +260,9 @@ class DecisionOption(UUIDTimeStampedModel):
         else:
             self.outcome_decided_at = timezone.now()
             self.outcome_decided_by = actor
-            self.awarded_amount = awarded_amount if outcome_status == self.OutcomeStatus.FUNDED else None
+            self.awarded_amount = (
+                awarded_amount if outcome_status == self.OutcomeStatus.FUNDED else None
+            )
 
     def __str__(self) -> str:
         return f"{self.decision.title}: {self.title}"

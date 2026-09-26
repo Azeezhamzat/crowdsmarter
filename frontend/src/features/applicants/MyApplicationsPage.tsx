@@ -11,10 +11,9 @@ import { StatusMessage } from "../../components/StatusMessage";
 import { ApiError } from "../../lib/api";
 import type { MyApplication } from "../../lib/types";
 import {
-  clearApplicantToken,
   consumeMagicLink,
   getMyApplications,
-  getStoredApplicantToken,
+  logoutApplicantSession,
   requestMagicLink,
   submitProgressReport,
 } from "./api";
@@ -115,30 +114,30 @@ export function MyApplicationsPage() {
   const queryKey = ["my-applications"];
   const location = useLocation();
   const navigate = useNavigate();
-  const [hasToken, setHasToken] = useState(() => Boolean(getStoredApplicantToken()));
+  const [signedOut, setSignedOut] = useState(false);
   const [linkRequested, setLinkRequested] = useState(false);
+  const magicLinkToken = location.hash.match(/token=([^&]+)/)?.[1];
 
   const consume = useMutation({
     mutationFn: (token: string) => consumeMagicLink(token),
     onSuccess: async () => {
-      setHasToken(true);
-      navigate(location.pathname, { replace: true });
+      setSignedOut(false);
+      await navigate(location.pathname, { replace: true });
       await queryClient.invalidateQueries({ queryKey });
     },
   });
 
   useEffect(() => {
-    const match = location.hash.match(/token=([^&]+)/);
-    if (match?.[1]) {
-      consume.mutate(decodeURIComponent(match[1]));
+    if (magicLinkToken) {
+      consume.mutate(decodeURIComponent(magicLinkToken));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.hash]);
+  }, [magicLinkToken]);
 
   const applications = useQuery({
     queryKey,
     queryFn: getMyApplications,
-    enabled: hasToken,
+    enabled: !signedOut && !magicLinkToken && !consume.isPending,
   });
 
   const requestForm = useForm<RequestForm>({ resolver: zodResolver(requestSchema), defaultValues: { email: "", name: "" } });
@@ -152,18 +151,23 @@ export function MyApplicationsPage() {
     onSuccess: (data) => queryClient.setQueryData(queryKey, data),
   });
 
-  const signOut = () => {
-    clearApplicantToken();
-    setHasToken(false);
-    queryClient.removeQueries({ queryKey });
-  };
+  const signOut = useMutation({
+    mutationFn: logoutApplicantSession,
+    onSuccess: () => {
+      setSignedOut(true);
+      queryClient.removeQueries({ queryKey });
+    },
+  });
+  const sessionMissing =
+    signedOut ||
+    (applications.error instanceof ApiError && applications.error.status === 403);
 
   return (
     <main id="main-content" className="my-applications-page" tabIndex={-1}>
       <header className="demo-request-header">
         <Link className="public-brand" to="/" aria-label="CrowdSmarter home">
           <LogoMark size={38} />
-          <span><strong>CrowdSmarter</strong><small>Foresight. Collective intelligence. Decisions.</small></span>
+          <span><strong>CrowdSmarter</strong><small>Facilitation. Systems. Collective intelligence.</small></span>
         </Link>
       </header>
 
@@ -182,7 +186,7 @@ export function MyApplicationsPage() {
         </StatusMessage>
       ) : null}
 
-      {!hasToken && !consume.isPending ? (
+      {sessionMissing && !consume.isPending ? (
         <section className="open-session-join" aria-label="Sign in to view your applications">
           {linkRequested ? (
             <StatusMessage kind="info">
@@ -212,11 +216,11 @@ export function MyApplicationsPage() {
         </section>
       ) : null}
 
-      {hasToken ? (
+      {!sessionMissing && !magicLinkToken ? (
         <>
           <div className="my-applications-page__toolbar">
-            <button className="button button--link button--compact" type="button" onClick={signOut}>
-              Sign out
+            <button className="button button--link button--compact" type="button" onClick={() => signOut.mutate()} disabled={signOut.isPending}>
+              {signOut.isPending ? "Signing out…" : "Sign out"}
             </button>
           </div>
           {applications.isPending ? <p>Loading your applications…</p> : null}

@@ -1,8 +1,11 @@
 """Thin REST endpoints for source and signal intelligence."""
 
+from django.conf import settings
 from django.db.models import Count
 from django.http import FileResponse
+from django.utils import timezone
 from rest_framework import status
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -10,12 +13,14 @@ from rest_framework.views import APIView
 
 from apps.organisations.selectors import organisation_for_user
 
-from .models import Signal
+from .models import Signal, SourceAttachment
 from .policies import can_contribute
 from .selectors import (
     attachment_for_user,
     feed_for_user,
     feeds_for_organisation,
+    research_claim_for_user,
+    research_claims_for_organisation,
     signal_for_user,
     signals_for_organisation,
     source_for_user,
@@ -26,6 +31,10 @@ from .selectors import (
 from .serializers import (
     FeedSubscriptionSerializer,
     FeedSubscriptionWriteSerializer,
+    ResearchClaimPatchSerializer,
+    ResearchClaimSerializer,
+    ResearchClaimSourceWriteSerializer,
+    ResearchClaimWriteSerializer,
     SignalDecisionLinkSerializer,
     SignalPatchSerializer,
     SignalSerializer,
@@ -39,22 +48,26 @@ from .serializers import (
     WatchlistSignalSerializer,
     WatchlistWriteSerializer,
 )
-from .throttles import ForesightFeedSyncThrottle
 from .services import (
     add_signal_to_watchlist,
-    create_feed_subscription,
     attach_source_file,
+    create_feed_subscription,
+    create_research_claim,
     create_signal,
     create_source,
     create_watchlist,
     link_signal_to_decision,
+    link_source_to_research_claim,
     record_source_attachment_download,
     remove_signal_from_watchlist,
     sync_feed_subscription,
+    unlink_source_from_research_claim,
+    update_research_claim,
     update_signal,
     update_source,
     update_watchlist,
 )
+from .throttles import ForesightFeedSyncThrottle
 
 
 class FeedSubscriptionListCreateView(APIView):
@@ -100,7 +113,9 @@ class ForesightOverviewView(APIView):
 
     def get(self, request, organisation_id):  # type: ignore[no-untyped-def]
         organisation = organisation_for_user(user=request.user, organisation_id=organisation_id)
-        base = Signal.objects.filter(organisation=organisation).exclude(status=Signal.Status.RETIRED)
+        base = Signal.objects.filter(organisation=organisation).exclude(
+            status=Signal.Status.RETIRED
+        )
         by_steep = {
             item["steep_category"]: item["count"]
             for item in base.values("steep_category").annotate(count=Count("id"))
@@ -113,6 +128,16 @@ class ForesightOverviewView(APIView):
             {
                 "signal_count": base.count(),
                 "source_count": organisation.foresight_sources.filter(status="active").count(),
+                "claim_count": organisation.research_claims.exclude(
+                    lifecycle_status="retired"
+                ).count(),
+                "claims_due_for_review": organisation.research_claims.filter(
+                    lifecycle_status="active", review_due_on__lte=timezone.localdate()
+                ).count(),
+                "claims_with_evidence_gaps": sum(
+                    claim.evidence_score < 6
+                    for claim in organisation.research_claims.filter(lifecycle_status="active")
+                ),
                 "watchlist_count": organisation.foresight_watchlists.filter(is_active=True).count(),
                 "canvas_count": organisation.foresight_canvases.exclude(status="archived").count(),
                 "high_attention_count": base.filter(impact__gte=4, uncertainty__gte=4).count(),
@@ -139,7 +164,9 @@ class SourceListCreateView(APIView):
         organisation = organisation_for_user(user=request.user, organisation_id=organisation_id)
         serializer = SourceWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        item = create_source(actor=request.user, organisation=organisation, **serializer.validated_data)
+        item = create_source(
+            actor=request.user, organisation=organisation, **serializer.validated_data
+        )
         return Response(
             SourceSerializer(item, context={"request": request}).data,
             status=status.HTTP_201_CREATED,
@@ -157,7 +184,9 @@ class SourceDetailView(APIView):
         item = source_for_user(user=request.user, source_id=source_id)
         serializer = SourcePatchSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        item = update_source(actor=request.user, source=item, fields=dict(serializer.validated_data))
+        item = update_source(
+            actor=request.user, source=item, fields=dict(serializer.validated_data)
+        )
         return Response(SourceSerializer(item, context={"request": request}).data)
 
 
@@ -169,7 +198,9 @@ class SourceAttachmentUploadView(APIView):
         item = source_for_user(user=request.user, source_id=source_id)
         upload = request.FILES.get("file")
         if upload is None:
-            return Response({"file": ["Choose a file to upload."]}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"file": ["Choose a file to upload."]}, status=status.HTTP_400_BAD_REQUEST
+            )
         attachment = attach_source_file(actor=request.user, source=item, upload=upload)
         return Response(
             SourceAttachmentSerializer(attachment).data,
@@ -182,6 +213,11 @@ class SourceAttachmentDownloadView(APIView):
 
     def get(self, request, attachment_id):  # type: ignore[no-untyped-def]
         attachment = attachment_for_user(user=request.user, attachment_id=attachment_id)
+        if (
+            getattr(settings, "SOURCE_ATTACHMENT_ENFORCE_CLEAN_DOWNLOADS", False)
+            and attachment.malware_scan_status != SourceAttachment.ScanStatus.CLEAN
+        ):
+            raise PermissionDenied("This file is unavailable until malware scanning succeeds.")
         file_handle = attachment.file.open("rb")
         record_source_attachment_download(actor=request.user, attachment=attachment)
         response = FileResponse(
@@ -193,6 +229,71 @@ class SourceAttachmentDownloadView(APIView):
         response["Cache-Control"] = "private, no-store"
         response["X-Content-Type-Options"] = "nosniff"
         return response
+
+
+class ResearchClaimListCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, organisation_id):  # type: ignore[no-untyped-def]
+        items = research_claims_for_organisation(
+            user=request.user,
+            organisation_id=organisation_id,
+            query=request.query_params.get("q", "").strip(),
+            state=request.query_params.get("state", "").strip(),
+            recommendation=request.query_params.get("recommendation", "").strip(),
+            lifecycle_status=request.query_params.get("lifecycle_status", "").strip(),
+        )
+        return Response(
+            ResearchClaimSerializer(items, many=True, context={"request": request}).data
+        )
+
+    def post(self, request, organisation_id):  # type: ignore[no-untyped-def]
+        organisation = organisation_for_user(user=request.user, organisation_id=organisation_id)
+        serializer = ResearchClaimWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        item = create_research_claim(
+            actor=request.user, organisation=organisation, **serializer.validated_data
+        )
+        item = research_claim_for_user(user=request.user, claim_id=item.id)
+        return Response(
+            ResearchClaimSerializer(item, context={"request": request}).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class ResearchClaimDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, claim_id):  # type: ignore[no-untyped-def]
+        item = research_claim_for_user(user=request.user, claim_id=claim_id)
+        return Response(ResearchClaimSerializer(item, context={"request": request}).data)
+
+    def patch(self, request, claim_id):  # type: ignore[no-untyped-def]
+        item = research_claim_for_user(user=request.user, claim_id=claim_id)
+        serializer = ResearchClaimPatchSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        item = update_research_claim(
+            actor=request.user, claim=item, fields=dict(serializer.validated_data)
+        )
+        item = research_claim_for_user(user=request.user, claim_id=item.id)
+        return Response(ResearchClaimSerializer(item, context={"request": request}).data)
+
+
+class ResearchClaimSourceView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, claim_id):  # type: ignore[no-untyped-def]
+        item = research_claim_for_user(user=request.user, claim_id=claim_id)
+        serializer = ResearchClaimSourceWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        link_source_to_research_claim(actor=request.user, claim=item, **serializer.validated_data)
+        item = research_claim_for_user(user=request.user, claim_id=claim_id)
+        return Response(ResearchClaimSerializer(item, context={"request": request}).data)
+
+    def delete(self, request, claim_id, source_id):  # type: ignore[no-untyped-def]
+        item = research_claim_for_user(user=request.user, claim_id=claim_id)
+        unlink_source_from_research_claim(actor=request.user, claim=item, source_id=source_id)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class SignalListCreateView(APIView):
@@ -214,7 +315,9 @@ class SignalListCreateView(APIView):
         organisation = organisation_for_user(user=request.user, organisation_id=organisation_id)
         serializer = SignalWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        item = create_signal(actor=request.user, organisation=organisation, **serializer.validated_data)
+        item = create_signal(
+            actor=request.user, organisation=organisation, **serializer.validated_data
+        )
         return Response(
             SignalSerializer(item, context={"request": request}).data,
             status=status.HTTP_201_CREATED,
@@ -232,7 +335,9 @@ class SignalDetailView(APIView):
         item = signal_for_user(user=request.user, signal_id=signal_id)
         serializer = SignalPatchSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        item = update_signal(actor=request.user, signal=item, fields=dict(serializer.validated_data))
+        item = update_signal(
+            actor=request.user, signal=item, fields=dict(serializer.validated_data)
+        )
         return Response(SignalSerializer(item, context={"request": request}).data)
 
 
@@ -259,7 +364,9 @@ class WatchlistListCreateView(APIView):
         organisation = organisation_for_user(user=request.user, organisation_id=organisation_id)
         serializer = WatchlistWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        item = create_watchlist(actor=request.user, organisation=organisation, **serializer.validated_data)
+        item = create_watchlist(
+            actor=request.user, organisation=organisation, **serializer.validated_data
+        )
         item.signal_count = 0
         return Response(
             WatchlistSerializer(item, context={"request": request}).data,
@@ -278,7 +385,9 @@ class WatchlistDetailView(APIView):
         item = watchlist_for_user(user=request.user, watchlist_id=watchlist_id)
         serializer = WatchlistPatchSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        item = update_watchlist(actor=request.user, watchlist=item, fields=dict(serializer.validated_data))
+        item = update_watchlist(
+            actor=request.user, watchlist=item, fields=dict(serializer.validated_data)
+        )
         item.signal_count = item.signal_links.count()
         return Response(WatchlistSerializer(item, context={"request": request}).data)
 

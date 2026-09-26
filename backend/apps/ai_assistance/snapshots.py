@@ -84,9 +84,9 @@ def build_decision_snapshot(*, decision: Decision) -> dict[str, Any]:
         )
     )
     risks = list(
-        Risk.objects.filter(decision=decision).exclude(
-            status=Risk.Status.CLOSED
-        ).values(
+        Risk.objects.filter(decision=decision)
+        .exclude(status=Risk.Status.CLOSED)
+        .values(
             "id",
             "option_id",
             "title",
@@ -119,9 +119,7 @@ def build_decision_snapshot(*, decision: Decision) -> dict[str, Any]:
         decision_id__in=[item.id for item in prior],
         status=Lesson.Status.ACTIVE,
     ).values("decision_id", "title"):
-        lessons_by_decision.setdefault(str(lesson["decision_id"]), []).append(
-            lesson["title"]
-        )
+        lessons_by_decision.setdefault(str(lesson["decision_id"]), []).append(lesson["title"])
     for item in prior:
         historical_decisions.append(
             {

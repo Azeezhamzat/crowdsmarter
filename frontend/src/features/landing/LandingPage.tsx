@@ -1,7 +1,6 @@
 import { Link } from "react-router";
 
 import { Icon, type IconName } from "../../components/Icon";
-import { LanguageSwitcher } from "../../components/LanguageSwitcher";
 import { LogoMark } from "../../components/Logo";
 import { buildMailto, contactChannels } from "../../config/contact";
 import { useLocale, useTranslations } from "../../lib/i18n";
@@ -9,9 +8,9 @@ import { landingCatalog } from "../../lib/catalogs/landing";
 import { HeroVideo } from "./HeroVideo";
 
 const heroTitleByLocale = {
-  en: <>Decide together,<br />in a commons<br /><span>everyone can see.</span></>,
+  en: <>Make difficult decisions{" "}<br />together, with a process{" "}<br /><span>people can trust.</span></>,
   fr: <>Décidez ensemble,<br />dans un commun<br /><span>que chacun peut voir.</span></>,
-  pt: <>Decidam juntos,<br />num comum<br /><span>que todos podem ver.</span></>,
+  ar: <>قرّروا معاً،<br />في مساحة مشتركة<br /><span>يمكن للجميع رؤيتها.</span></>,
 };
 
 const lifecycleStages = [
@@ -37,18 +36,18 @@ const lifecycleStages = [
   },
 ];
 
-const freeStartJourney = [
+const startJourney = [
   {
-    title: "Sign up free",
-    description: "Create your account and your commons in a couple of minutes. No card required.",
+    title: "Frame the decision",
+    description: "Work with a facilitator to clarify the purpose, the people affected, the decision criteria, and who holds authority.",
   },
   {
-    title: "Bring your group",
-    description: "Share one link. Anyone can join, contribute a signal or a submission, and vote, with no account needed on their side.",
+    title: "Convene the right people",
+    description: "Bring evidence and different perspectives into a process designed for meaningful participation rather than performative consultation.",
   },
   {
-    title: "Decide, together",
-    description: "Move from open contribution to a recorded, accountable decision, then carry what you learned into the next one.",
+    title: "Reach an accountable decision",
+    description: "Make the judgement, explain the reasoning, and keep a usable record of disagreement, commitments, and what happens next.",
   },
 ];
 
@@ -131,7 +130,7 @@ export function LandingPage() {
       <header className="public-header public-header--executive">
         <Link className="public-brand" to="/" aria-label="CrowdSmarter home">
           <LogoMark size={38} />
-          <span><strong>CrowdSmarter</strong><small>Systems. Futures. Collective intelligence.</small></span>
+          <span><strong>CrowdSmarter</strong><small>Facilitation. Systems. Collective intelligence.</small></span>
         </Link>
         <nav className="public-nav public-nav--executive" aria-label="Primary navigation">
           <a href="#platform">{t.navPlatform}</a>
@@ -140,10 +139,9 @@ export function LandingPage() {
           <a href="#trust">{t.navTrust}</a>
         </nav>
         <div className="public-header__actions">
-          <LanguageSwitcher />
           <Link className="public-nav__signin" to="/login">{t.signIn}</Link>
-          <Link className="public-button public-button--secondary" to="/request-demo">{t.bookAssessment}</Link>
-          <Link className="public-button public-button--primary public-header__demo" to="/signup">{t.startFreeCta}</Link>
+          <Link className="public-button public-button--secondary public-header__signup" to="/signup">{t.startCta}</Link>
+          <Link className="public-button public-button--primary public-header__demo" to="/request-demo">{t.bookAssessment}</Link>
         </div>
       </header>
 
@@ -152,19 +150,19 @@ export function LandingPage() {
           eyebrow={t.heroEyebrow}
           title={heroTitleByLocale[locale]}
           lead={t.heroLead}
-          primaryCta={{ label: t.startFreeCta, href: "/signup" }}
+          primaryCta={{ label: t.bookAssessment, href: "/request-demo" }}
           secondaryCta={{ label: t.heroSecondaryCta, href: "#how-it-works" }}
           trustItems={[t.trustItem1, t.trustItem2, t.trustItem3]}
         />
 
-        <section className="proof-strip" aria-label="Product foundation">
+        <section className="proof-strip" aria-label="Approach foundation">
           <p className="public-eyebrow">{t.proofEyebrow}</p>
           <p>{t.proofBody}</p>
         </section>
 
         <section className="public-section public-section--platform" id="platform" aria-labelledby="platform-title">
           <div className="section-intro section-intro--split section-intro--executive">
-            <div><p className="public-eyebrow">The process</p><h2 id="platform-title">Any group's decision, as a connected system.</h2></div>
+            <div><p className="public-eyebrow">The facilitation process</p><h2 id="platform-title">A facilitated decision, supported by a connected system.</h2></div>
             <p>
               Each stage carries evidence forward. The aim is not simply to move a decision through a workflow,
               but to keep participation, assessment, judgement, and learning connected from one decision to the next.
@@ -183,14 +181,13 @@ export function LandingPage() {
 
         <section className="public-section public-section--dark" id="how-it-works" aria-labelledby="how-it-works-title">
           <div className="section-intro section-intro--split section-intro--executive">
-            <div><p className="public-eyebrow">Getting started</p><h2 id="how-it-works-title">Free to start, no institution required.</h2></div>
+            <div><p className="public-eyebrow">How we work</p><h2 id="how-it-works-title">Facilitation comes first. The platform supports continuity.</h2></div>
             <p>
-              Most groups start on their own, with no sales conversation. The three steps below are the
-              whole process.
+              The engagement is shaped around the decision and the people involved. Technology supports the process without becoming the process.
             </p>
           </div>
           <div className="commercial-journey">
-            {freeStartJourney.map((step, index) => (
+            {startJourney.map((step, index) => (
               <article className="commercial-journey__step" key={step.title}>
                 <span>{index + 1}</span>
                 <div><h3>{step.title}</h3><p>{step.description}</p></div>
@@ -200,8 +197,8 @@ export function LandingPage() {
           <div className="pilot-panel">
             <div className="pilot-panel__copy">
               <p className="public-eyebrow">For funders and institutions</p>
-              <h3>Prefer a guided rollout? Run a charter grant round.</h3>
-              <p>Charter programmes provide a bounded setting to run the method, refine the platform, and leave your organisation with a completed round and a reusable process. This is the path for an institution running a funded grant round, not a requirement for starting a commons.</p>
+              <h3>Run a facilitated charter grant round.</h3>
+              <p>Charter programmes provide a bounded engagement to apply the method to a real funding decision. Facilitation leads the work; the platform supports participation, assessment, traceability, and a reusable process for the next round.</p>
             </div>
             <div className="pilot-stats">
               {charterStats.map(([label, value]) => <div key={label}><small>{label}</small><strong>{value}</strong></div>)}
@@ -212,7 +209,7 @@ export function LandingPage() {
 
         <section className="public-section public-difference-section" aria-labelledby="difference-title">
           <div className="section-intro section-intro--split section-intro--executive">
-            <div><p className="public-eyebrow">Connected reasoning</p><h2 id="difference-title">The distinction is continuity, not more software.</h2></div>
+            <div><p className="public-eyebrow">Connected reasoning</p><h2 id="difference-title">The distinction is facilitated continuity, not more software.</h2></div>
             <p>
               Forms, spreadsheets, and separate review tools can all be practical. The difficulty appears when
               evidence, discussion, decision rationale, and feedback become separated across them.
@@ -226,7 +223,7 @@ export function LandingPage() {
             <div className="difference-connector" aria-hidden="true"><Icon name="arrow-right" size={25} /></div>
             <div className="difference-statement difference-statement--positive">
               <span>When the reasoning stays connected</span>
-              <p>CrowdSmarter keeps evidence, assessments, disagreement, the final decision, and its rationale connected, creating traceability without removing human judgement.</p>
+              <p>CrowdSmarter combines facilitation with a supporting platform that keeps evidence, assessments, disagreement, the final decision, and its rationale connected without removing human judgement.</p>
             </div>
           </div>
         </section>
@@ -285,19 +282,19 @@ export function LandingPage() {
 
         <section className="public-cta public-cta--executive" aria-labelledby="cta-title">
           <div>
-            <p className="public-eyebrow">Two ways in</p>
-            <h2 id="cta-title">Start free, or bring us a real round.</h2>
-            <p>Start your own commons for free, or talk to us about a guided, funded grant round for your institution.</p>
+            <p className="public-eyebrow">Start with the decision</p>
+            <h2 id="cta-title">Bring a decision that needs better participation and clearer reasoning.</h2>
+            <p>We can shape and facilitate the process with you. The platform is one part of how the evidence, participation, and decision record stay connected.</p>
           </div>
           <div className="public-cta__actions">
-            <Link className="public-button public-button--light public-button--large" to="/signup">{t.startFreeCta} <Icon name="arrow-right" size={18} /></Link>
-            <Link className="public-cta__signin" to="/request-demo">{t.bookAssessment}</Link>
+            <Link className="public-button public-button--light public-button--large" to="/request-demo">{t.bookAssessment} <Icon name="arrow-right" size={18} /></Link>
+            <Link className="public-cta__signin" to="/signup">{t.startCta}</Link>
           </div>
         </section>
       </main>
 
       <footer className="public-footer public-footer--executive">
-        <div className="public-brand"><LogoMark size={38} /><span><strong>CrowdSmarter</strong><small>Systems. Futures. Collective intelligence.</small></span></div>
+        <div className="public-brand"><LogoMark size={38} /><span><strong>CrowdSmarter</strong><small>Facilitation. Systems. Collective intelligence.</small></span></div>
         <div className="public-footer__contact">
           <span>General enquiries and partnerships</span>
           <a href={buildMailto(contactChannels.general, "CrowdSmarter enquiry")}>{contactChannels.general}</a>
@@ -310,7 +307,7 @@ export function LandingPage() {
         </nav>
         <div className="public-footer__bottom">
           <span>© {new Date().getFullYear()} CrowdSmarter</span>
-          <div className="public-footer__links"><Link to="/signup">{t.startFreeCta}</Link><Link to="/request-demo">{t.bookAssessment}</Link><Link to="/login">{t.signIn}</Link><Link to="/my-applications">{t.footerApplicant}</Link><Link to="/trust">{t.footerTrust}</Link><span>{t.footerHumanAuthority}</span></div>
+          <div className="public-footer__links"><Link to="/request-demo">{t.bookAssessment}</Link><Link to="/signup">{t.startCta}</Link><Link to="/login">{t.signIn}</Link><Link to="/my-applications">{t.footerApplicant}</Link><Link to="/trust">{t.footerTrust}</Link><span>{t.footerHumanAuthority}</span></div>
         </div>
       </footer>
     </div>

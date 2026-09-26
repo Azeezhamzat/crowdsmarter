@@ -1,12 +1,23 @@
 import pytest
 from django.core.exceptions import ValidationError
 
-from apps.contributions.models import ContributionRequest, ContributionSubmission
+from apps.contributions.models import (
+    ContributionRequest,
+    ContributionSubmission,
+    FacilitationAuthorityResponse,
+    FacilitationRecord,
+    SessionParticipant,
+)
 from apps.contributions.services import (
+    ContributionServiceError,
+    create_facilitation_record,
     create_request,
+    create_session,
     review_submission,
     save_draft,
+    save_facilitation_authority_response,
     submit_request,
+    update_session_status,
 )
 from apps.organisations.models import Membership
 from apps.participants.models import Participant
@@ -79,9 +90,7 @@ def test_contribution_request_preserves_draft_submission_and_review_history(
 
 
 @pytest.mark.django_db
-def test_assignment_requires_active_non_observer_participant(
-    decision_factory, user_factory
-):  # type: ignore[no-untyped-def]
+def test_assignment_requires_active_non_observer_participant(decision_factory, user_factory):  # type: ignore[no-untyped-def]
     decision = decision_factory(status="open_for_contribution")
     outsider = user_factory()
     Membership.objects.create(
@@ -124,6 +133,176 @@ def test_facilitation_sessions_follow_forward_only_transitions(
         update_session_status(actor=decision.owner, session=session, status="planned")
     session = update_session_status(actor=decision.owner, session=session, status="closed")
     assert session.status == "closed"
+
+
+@pytest.mark.django_db
+def test_facilitator_captures_provenance_without_leaking_anonymous_identity(
+    decision_factory, user_factory
+):  # type: ignore[no-untyped-def]
+    decision = decision_factory(status="open_for_contribution")
+    participant_user = user_factory(email="workshop-participant@example.com")
+    Membership.objects.create(
+        organisation=decision.organisation,
+        user=participant_user,
+        role=Membership.Role.CONTRIBUTOR,
+        status=Membership.Status.ACTIVE,
+    )
+    Participant.objects.create(
+        organisation=decision.organisation,
+        decision=decision,
+        user=participant_user,
+        role=Participant.Role.CONTRIBUTOR,
+        added_by=decision.owner,
+    )
+    session = create_session(
+        actor=decision.owner,
+        decision=decision,
+        title="Hybrid evidence session",
+        objective="Capture evidence from in-person and telephone participants.",
+        influence_boundary="Evidence weighting and implementation conditions.",
+        fixed_constraints="The statutory deadline.",
+        participation_channels=["in_person", "phone"],
+        participants=[{"user_id": participant_user.id, "role": "participant"}],
+    )
+    session = update_session_status(actor=decision.owner, session=session, status="open")
+    source = session.participants.get(user=participant_user)
+
+    record = create_facilitation_record(
+        actor=decision.owner,
+        session=session,
+        kind="evidence_gap",
+        body="Telephone participants could not verify the baseline estimate.",
+        channel="phone",
+        origin="participant_input",
+        attribution="confidential",
+        source_participant_id=source.id,
+        permission_to_quote=False,
+        follow_up_owner="Evidence lead",
+    )
+
+    assert record.source_participant == source
+    assert record.channel == FacilitationRecord.Channel.PHONE
+    assert record.follow_up_owner == "Evidence lead"
+    with pytest.raises(ValidationError, match="Anonymous records cannot retain"):
+        create_facilitation_record(
+            actor=decision.owner,
+            session=session,
+            kind="agreement",
+            body="A purported anonymous statement.",
+            channel="in_person",
+            origin="participant_input",
+            attribution="anonymous",
+            source_participant_id=source.id,
+        )
+
+
+@pytest.mark.django_db
+def test_authority_response_requires_closed_session_and_becomes_immutable(
+    decision_factory,
+):  # type: ignore[no-untyped-def]
+    decision = decision_factory(status="open_for_contribution")
+    session = create_session(
+        actor=decision.owner,
+        decision=decision,
+        title="Implementation workshop",
+        objective="Test implementation conditions.",
+    )
+    session = update_session_status(actor=decision.owner, session=session, status="open")
+    draft = save_facilitation_authority_response(
+        actor=decision.owner,
+        session=session,
+        what_we_heard="Participants need a clearer delivery timetable.",
+        what_changed="The timetable will include decision gates.",
+        what_did_not_change="",
+        rationale="",
+        next_steps="Publish the revised timetable next week.",
+    )
+    assert draft.status == FacilitationAuthorityResponse.Status.DRAFT
+    with pytest.raises(ContributionServiceError, match="Close the session"):
+        save_facilitation_authority_response(
+            actor=decision.owner,
+            session=session,
+            what_we_heard=draft.what_we_heard,
+            what_changed=draft.what_changed,
+            what_did_not_change="",
+            rationale="",
+            next_steps=draft.next_steps,
+            publish=True,
+        )
+
+    session = update_session_status(actor=decision.owner, session=session, status="closed")
+    published = save_facilitation_authority_response(
+        actor=decision.owner,
+        session=session,
+        what_we_heard=draft.what_we_heard,
+        what_changed=draft.what_changed,
+        what_did_not_change="",
+        rationale="",
+        next_steps=draft.next_steps,
+        publish=True,
+    )
+    assert published.status == FacilitationAuthorityResponse.Status.PUBLISHED
+    assert published.published_by == decision.owner
+    with pytest.raises(ContributionServiceError, match="immutable"):
+        save_facilitation_authority_response(
+            actor=decision.owner,
+            session=session,
+            what_we_heard="A rewritten account.",
+            what_changed=draft.what_changed,
+            what_did_not_change="",
+            rationale="",
+            next_steps=draft.next_steps,
+        )
+
+
+@pytest.mark.django_db
+def test_facilitation_session_preserves_participant_and_observer_roles(
+    decision_factory, user_factory
+):  # type: ignore[no-untyped-def]
+    from apps.contributions.services import create_session
+
+    decision = decision_factory(status="open_for_contribution")
+    contributor = user_factory(email="participant@example.com")
+    observer = user_factory(email="observer@example.com")
+    for user in [contributor, observer]:
+        Membership.objects.create(
+            organisation=decision.organisation,
+            user=user,
+            role=Membership.Role.CONTRIBUTOR,
+            status=Membership.Status.ACTIVE,
+        )
+    Participant.objects.create(
+        organisation=decision.organisation,
+        decision=decision,
+        user=contributor,
+        role=Participant.Role.CONTRIBUTOR,
+        added_by=decision.owner,
+    )
+    Participant.objects.create(
+        organisation=decision.organisation,
+        decision=decision,
+        user=observer,
+        role=Participant.Role.OBSERVER,
+        added_by=decision.owner,
+    )
+
+    session = create_session(
+        actor=decision.owner,
+        decision=decision,
+        title="Decision framing workshop",
+        objective="Clarify the question, authority, and participation boundary.",
+        participants=[
+            {"user_id": contributor.id, "role": SessionParticipant.Role.PARTICIPANT},
+            {"user_id": observer.id, "role": SessionParticipant.Role.OBSERVER},
+        ],
+    )
+
+    assert list(
+        session.participants.order_by("user__email").values_list("user__email", "role")
+    ) == [
+        ("observer@example.com", SessionParticipant.Role.OBSERVER),
+        ("participant@example.com", SessionParticipant.Role.PARTICIPANT),
+    ]
 
 
 @pytest.mark.django_db

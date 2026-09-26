@@ -15,9 +15,7 @@ from .models import Lesson
 
 def lessons_for_decision(*, user: User, decision_id: UUID) -> models.QuerySet[Lesson]:
     decision = decision_for_user(user=user, decision_id=decision_id)
-    return Lesson.objects.filter(decision=decision).select_related(
-        "created_by", "retired_by"
-    )
+    return Lesson.objects.filter(decision=decision).select_related("created_by", "retired_by")
 
 
 def lesson_for_user(*, user: User, lesson_id: UUID) -> Lesson:

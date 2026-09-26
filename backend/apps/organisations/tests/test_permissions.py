@@ -11,9 +11,7 @@ from apps.organisations.permissions import (
 
 
 @pytest.mark.django_db
-def test_is_organisation_member_denies_outsider(
-    user_factory, organisation_factory
-):  # type: ignore[no-untyped-def]
+def test_is_organisation_member_denies_outsider(user_factory, organisation_factory):  # type: ignore[no-untyped-def]
     outsider = user_factory()
     organisation = organisation_factory()
     request = APIRequestFactory().get("/")
@@ -50,9 +48,7 @@ def test_can_manage_organisation_allows_member_read_but_not_write(
 
 
 @pytest.mark.django_db
-def test_can_manage_membership_prevents_admin_changing_owner(
-    user_factory, organisation_factory
-):  # type: ignore[no-untyped-def]
+def test_can_manage_membership_prevents_admin_changing_owner(user_factory, organisation_factory):  # type: ignore[no-untyped-def]
     owner = user_factory()
     admin = user_factory()
     organisation = organisation_factory(owner=owner)

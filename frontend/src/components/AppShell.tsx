@@ -150,7 +150,7 @@ export function AppShell() {
   const commandItems = useMemo<CommandItem[]>(() => {
     const basics: CommandItem[] = [
       { label: "My work", description: "Your active decisions and next actions", href: "/app", icon: "home", group: "Navigate" },
-      ...(currentUser.data?.is_platform_administrator ? [{ label: "Platform administration", description: "Users, tenants, support access, demo requests, and service settings", href: "/platform-admin", icon: "shield" as const, group: "Administration" }] : []),
+      ...(currentUser.data?.is_platform_administrator ? [{ label: "Platform administration", description: "Users, tenants, support access, decision enquiries, and service settings", href: "/platform-admin", icon: "shield" as const, group: "Administration" }] : []),
       { label: "Notifications", description: "Assignments, mentions, and workflow updates", href: "/notifications", icon: "bell", group: "Navigate" },
       { label: "Contribution inbox", description: "Assigned contributions, drafts, reviews, and due work", href: "/contributions", icon: "check", group: "Navigate" },
       { label: "Account settings", description: "Profile and password security", href: "/account", icon: "shield", group: "Navigate" },
@@ -220,7 +220,7 @@ export function AppShell() {
     if (event.key === "Enter" && selectedCommand) {
       event.preventDefault();
       closeCommand(false);
-      navigate(selectedCommand.href);
+      void navigate(selectedCommand.href);
     }
   }
 
@@ -261,7 +261,7 @@ export function AppShell() {
         <div className="app-sidebar__brand-row">
           <Link to="/app" className="brand brand--sidebar" aria-label="CrowdSmarter application home">
             <LogoMark variant="inverse" size={34} />
-            <span className="brand-copy"><strong>CrowdSmarter</strong><small>Foresight. Collective intelligence. Decisions.</small></span>
+            <span className="brand-copy"><strong>CrowdSmarter</strong><small>Facilitation. Systems. Collective intelligence.</small></span>
           </Link>
           <button ref={sidebarCloseButtonRef} className="icon-button app-sidebar__close" type="button" onClick={() => closeSidebar()} aria-label="Close navigation">
             <Icon name="close" />
@@ -400,7 +400,7 @@ export function AppShell() {
                   tabIndex={-1}
                   key={`${item.group}-${item.href}`}
                   onMouseEnter={() => setCommandIndex(index)}
-                  onClick={() => { closeCommand(false); navigate(item.href); }}
+                  onClick={() => { closeCommand(false); void navigate(item.href); }}
                 >
                   <span className="command-item__icon"><Icon name={item.icon} /></span>
                   <span><strong>{item.label}</strong><small>{item.description}</small></span>

@@ -6,9 +6,7 @@ from apps.lessons.models import Lesson
 
 
 @pytest.mark.django_db
-def test_search_finds_tenant_decisions_and_lessons(
-    api_client, decision_factory
-):  # type: ignore[no-untyped-def]
+def test_search_finds_tenant_decisions_and_lessons(api_client, decision_factory):  # type: ignore[no-untyped-def]
     decision = decision_factory(
         status=Decision.Status.LESSONS_LEARNED,
         title="Crop monitoring pilot",
@@ -37,9 +35,7 @@ def test_search_finds_tenant_decisions_and_lessons(
 
 
 @pytest.mark.django_db
-def test_search_does_not_reveal_another_tenant(
-    api_client, user_factory, decision_factory
-):  # type: ignore[no-untyped-def]
+def test_search_does_not_reveal_another_tenant(api_client, user_factory, decision_factory):  # type: ignore[no-untyped-def]
     decision = decision_factory(title="Confidential acquisition decision")
     outsider = user_factory()
     api_client.force_authenticate(outsider)
@@ -51,9 +47,7 @@ def test_search_does_not_reveal_another_tenant(
 
 
 @pytest.mark.django_db
-def test_search_requires_meaningful_query(
-    api_client, decision_factory
-):  # type: ignore[no-untyped-def]
+def test_search_requires_meaningful_query(api_client, decision_factory):  # type: ignore[no-untyped-def]
     decision = decision_factory()
     api_client.force_authenticate(decision.owner)
     url = reverse(

@@ -41,15 +41,17 @@ class ScenarioServiceError(ValidationError):
 
 def _active_member(*, organisation, user_id: Any) -> User:  # type: ignore[no-untyped-def]
     try:
-        return Membership.objects.select_related("user").get(
-            organisation=organisation,
-            user_id=user_id,
-            status=Membership.Status.ACTIVE,
-        ).user
+        return (
+            Membership.objects.select_related("user")
+            .get(
+                organisation=organisation,
+                user_id=user_id,
+                status=Membership.Status.ACTIVE,
+            )
+            .user
+        )
     except Membership.DoesNotExist as exc:
-        raise ScenarioServiceError(
-            {"owner_id": "Choose an active organisation member."}
-        ) from exc
+        raise ScenarioServiceError({"owner_id": "Choose an active organisation member."}) from exc
 
 
 def _require_canvas_contributor(*, actor: User, canvas: ForesightCanvas) -> None:
@@ -73,16 +75,12 @@ def _driver_for_axis(*, canvas: ForesightCanvas, driver_id: Any, field_name: str
             {field_name: "Choose an active driver from this canvas."}
         ) from exc
     if driver.driver_type != Driver.DriverType.CRITICAL_UNCERTAINTY:
-        raise ScenarioServiceError(
-            {field_name: "Scenario axes must be critical uncertainties."}
-        )
+        raise ScenarioServiceError({field_name: "Scenario axes must be critical uncertainties."})
     return driver
 
 
 @transaction.atomic
-def create_scenario_set(
-    *, actor: User, canvas: ForesightCanvas, **fields: Any
-) -> ScenarioSet:
+def create_scenario_set(*, actor: User, canvas: ForesightCanvas, **fields: Any) -> ScenarioSet:
     _require_canvas_contributor(actor=actor, canvas=canvas)
     axis_x_driver = _driver_for_axis(
         canvas=canvas,
@@ -115,9 +113,7 @@ def create_scenario_set(
         axis_x_driver=axis_x_driver,
         axis_y_driver=axis_y_driver,
         linked_decision=linked_decision,
-        owner=_active_member(
-            organisation=canvas.organisation, user_id=owner_id
-        ),
+        owner=_active_member(organisation=canvas.organisation, user_id=owner_id),
         created_by=actor,
         **fields,
     )
@@ -148,9 +144,11 @@ def create_scenario_set(
 def update_scenario_set(
     *, actor: User, scenario_set: ScenarioSet, fields: dict[str, Any]
 ) -> ScenarioSet:
-    item = ScenarioSet.objects.select_for_update().select_related(
-        "canvas__organisation", "axis_x_driver", "axis_y_driver"
-    ).get(id=scenario_set.id)
+    item = (
+        ScenarioSet.objects.select_for_update()
+        .select_related("canvas__organisation", "axis_x_driver", "axis_y_driver")
+        .get(id=scenario_set.id)
+    )
     if not can_manage_record(
         actor=actor,
         organisation=item.canvas.organisation,
@@ -161,9 +159,7 @@ def update_scenario_set(
     _require_scenario_set_contributor(actor=actor, scenario_set=item)
     owner_id = fields.pop("owner_id", None)
     if owner_id is not None:
-        item.owner = _active_member(
-            organisation=item.canvas.organisation, user_id=owner_id
-        )
+        item.owner = _active_member(organisation=item.canvas.organisation, user_id=owner_id)
     marker = object()
     linked_decision_id = fields.pop("linked_decision_id", marker)
     if linked_decision_id is not marker:
@@ -234,12 +230,12 @@ def create_scenario(*, actor: User, scenario_set: ScenarioSet, **fields: Any) ->
 
 
 @transaction.atomic
-def update_scenario(
-    *, actor: User, scenario: Scenario, fields: dict[str, Any]
-) -> Scenario:
-    item = Scenario.objects.select_for_update().select_related(
-        "scenario_set__canvas__organisation"
-    ).get(id=scenario.id)
+def update_scenario(*, actor: User, scenario: Scenario, fields: dict[str, Any]) -> Scenario:
+    item = (
+        Scenario.objects.select_for_update()
+        .select_related("scenario_set__canvas__organisation")
+        .get(id=scenario.id)
+    )
     if not can_manage_record(
         actor=actor,
         organisation=item.scenario_set.canvas.organisation,
@@ -254,7 +250,9 @@ def update_scenario(
     try:
         item.save()
     except IntegrityError as exc:
-        raise ScenarioServiceError("The scenario title, code, and quadrant must be unique.") from exc
+        raise ScenarioServiceError(
+            "The scenario title, code, and quadrant must be unique."
+        ) from exc
     record_event(
         action="foresight.scenario.updated",
         object_type="foresight_scenario",
@@ -272,9 +270,7 @@ def set_scenario_driver_state(
 ) -> ScenarioDriverState:
     _require_scenario_set_contributor(actor=actor, scenario_set=scenario.scenario_set)
     try:
-        driver = Driver.objects.get(
-            id=driver_id, canvas=scenario.scenario_set.canvas
-        )
+        driver = Driver.objects.get(id=driver_id, canvas=scenario.scenario_set.canvas)
     except Driver.DoesNotExist as exc:
         raise ScenarioServiceError(
             {"driver_id": "Choose a driver from the scenario canvas."}
@@ -302,9 +298,7 @@ def set_scenario_driver_state(
 
 
 @transaction.atomic
-def submit_scenario_review(
-    *, actor: User, scenario: Scenario, **fields: Any
-) -> ScenarioReview:
+def submit_scenario_review(*, actor: User, scenario: Scenario, **fields: Any) -> ScenarioReview:
     _require_scenario_set_contributor(actor=actor, scenario_set=scenario.scenario_set)
     item, created = ScenarioReview.objects.update_or_create(
         scenario=scenario,
@@ -315,9 +309,7 @@ def submit_scenario_review(
     item.save()
     record_event(
         action=(
-            "foresight.scenario_review.created"
-            if created
-            else "foresight.scenario_review.updated"
+            "foresight.scenario_review.created" if created else "foresight.scenario_review.updated"
         ),
         object_type="foresight_scenario_review",
         object_id=str(item.id),
@@ -334,9 +326,7 @@ def assess_option(
 ) -> WindTunnelAssessment:
     _require_scenario_set_contributor(actor=actor, scenario_set=scenario.scenario_set)
     if not scenario.scenario_set.linked_decision_id:
-        raise ScenarioServiceError(
-            {"option_id": "Link the scenario set to a decision first."}
-        )
+        raise ScenarioServiceError({"option_id": "Link the scenario set to a decision first."})
     try:
         option = DecisionOption.objects.get(
             id=option_id,
@@ -382,9 +372,7 @@ def create_signpost(
     owner_id = fields.pop("owner_id", actor.id)
     item = Signpost(
         scenario_set=scenario_set,
-        owner=_active_member(
-            organisation=scenario_set.canvas.organisation, user_id=owner_id
-        ),
+        owner=_active_member(organisation=scenario_set.canvas.organisation, user_id=owner_id),
         created_by=actor,
         **fields,
     )
@@ -392,15 +380,11 @@ def create_signpost(
         item.full_clean(validate_unique=False, validate_constraints=False)
         item.save()
     except IntegrityError as exc:
-        raise ScenarioServiceError(
-            {"title": "A signpost with this title already exists."}
-        ) from exc
+        raise ScenarioServiceError({"title": "A signpost with this title already exists."}) from exc
     scenario_ids = [link["scenario_id"] for link in scenario_links]
     scenarios = {
         str(scenario.id): scenario
-        for scenario in Scenario.objects.filter(
-            scenario_set=scenario_set, id__in=scenario_ids
-        )
+        for scenario in Scenario.objects.filter(scenario_set=scenario_set, id__in=scenario_ids)
     }
     if len(scenarios) != len(set(map(str, scenario_ids))):
         raise ScenarioServiceError(
@@ -489,7 +473,9 @@ def link_signpost_to_assumption(
     )
     link.full_clean(validate_unique=False, validate_constraints=False)
     record_event(
-        action="foresight.signpost.linked_to_assumption" if created else "foresight.signpost_assumption_link.updated",
+        action="foresight.signpost.linked_to_assumption"
+        if created
+        else "foresight.signpost_assumption_link.updated",
         object_type="foresight_signpost_assumption_link",
         object_id=str(link.id),
         actor=actor,
@@ -518,7 +504,9 @@ def link_signpost_to_risk(
     )
     link.full_clean(validate_unique=False, validate_constraints=False)
     record_event(
-        action="foresight.signpost.linked_to_risk" if created else "foresight.signpost_risk_link.updated",
+        action="foresight.signpost.linked_to_risk"
+        if created
+        else "foresight.signpost_risk_link.updated",
         object_type="foresight_signpost_risk_link",
         object_id=str(link.id),
         actor=actor,

@@ -1,27 +1,145 @@
 # Current state (Phase 19/20/21/22/23/24/25/26/27/28/29 baseline)
 
-Verified against the running system on 2026-08-03. Update this document
-whenever the baseline materially changes; do not let it drift into aspiration.
+Originally verified on 2026-08-03 and re-audited on 2026-08-30. Update this
+document whenever the baseline materially changes; do not let it drift into
+aspiration.
+
+## Competitive-depth programme added 2026-09-03
+
+The programme-wide maturity bar and delivery order are now explicit in
+`docs/global-competition-programme.md`. The first vertical slice upgrades the
+foresight source library into a decision-grade research claim ledger:
+
+- claims distinguish demonstrated, supported, plausible, unknown, and
+  contradicted propositions and record an explicit build, integrate, defer,
+  avoid, or monitor recommendation;
+- evidence quality is scored transparently for authority, directness,
+  recency, and triangulation rather than hidden behind one opaque score;
+- supporting, contradictory, and contextual sources remain separately
+  attributable, with material limitations, assumptions, expected outcomes,
+  and reversal conditions preserved;
+- every claim has an owner, lifecycle, review date, optional linked decision,
+  tenant-safe API, role enforcement, and audit history;
+- sources now retain access date, jurisdiction, archived URL, verification
+  time, and review date; attachments expose their malware-scan state;
+- claims and claim-source links are included in complete organisation exports
+  and in any linked decision dossier.
+
+Migration `apps.foresight.0008_source_accessed_on_source_archived_url_and_more`
+is applied to the local development database. The live interface exposes the
+workflow as **Research claims** within organisation foresight.
+
+The second vertical slice turns hybrid facilitation records into a live
+facilitator cockpit:
+
+- a session can carry an ordered run-of-show of purposeful activities,
+  methods, timeboxes, facilitator prompts, and expected captured outputs;
+- only one item can be active, its elapsed time is visible, and the session
+  cannot close until the live item is completed or skipped;
+- session records may be tied to the exact agenda item that produced them;
+- session briefs make accessibility arrangements and the consent/attribution
+  boundary explicit rather than leaving them in informal notes;
+- the cockpit supports ad-hoc activities, completion, skipping, returning an
+  item to the queue, and responsive operation during a live session;
+- closed sessions support a human quality review across inclusion, boundary
+  clarity, facilitator neutrality, meaningful participation, and
+  follow-through, backed by qualitative learning and unresolved risks;
+- run-of-show timing and output counts appear in printable session reports,
+  while quality, accessibility, and consent records appear in printable
+  reports, complete organisation exports, and portable decision dossiers.
+
+Migrations `apps.contributions.0004_facilitationagendaitem_and_more` and
+`apps.contributions.0005_facilitationsession_accessibility_arrangements_and_more`
+are applied to the local development database. The interface exposes the
+cockpit inside each decision's **Facilitation sessions** workspace.
+
+Current verification after this slice:
+
+- Backend: **575 tests pass**; Ruff, Ruff formatting, MyPy, Django checks, and
+  migration-drift checks pass.
+- Frontend: **46 test files / 88 tests pass**; ESLint, type-check, and the
+  production build pass.
+- Focused foresight/export integration: **45 tests pass**, including claim
+  tenant isolation, conflicting evidence, audit events, and portability.
+
+## Production-readiness controls added 2026-08-30
+
+The repository now includes structured request logs and request IDs, private
+Prometheus metrics, database/cache readiness checks, and an optional local
+Prometheus/Loki/Alloy/Grafana/Alertmanager profile. Source uploads are scanned
+before persistence, production scanning is fail-closed through ClamAV, and
+unclean files cannot be downloaded or exported in production. Legacy files
+have a preview/apply rescan command.
+
+Operational controls now also include a preview-only deletion-retention
+report, a daily review task, SMTP deployment checks, and an isolated
+PostgreSQL backup-restore drill. Runbooks and the owner-approval retention
+draft are under `docs/operations/` and `docs/retention-deletion-policy-draft.md`.
+The self-review at `docs/internal-security-privacy-review-2026-08-30.md`
+records remaining external and human-governance work; it is not an independent
+review or a production approval.
+
+- Backend: **575 tests pass**; Ruff, formatting, MyPy, Django deployment
+  checks, Compose parsing, and migration-drift checks pass.
+- Frontend: **46 test files / 88 tests pass**; ESLint, type-check, and the
+  production build pass.
+- The isolated PostgreSQL restore drill passed, the live ClamAV clean/EICAR
+  control passed, and the local monitoring scrape/log/dashboard/alert path was
+  exercised end to end. Evidence is recorded in the operations runbooks.
+
+## 2026-08-27 release audit baseline
+
+- Backend: 554 tests pass; Ruff, Ruff formatting, MyPy, Django system checks,
+  and migration-drift checks pass.
+- Frontend: 43 test files / 80 tests pass; type-check, production build, and
+  ESLint all pass without errors or warnings.
+- Dependency inputs are reproducible: npm uses a committed lockfile and both
+  backend requirement sets are hash-locked. The npm audit reports zero known
+  vulnerabilities.
+- A verified email-change workflow now requires the current password, sends a
+  short-lived single-use link to the new address, notifies the old address,
+  invalidates superseded links, and records the request and completion.
+- The reverse proxy now sets CSP, Permissions-Policy, COOP and CORP alongside
+  the existing security headers. Proxy and Django requests carry a safe
+  `X-Request-ID` correlation value.
+- Frontend routes are loaded on demand. The shared initial JavaScript chunk
+  fell from about 1.06 MB to about 360 kB, with feature pages emitted as
+  separate chunks.
+- Two full-suite defects found by the audit were fixed: grant dossier decimal
+  formatting now remains currency-safe, and tenant search has a deterministic
+  SQLite fallback matching the documented local-test path.
+- Public Playwright contracts were refreshed for the current landing, signup,
+  login, accessibility, and email-verification routes. CI installs Chromium;
+  the Alpine development container intentionally does not bundle a browser,
+  so Mac execution uses the host commands in `docs/development-workflow.md`.
 
 ## Repository
 
-`~/Downloads/crowdsmarter` is the canonical Git working tree, tracking
-`origin/main` at `https://github.com/Azeezhamzat/crowdsmarter.git`. It was
-previously untracked (no `.git`) while a separate publishing clone
-(`~/Downloads/crowdsmarter-github-publish`) held the only Git history; the two
-trees were reconciled with near-zero drift and this tree is now the single
-source of truth. See `docs/development-workflow.md`.
+This audit ran from `~/Downloads/crowdsmarter-main`. The supplied workspace
+does not include `.git` metadata, so branch, remote, and commit claims in the
+historical phase notes below were not re-verified. See
+`docs/development-workflow.md` before publishing changes from a Git clone.
 
 ## Stack versions (verified)
 
-- Python 3.12.13, Django 5.2.16, Django REST Framework 3.16.1
+- Python 3.12.14, Django 5.2.17, Django REST Framework 3.16.1
 - PostgreSQL 17 (Docker image `postgres:17-alpine`), Redis 7 (`redis:7-alpine`)
 - React 19.2.8, TypeScript 5.9.3, Vite 8.1.5, Vitest 4.1.10, React Router 8.3.0
 - `frontend/package.json` and `backend/pyproject.toml` both report `0.18.2`
 
 ## Migrations
 
-63 backend migrations applied cleanly across all apps, including the new
+71 backend migrations are present across all apps, including
+`apps.accounts.0005_emailchangerequest`, the hybrid-facilitation migrations,
+the two source-attachment malware status migrations,
+`apps.foresight.0008_source_accessed_on_source_archived_url_and_more`, and
+`apps.contributions.0004_facilitationagendaitem_and_more`, and
+`apps.contributions.0005_facilitationsession_accessibility_arrangements_and_more`.
+The
+audit's migration-drift check reports no model changes missing a migration.
+Historical migration detail follows.
+
+Before this audit, 63 backend migrations applied cleanly, including the new
 `apps.billing` app's `0001_initial` (creates `Plan` and
 `OrganisationSubscription`) and `0002_seed_plans_and_backfill_subscriptions`
 (a `RunPython` data migration seeding three plans — `team`/`professional`/
@@ -47,14 +165,16 @@ the two new migrations above were applied by hand).
 
 ## Test suites
 
-- Backend: `docker compose exec backend pytest` — **410 passed, 0 failed**
+- Current audited backend: **575 passed, 0 failed**.
+- Historical Phase 29 backend: `docker compose exec backend pytest` — **410 passed, 0 failed**
   (was 384 passed at the end of Phase 28; +26 new tests for Phase 29's
   billing/entitlement feature: `apps/billing/tests/test_models.py` (5),
   `apps/billing/tests/test_services.py` (13), `apps/billing/tests/test_api.py`
   (7), and one new assertion in
   `apps/organisations/tests/test_services.py` confirming `create_organisation`
   auto-enrolls a trialing subscription).
-- Frontend: `docker compose exec frontend npx vitest run` — **36 test files /
+- Current audited frontend: **46 test files / 88 tests, all passing**.
+- Historical Phase 29 frontend: `docker compose exec frontend npx vitest run` — **36 test files /
   50 tests, all passing** (the existing
   `OrganisationAdministrationPage.test.tsx` test was extended in place to
   cover the new "Plan and billing" section rather than adding a new file, so
@@ -74,17 +194,17 @@ the two new migrations above were applied by hand).
   package no longer exists as of v8; `react`/`react-dom` bumped to `19.2.8`
   to meet its minimum version requirement) — see `docs/known-issues.md` for
   the migration details.
-- Backend has no committed lockfile yet; `pyproject.toml` uses range
-  constraints only. See `docs/known-issues.md`.
+- Backend runtime and development requirements are committed with hashes in
+  `requirements.lock` and `requirements-dev.lock`; `pyproject.toml` retains
+  the human-maintained compatible ranges.
 - Phase 26 added `openpyxl>=3.1,<4` to `backend/pyproject.toml` (XLSX export
   generation). Installed at runtime first (`pip install openpyxl`) to
   iterate, then the backend image was properly rebuilt
   (`docker compose build backend && docker compose up -d backend`) so the
   dependency is baked in rather than only present in the live container's
   ephemeral filesystem.
-- `npm run lint` fails with 93 pre-existing errors unrelated to anything
-  fixed in this phase (confirmed by re-running it against the unmodified
-  code, which fails with 386). Not fixed here; see `docs/known-issues.md`.
+- `npm run lint` passes without errors or warnings. Form subscriptions use
+  React Hook Form's compiler-compatible `useWatch()` API.
 
 ## CI
 
@@ -96,10 +216,10 @@ because the frontend `npm test` step collided with Playwright specs and
 
 ## Docker Compose
 
-Four services running under the `crowdsmarter` project (`db`, `redis`,
-`backend`, `frontend`), all healthy. `docker compose config` validates
-cleanly. `docker buildx` is not installed locally; Compose falls back from
-Bake without disrupting the working setup.
+Four services run under the `crowdsmarter-main` Compose project (`db`,
+`redis`, `backend`, `frontend`), with explicit health checks on each.
+`docker compose config` validates cleanly. `docker buildx` is not installed
+locally; Compose falls back from Bake without disrupting the working setup.
 
 ## Phase 20 (product experience) progress
 
@@ -378,20 +498,16 @@ fast-forward merged into `main`.
 
 ## Phase 27 (governed AI copilot) progress
 
-Audited `apps/ai_assistance` against the AI roadmap's "appropriate
-functions," "required controls," and "AI evaluation" sections. The single
-most important finding: **this codebase has no real LLM integration at
-all** — `RuleBasedAIProvider` (the hard default, and the only provider that
-exists) is pure deterministic Python (token-overlap similarity, threshold
-checks), with zero external HTTP calls and no API key referenced anywhere
-in settings or `.env.example`. Most of the roadmap's "required controls"
-were already implemented (explicit initiation, visible provider/model,
-tenant boundaries, source references, uncertainty disclosure, no automatic
-writes, graceful fallback, audit logging of every request/completion/
-dismissal). No AI evaluation harness existed at all. Building a real
-provider integration was correctly out of scope — untestable here without
-live credentials, and the roadmap explicitly says not to market AI
-functionality before it meets measurable quality criteria.
+At Phase 27, `RuleBasedAIProvider` was the only provider and the application
+had no external LLM integration. The provider registry now also contains
+optional OpenAI, Anthropic, and Gemini adapters. The deterministic provider
+remains the credential-free default and the only provider covered by the
+offline evaluation baseline; enabled external providers still require live
+credentials, provider-specific evaluation, privacy review, and production
+monitoring. The existing controls include explicit initiation, visible
+provider/model, tenant boundaries, source references, uncertainty disclosure,
+no automatic writes, graceful fallback, and audit logging of every request,
+completion, and dismissal.
 
 Extended the existing deterministic provider and built a genuine,
 offline-testable evaluation harness instead:

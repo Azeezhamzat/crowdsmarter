@@ -6,9 +6,7 @@ from apps.organisations.models import Membership
 
 
 @pytest.mark.django_db
-def test_organisation_list_is_tenant_isolated(
-    api_client, user_factory, organisation_factory
-):  # type: ignore[no-untyped-def]
+def test_organisation_list_is_tenant_isolated(api_client, user_factory, organisation_factory):  # type: ignore[no-untyped-def]
     actor = user_factory()
     visible = organisation_factory(owner=actor, name="Visible", slug="visible")
     hidden = organisation_factory(name="Hidden", slug="hidden")
@@ -22,9 +20,7 @@ def test_organisation_list_is_tenant_isolated(
 
 
 @pytest.mark.django_db
-def test_create_retrieve_and_update_organisation(
-    api_client, user_factory
-):  # type: ignore[no-untyped-def]
+def test_create_retrieve_and_update_organisation(api_client, user_factory):  # type: ignore[no-untyped-def]
     actor = user_factory()
     api_client.force_authenticate(actor)
 
@@ -100,11 +96,14 @@ def test_owner_can_list_change_and_remove_accepted_member(
     list_response = api_client.get(collection_url)
     assert list_response.status_code == 200
     assert len(list_response.json()) == 2
-    assert api_client.post(
-        collection_url,
-        {"email": "bypass@example.com", "role": "contributor"},
-        format="json",
-    ).status_code == 405
+    assert (
+        api_client.post(
+            collection_url,
+            {"email": "bypass@example.com", "role": "contributor"},
+            format="json",
+        ).status_code
+        == 405
+    )
 
     detail_url = reverse(
         "organisations:membership-detail",
@@ -139,9 +138,7 @@ def test_membership_collection_never_accepts_direct_additions(
 
 
 @pytest.mark.django_db
-def test_admin_cannot_patch_owner_membership(
-    api_client, user_factory, organisation_factory
-):  # type: ignore[no-untyped-def]
+def test_admin_cannot_patch_owner_membership(api_client, user_factory, organisation_factory):  # type: ignore[no-untyped-def]
     owner = user_factory()
     admin = user_factory()
     organisation = organisation_factory(owner=owner)

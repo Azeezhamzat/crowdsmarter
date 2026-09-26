@@ -141,10 +141,13 @@ A member who owns an active implementation record cannot be removed until owners
 
 | Action | Owner | Administrator | Contributor | Viewer |
 |---|---:|---:|---:|---:|
-| Read sources, signals, watchlists, and feeds | Yes | Yes | Yes | Yes |
-| Create sources and signals | Yes | Yes | Yes | No |
+| Read sources, research claims, signals, watchlists, and feeds | Yes | Yes | Yes | Yes |
+| Create sources, research claims, and signals | Yes | Yes | Yes | No |
 | Edit own source | Yes | Yes | Yes | No |
 | Edit any source | Yes | Yes | No | No |
+| Edit claims owned or created by self | Yes | Yes | Yes | No |
+| Edit any research claim | Yes | Yes | No | No |
+| Link/unlink same-tenant sources on an editable claim | Yes | Yes | Yes | No |
 | Edit signal owned or created by self | Yes | Yes | Yes | No |
 | Edit any signal or watchlist | Yes | Yes | No | No |
 | Upload private source files | Yes | Yes | Own sources | No |
@@ -152,7 +155,11 @@ A member who owns an active implementation record cannot be removed until owners
 | Create and synchronise owned feeds | Yes | Yes | Yes | No |
 | Link signals to same-tenant decisions | Yes | Yes | Yes | No |
 
-A viewer can inspect private source files because active tenant membership already grants read access to the organisation's decision knowledge. Files are never accessible through public media URLs. Active feed, signal, and watchlist ownership must be transferred before the owner can be removed from the organisation.
+A viewer can inspect private source files and research claims because active
+tenant membership already grants read access to the organisation's decision
+knowledge. Files are never accessible through public media URLs. Active feed,
+claim, signal, and watchlist ownership must be transferred before the owner can
+be removed from the organisation.
 
 ## Phase 12 foresight permissions
 
@@ -189,9 +196,9 @@ Active contributors, administrators, and owners may create scenario sets, worlds
 
 ## Phase 15.1 public and operational permissions
 
-- Anyone with a valid same-origin CSRF token may submit a rate-limited demo request.
-- Public callers cannot list, retrieve, update, or delete demo requests.
-- Demo-request review uses Django administration and therefore requires staff authentication.
+- Anyone with a valid same-origin CSRF token may submit a rate-limited decision enquiry.
+- Public callers cannot list, retrieve, update, or delete decision enquiries.
+- Decision-enquiry review uses protected platform or Django administration and requires the corresponding administrator authority.
 - `ensure_local_owner` and `reset_local_password` are management commands, not API endpoints, and reject execution unless `DJANGO_DEBUG=true`.
 - Public demo submission never grants product access; organisation membership remains invitation controlled.
 
@@ -203,7 +210,9 @@ Active contributors, administrators, and owners may create scenario sets, worlds
 - Only the assignee may create or update a draft and submit a revision.
 - Only the named reviewer or an accountable authority may review a submitted revision.
 - Draft requests are visible only to managers until opened. Draft submission content is visible only to the assignee, named reviewer, and accountable authorities.
-- Session status and attendance may be managed only by the facilitator or an accountable authority.
+- Session status, attendance, run-of-show creation, and agenda execution may be managed only by the facilitator or an accountable authority. Only one agenda item may be live, and the live item must be completed or skipped before session closure.
+- Only the facilitator or an accountable authority may save a session-quality review, and only after the session is closed. The review is a human reflection and does not change decision authority or participant records.
+- A session invite may name an active decision participant as a participant or observer. This session role records how the person is involved in the workshop; it does not grant decision authority or make an observer eligible for a contribution assignment.
 - Archived and other non-writable decisions expose read-only history.
 - Member removal is blocked while active assignments, pending named reviews, or live facilitation responsibility remains.
 

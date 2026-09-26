@@ -10,6 +10,7 @@ disbursement flow - it just reports as not-ok.
 
 from __future__ import annotations
 
+import contextlib
 from decimal import Decimal
 
 import httpx
@@ -27,43 +28,67 @@ class StripeDisbursementProvider:
         self.api_key = api_key
         self.account_id = account_id
 
-    def issue_payout(self, *, amount: Decimal, reference_hint: str = "") -> DisbursementResult:
+    def issue_payout(
+        self,
+        *,
+        amount: Decimal,
+        currency: str,
+        idempotency_key: str,
+        reference_hint: str = "",
+    ) -> DisbursementResult:
         if not self.api_key or not self.account_id:
             return DisbursementResult(
-                ok=False, status="failed", external_reference="",
+                ok=False,
+                status="failed",
+                external_reference="",
                 detail="Stripe is not fully configured - set an API key and connected account first.",
             )
         try:
             response = httpx.post(
                 f"{STRIPE_API_BASE}/transfers",
                 auth=(self.api_key, ""),
+                headers={"Idempotency-Key": idempotency_key},
                 data={
                     "amount": str(int(Decimal(amount) * 100)),
-                    "currency": "usd",
+                    "currency": currency.lower(),
                     "destination": self.account_id,
                     "description": reference_hint or "CrowdSmarter grant disbursement",
                 },
                 timeout=10.0,
             )
         except httpx.HTTPError as exc:
-            return DisbursementResult(ok=False, status="failed", external_reference="", detail=f"Stripe request failed: {exc}")
+            return DisbursementResult(
+                ok=False,
+                status="failed",
+                external_reference="",
+                detail=f"Stripe request failed: {exc}",
+            )
         if response.status_code >= 400:
             detail = "Stripe rejected the transfer."
-            try:
+            with contextlib.suppress(ValueError):
                 detail = response.json().get("error", {}).get("message", detail)
-            except ValueError:
-                pass
-            return DisbursementResult(ok=False, status="failed", external_reference="", detail=detail)
+            return DisbursementResult(
+                ok=False, status="failed", external_reference="", detail=detail
+            )
         payload = response.json()
-        return DisbursementResult(ok=True, status="paid", external_reference=payload.get("id", ""), detail="Stripe transfer created.")
+        return DisbursementResult(
+            ok=True,
+            status="paid",
+            external_reference=payload.get("id", ""),
+            detail="Stripe transfer created.",
+        )
 
     def test_connection(self) -> ProviderConnectionResult:
         if not self.api_key:
             return ProviderConnectionResult(ok=False, detail="No Stripe API key is configured.")
         try:
-            response = httpx.get(f"{STRIPE_API_BASE}/balance", auth=(self.api_key, ""), timeout=10.0)
+            response = httpx.get(
+                f"{STRIPE_API_BASE}/balance", auth=(self.api_key, ""), timeout=10.0
+            )
         except httpx.HTTPError as exc:
             return ProviderConnectionResult(ok=False, detail=f"Stripe request failed: {exc}")
         if response.status_code >= 400:
-            return ProviderConnectionResult(ok=False, detail="Stripe rejected the configured API key.")
+            return ProviderConnectionResult(
+                ok=False, detail="Stripe rejected the configured API key."
+            )
         return ProviderConnectionResult(ok=True, detail="Connected to Stripe.")

@@ -63,6 +63,7 @@ describe("PlatformAdminPage", () => {
     expect(await screen.findByText("4")).toBeInTheDocument();
     expect(screen.getByText(/tenant detail access is reasoned, time-bounded and audited/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Organisations" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Decision enquiries" })).toBeInTheDocument();
   });
 
   it("shows the AI provider panel with no key configured by default", async () => {
@@ -106,8 +107,8 @@ describe("PlatformAdminPage", () => {
     expect(screen.getByRole("button", { name: /set api key/i })).toBeDisabled();
     expect(screen.queryByRole("button", { name: /remove api key/i })).not.toBeInTheDocument();
 
-    const providerSelect = screen.getByLabelText(/^provider$/i) as HTMLSelectElement;
-    const optionLabels = [...providerSelect.options].map((option) => option.textContent);
+    const providerSelect = screen.getByLabelText<HTMLSelectElement>(/^provider$/i);
+    const optionLabels = Array.from(providerSelect.options, (option) => option.textContent);
     expect(optionLabels).toEqual([
       "Transparent rules (no external service)",
       "Anthropic Claude",

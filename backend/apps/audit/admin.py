@@ -25,4 +25,3 @@ class AuditEventAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
         "organisation",
         "metadata",
     ]
-

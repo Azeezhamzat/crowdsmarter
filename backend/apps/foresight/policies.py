@@ -4,9 +4,7 @@ from apps.organisations.models import Membership
 
 
 def membership_for(actor, organisation):  # type: ignore[no-untyped-def]
-    return organisation.memberships.filter(
-        user=actor, status=Membership.Status.ACTIVE
-    ).first()
+    return organisation.memberships.filter(user=actor, status=Membership.Status.ACTIVE).first()
 
 
 def can_contribute(*, actor, organisation) -> bool:  # type: ignore[no-untyped-def]

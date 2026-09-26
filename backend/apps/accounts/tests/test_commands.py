@@ -38,9 +38,7 @@ def test_ensure_local_owner_bootstraps_only_an_empty_installation():
 
 @pytest.mark.django_db
 @override_settings(DEBUG=True)
-def test_reset_local_password_reads_secret_from_stdin(
-    user_factory, monkeypatch
-):  # type: ignore[no-untyped-def]
+def test_reset_local_password_reads_secret_from_stdin(user_factory, monkeypatch):  # type: ignore[no-untyped-def]
     user = user_factory(email="person@example.com", password="Old-password-123")
     monkeypatch.setattr("sys.stdin", StringIO("New-secure-password-456\n"))
     call_command("reset_local_password", email="PERSON@example.com")
@@ -50,9 +48,7 @@ def test_reset_local_password_reads_secret_from_stdin(
 
 @pytest.mark.django_db
 @override_settings(DEBUG=False)
-def test_local_access_commands_refuse_production(
-    user_factory, monkeypatch
-):  # type: ignore[no-untyped-def]
+def test_local_access_commands_refuse_production(user_factory, monkeypatch):  # type: ignore[no-untyped-def]
     from django.core.management import CommandError
 
     user_factory(email="person@example.com", password="Old-password-123")
@@ -78,7 +74,9 @@ def test_provision_local_login_guarantees_requested_email_and_secure_file(tmp_pa
     )
     user = User.objects.get(email="owner@example.test")
     content = credentials.read_text(encoding="utf-8")
-    password_line = next(line for line in content.splitlines() if line.startswith("Temporary password:"))
+    password_line = next(
+        line for line in content.splitlines() if line.startswith("Temporary password:")
+    )
     password = password_line.split(":", 1)[1].strip()
     assert user.is_active
     assert user.check_password(password)

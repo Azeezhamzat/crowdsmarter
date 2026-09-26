@@ -4,11 +4,12 @@ import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { Idea } from "../../lib/types";
+import type * as OpenSessionApi from "./api";
 import { getPublicSession, getStoredParticipantToken, joinSession, submitIdea, voteIdea } from "./api";
 import { OpenSessionPublicPage } from "./OpenSessionPublicPage";
 
 vi.mock("./api", async () => {
-  const actual = await vi.importActual<typeof import("./api")>("./api");
+  const actual = await vi.importActual<typeof OpenSessionApi>("./api");
   return {
     ...actual,
     getPublicSession: vi.fn(),

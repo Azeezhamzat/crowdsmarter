@@ -17,12 +17,24 @@ class DemoRequest(UUIDTimeStampedModel):
         NOT_SURE = "not_sure", "Not sure"
 
     class PrimaryNeed(models.TextChoices):
-        STRATEGIC_FORESIGHT = "strategic_foresight", "Strategic foresight"
-        DECISION_GOVERNANCE = "decision_governance", "Decision governance"
-        COLLECTIVE_INTELLIGENCE = "collective_intelligence", "Collective intelligence"
-        PORTFOLIO_PRIORITISATION = "portfolio_prioritisation", "Portfolio prioritisation"
-        ORGANISATIONAL_LEARNING = "organisational_learning", "Organisational learning"
-        OTHER = "other", "Other"
+        STRATEGIC_FORESIGHT = "strategic_foresight", "Understanding change or uncertainty"
+        DECISION_GOVERNANCE = (
+            "decision_governance",
+            "Clarifying authority or the decision process",
+        )
+        COLLECTIVE_INTELLIGENCE = (
+            "collective_intelligence",
+            "Involving relevant people and perspectives",
+        )
+        PORTFOLIO_PRIORITISATION = (
+            "portfolio_prioritisation",
+            "Comparing options or allocating resources",
+        )
+        ORGANISATIONAL_LEARNING = (
+            "organisational_learning",
+            "Following through and learning",
+        )
+        OTHER = "other", "Another issue or not sure"
 
     class Status(models.TextChoices):
         NEW = "new", "New"
@@ -45,6 +57,8 @@ class DemoRequest(UUIDTimeStampedModel):
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.NEW)
 
     class Meta:
+        verbose_name = "decision enquiry"
+        verbose_name_plural = "decision enquiries"
         ordering = ["-created_at", "id"]
         indexes = [
             models.Index(fields=["status", "created_at"], name="demo_status_created_idx"),

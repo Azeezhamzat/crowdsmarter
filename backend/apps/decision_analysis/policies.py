@@ -5,7 +5,6 @@ from apps.decisions.policies import MANAGER_ROLES, active_membership
 from apps.organisations.models import Membership
 from apps.participants.models import Participant
 
-
 WRITABLE_STATUSES = {
     Decision.Status.DRAFT,
     Decision.Status.FRAMING,
@@ -36,10 +35,14 @@ def can_contribute_analysis(*, actor, decision: Decision) -> bool:
         return True
     if membership.role == Membership.Role.VIEWER:
         return False
-    return decision.participants.filter(
-        user=actor,
-        status=Participant.Status.ACTIVE,
-    ).exclude(role=Participant.Role.OBSERVER).exists()
+    return (
+        decision.participants.filter(
+            user=actor,
+            status=Participant.Status.ACTIVE,
+        )
+        .exclude(role=Participant.Role.OBSERVER)
+        .exists()
+    )
 
 
 def can_edit_issue(*, actor, issue) -> bool:

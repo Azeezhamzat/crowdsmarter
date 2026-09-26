@@ -37,24 +37,12 @@ TEMPLATES: tuple[DecisionTemplate, ...] = (
         key="blank",
         name="Blank decision",
         summary="Start with a clean frame and write every field yourself.",
-        best_for=(
-            "Decisions that do not fit a standard organisational pattern."
-        ),
-        question_prompt=(
-            "State one choice that a named human authority can answer."
-        ),
-        purpose_prompt=(
-            "Explain what better outcome this decision should enable."
-        ),
-        context_prompt=(
-            "Describe what changed, what is known, and why a decision is needed now."
-        ),
-        scope_prompt=(
-            "Define what this decision includes and explicitly excludes."
-        ),
-        contribution_prompt=(
-            "Tell contributors which evidence, expertise, and boundaries matter."
-        ),
+        best_for=("Decisions that do not fit a standard organisational pattern."),
+        question_prompt=("State one choice that a named human authority can answer."),
+        purpose_prompt=("Explain what better outcome this decision should enable."),
+        context_prompt=("Describe what changed, what is known, and why a decision is needed now."),
+        scope_prompt=("Define what this decision includes and explicitly excludes."),
+        contribution_prompt=("Tell contributors which evidence, expertise, and boundaries matter."),
         checklist=(
             "Named decision authority",
             "Explicit alternatives",
@@ -64,19 +52,13 @@ TEMPLATES: tuple[DecisionTemplate, ...] = (
     DecisionTemplate(
         key="technology_adoption",
         name="Technology adoption",
-        summary=(
-            "Evaluate whether to adopt, pilot, replace, or reject a technology."
-        ),
-        best_for=(
-            "Software, AI systems, platforms, infrastructure, and technical tools."
-        ),
+        summary=("Evaluate whether to adopt, pilot, replace, or reject a technology."),
+        best_for=("Software, AI systems, platforms, infrastructure, and technical tools."),
         question_prompt=(
             "Should we adopt, pilot, replace, or reject the proposed technology "
             "for a defined use case?"
         ),
-        purpose_prompt=(
-            "Describe the customer or operational problem the technology must solve."
-        ),
+        purpose_prompt=("Describe the customer or operational problem the technology must solve."),
         context_prompt=(
             "Record the current process, pain points, existing systems, constraints, "
             "and trigger for change."
@@ -100,23 +82,17 @@ TEMPLATES: tuple[DecisionTemplate, ...] = (
         key="pilot_experiment",
         name="Pilot or experiment",
         summary="Decide whether and how to run a bounded learning exercise.",
-        best_for=(
-            "Product pilots, field trials, experiments, and proof-before-scale decisions."
-        ),
+        best_for=("Product pilots, field trials, experiments, and proof-before-scale decisions."),
         question_prompt=(
-            "Should we run the proposed pilot, and under what limits and success "
-            "thresholds?"
+            "Should we run the proposed pilot, and under what limits and success thresholds?"
         ),
-        purpose_prompt=(
-            "State the uncertainty the pilot must reduce before a larger commitment."
-        ),
+        purpose_prompt=("State the uncertainty the pilot must reduce before a larger commitment."),
         context_prompt=(
             "Explain the current evidence gap, proposed intervention, and why "
             "observation is needed."
         ),
         scope_prompt=(
-            "Define population, duration, locations, budget, controls, stop rules, "
-            "and exclusions."
+            "Define population, duration, locations, budget, controls, stop rules, and exclusions."
         ),
         contribution_prompt=(
             "Request measurable outcomes, safety constraints, implementation "
@@ -131,12 +107,8 @@ TEMPLATES: tuple[DecisionTemplate, ...] = (
     DecisionTemplate(
         key="strategic_investment",
         name="Strategic investment",
-        summary=(
-            "Compare a material allocation of money, people, or organisational attention."
-        ),
-        best_for=(
-            "New markets, major programmes, capital allocation, and strategic bets."
-        ),
+        summary=("Compare a material allocation of money, people, or organisational attention."),
+        best_for=("New markets, major programmes, capital allocation, and strategic bets."),
         question_prompt=(
             "Which investment option best advances the strategy within the "
             "organisation's constraints?"
@@ -145,12 +117,10 @@ TEMPLATES: tuple[DecisionTemplate, ...] = (
             "Connect the decision to a measurable strategic objective and customer value."
         ),
         context_prompt=(
-            "Describe the opportunity, timing, alternatives, prior commitments, "
-            "and uncertainty."
+            "Describe the opportunity, timing, alternatives, prior commitments, and uncertainty."
         ),
         scope_prompt=(
-            "Define investment horizon, budget, resources, dependencies, and "
-            "excluded commitments."
+            "Define investment horizon, budget, resources, dependencies, and excluded commitments."
         ),
         contribution_prompt=(
             "Request financial, operational, market, capability, downside, and "
@@ -166,19 +136,14 @@ TEMPLATES: tuple[DecisionTemplate, ...] = (
     DecisionTemplate(
         key="vendor_selection",
         name="Vendor selection",
-        summary=(
-            "Select a supplier through explicit requirements and comparable evidence."
-        ),
-        best_for=(
-            "Software, professional services, equipment, and outsourced capabilities."
-        ),
+        summary=("Select a supplier through explicit requirements and comparable evidence."),
+        best_for=("Software, professional services, equipment, and outsourced capabilities."),
         question_prompt=(
             "Which supplier, including an internal or no-purchase option, best meets "
             "the agreed requirements?"
         ),
         purpose_prompt=(
-            "Define the business outcome the supplier must enable, not merely the "
-            "product to buy."
+            "Define the business outcome the supplier must enable, not merely the product to buy."
         ),
         context_prompt=(
             "Describe the current arrangement, procurement trigger, market scan, and "
@@ -202,20 +167,16 @@ TEMPLATES: tuple[DecisionTemplate, ...] = (
         key="research_project",
         name="Research project approval",
         summary=(
-            "Assess whether a proposed study is valuable, feasible, ethical, and "
-            "decision-relevant."
+            "Assess whether a proposed study is valuable, feasible, ethical, and decision-relevant."
         ),
         best_for=(
-            "Field studies, organisational research, evaluations, and data-collection "
-            "programmes."
+            "Field studies, organisational research, evaluations, and data-collection programmes."
         ),
         question_prompt=(
             "Should the organisation approve, revise, postpone, or reject the "
             "proposed research project?"
         ),
-        purpose_prompt=(
-            "State the decision or knowledge gap the research must address."
-        ),
+        purpose_prompt=("State the decision or knowledge gap the research must address."),
         context_prompt=(
             "Summarise prior evidence, proposed methods, affected groups, and why the "
             "study matters now."
@@ -237,16 +198,12 @@ TEMPLATES: tuple[DecisionTemplate, ...] = (
     DecisionTemplate(
         key="policy_change",
         name="Policy or governance change",
-        summary=(
-            "Evaluate a rule, standard, governance, or operating-policy change."
-        ),
+        summary=("Evaluate a rule, standard, governance, or operating-policy change."),
         best_for=(
-            "Internal policies, governance controls, compliance rules, and operating "
-            "standards."
+            "Internal policies, governance controls, compliance rules, and operating standards."
         ),
         question_prompt=(
-            "Should the organisation introduce, amend, retain, or retire the proposed "
-            "policy?"
+            "Should the organisation introduce, amend, retain, or retire the proposed policy?"
         ),
         purpose_prompt=(
             "Describe the behaviour, risk, fairness, or accountability problem the "
@@ -273,9 +230,7 @@ TEMPLATES: tuple[DecisionTemplate, ...] = (
     DecisionTemplate(
         key="grant_round",
         name="Grant round",
-        summary=(
-            "Run a participatory, evidence-informed grant round from open call to award."
-        ),
+        summary=("Run a participatory, evidence-informed grant round from open call to award."),
         best_for=(
             "Foundations, funds, and grant committees allocating money across "
             "competing applications."
@@ -284,9 +239,7 @@ TEMPLATES: tuple[DecisionTemplate, ...] = (
             "Which applications should this round fund, at what amounts, and why "
             "these over the rest?"
         ),
-        purpose_prompt=(
-            "State what change this funding round is meant to enable, and for whom."
-        ),
+        purpose_prompt=("State what change this funding round is meant to enable, and for whom."),
         context_prompt=(
             "Describe the funding pool, prior rounds, community need, and why this "
             "round is opening now."
@@ -308,18 +261,14 @@ TEMPLATES: tuple[DecisionTemplate, ...] = (
     DecisionTemplate(
         key="idea_competition",
         name="Idea competition or hackathon",
-        summary=(
-            "Run a public challenge from open submissions through judged results."
-        ),
+        summary=("Run a public challenge from open submissions through judged results."),
         best_for=(
             "Hackathons, idea competitions, and challenge prompts for students or the public."
         ),
         question_prompt=(
             "Which submissions should advance, place, or win, and on what published criteria?"
         ),
-        purpose_prompt=(
-            "State the challenge prompt and what a winning entry should demonstrate."
-        ),
+        purpose_prompt=("State the challenge prompt and what a winning entry should demonstrate."),
         context_prompt=(
             "Describe who this is open to, the event or submission window, and why it is "
             "running now."
@@ -369,7 +318,7 @@ TEMPLATES: tuple[DecisionTemplate, ...] = (
             "and note any conflicts of interest to disclose."
         ),
         checklist=(
-            "A named accountable person or small group, not just \"the commons\"",
+            'A named accountable person or small group, not just "the commons"',
             "At least one real signal or observation behind the question",
             "A plan for what happens after this decision: who acts, and when the group revisits it",
         ),

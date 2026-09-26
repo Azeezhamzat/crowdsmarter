@@ -13,9 +13,7 @@ from apps.organisations.selectors import organisation_for_user
 from .models import Workspace
 
 
-def workspaces_for_organisation(
-    *, user: User, organisation_id: UUID
-) -> models.QuerySet[Workspace]:
+def workspaces_for_organisation(*, user: User, organisation_id: UUID) -> models.QuerySet[Workspace]:
     """List workspaces only after establishing organisation access."""
     organisation = organisation_for_user(user=user, organisation_id=organisation_id)
     return Workspace.objects.filter(organisation=organisation).select_related(

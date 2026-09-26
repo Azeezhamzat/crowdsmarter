@@ -3,23 +3,25 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { ApiError } from "../../lib/api";
+import type * as ApplicantApi from "./api";
 import {
   consumeMagicLink,
   getMyApplications,
-  getStoredApplicantToken,
+  logoutApplicantSession,
   requestMagicLink,
   submitProgressReport,
 } from "./api";
 import { MyApplicationsPage } from "./MyApplicationsPage";
 
 vi.mock("./api", async () => {
-  const actual = await vi.importActual<typeof import("./api")>("./api");
+  const actual = await vi.importActual<typeof ApplicantApi>("./api");
   return {
     ...actual,
-    getStoredApplicantToken: vi.fn(),
     requestMagicLink: vi.fn(),
     consumeMagicLink: vi.fn(),
     getMyApplications: vi.fn(),
+    logoutApplicantSession: vi.fn(),
     submitProgressReport: vi.fn(),
   };
 });
@@ -60,12 +62,14 @@ afterEach(() => vi.restoreAllMocks());
 
 describe("MyApplicationsPage", () => {
   it("requests a magic link when no session exists", async () => {
-    vi.mocked(getStoredApplicantToken).mockReturnValue(null);
+    vi.mocked(getMyApplications).mockRejectedValue(
+      new ApiError("Sign in", 403, { detail: "Sign in" }),
+    );
     vi.mocked(requestMagicLink).mockResolvedValue(undefined);
 
     renderPage();
 
-    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: "amina@example.com" } });
+    fireEvent.change(await screen.findByLabelText(/email/i), { target: { value: "amina@example.com" } });
     fireEvent.click(screen.getByRole("button", { name: /email me a link/i }));
 
     await waitFor(() => expect(requestMagicLink).toHaveBeenCalledWith({ email: "amina@example.com", name: "" }));
@@ -73,8 +77,7 @@ describe("MyApplicationsPage", () => {
   });
 
   it("consumes a magic-link token from the URL and lists applications", async () => {
-    vi.mocked(getStoredApplicantToken).mockReturnValue(null);
-    vi.mocked(consumeMagicLink).mockResolvedValue({ applicant_token: "tok-1", email: "amina@example.com", name: "Amina" });
+    vi.mocked(consumeMagicLink).mockResolvedValue({ email: "amina@example.com", name: "Amina" });
     vi.mocked(getMyApplications).mockResolvedValue({
       email: "amina@example.com",
       name: "Amina",
@@ -89,7 +92,6 @@ describe("MyApplicationsPage", () => {
   });
 
   it("submits a progress report for a funded application", async () => {
-    vi.mocked(getStoredApplicantToken).mockReturnValue("tok-1");
     vi.mocked(getMyApplications).mockResolvedValue({
       email: "amina@example.com",
       name: "Amina",
@@ -114,5 +116,20 @@ describe("MyApplicationsPage", () => {
 
     await waitFor(() => expect(submitProgressReport).toHaveBeenCalledWith("idea-1", "We drilled the well."));
     expect(await screen.findByText("We drilled the well.")).toBeInTheDocument();
+  });
+
+  it("revokes the server-side session when signing out", async () => {
+    vi.mocked(getMyApplications).mockResolvedValue({
+      email: "amina@example.com",
+      name: "Amina",
+      applications: [],
+    });
+    vi.mocked(logoutApplicantSession).mockResolvedValue(undefined);
+
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: /sign out/i }));
+
+    await waitFor(() => expect(logoutApplicantSession).toHaveBeenCalledOnce());
+    expect(await screen.findByRole("button", { name: /email me a link/i })).toBeInTheDocument();
   });
 });

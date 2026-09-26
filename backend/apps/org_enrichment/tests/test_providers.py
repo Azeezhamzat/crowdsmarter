@@ -32,7 +32,14 @@ def test_candid_provider_returns_match(monkeypatch):
         assert kwargs["headers"]["Subscription-Key"] == "key123"
         return httpx.Response(
             200,
-            json={"organization": {"organization_name": "Water for All", "ein": "12-3456789", "summary": "Clean water NGO", "subsection_code_description": "501(c)(3)"}},
+            json={
+                "organization": {
+                    "organization_name": "Water for All",
+                    "ein": "12-3456789",
+                    "summary": "Clean water NGO",
+                    "subsection_code_description": "501(c)(3)",
+                }
+            },
             request=httpx.Request("GET", url),
         )
 

@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from collections import Counter, defaultdict
 import builtins
+from collections import Counter, defaultdict
 from decimal import Decimal
 from statistics import mean, pstdev
+from typing import Any
 
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import IntegrityError, transaction
@@ -14,14 +15,31 @@ from django.utils import timezone
 
 from apps.audit.services import record_event
 from apps.decision_options.models import DecisionOption
-from apps.organisations.models import Membership
 from apps.notifications.models import Notification
 from apps.notifications.services import notify_users
+from apps.organisations.models import Membership
 from apps.participants.models import ConflictOfInterest
 from apps.participants.services import conflicts_for_decision
 
-from .models import (EvaluationCriterion, EvaluationExercise, EvaluationResponse, EvaluationRound, EvaluationSubmission, MinorityReport, PortfolioAssessment, PortfolioCandidate, PortfolioCriterion, PortfolioSelection, PrioritisationPortfolio)
-from .policies import can_assess_portfolio, can_manage_exercise, can_manage_portfolio, can_submit_evaluation
+from .models import (
+    EvaluationCriterion,
+    EvaluationExercise,
+    EvaluationResponse,
+    EvaluationRound,
+    EvaluationSubmission,
+    MinorityReport,
+    PortfolioAssessment,
+    PortfolioCandidate,
+    PortfolioCriterion,
+    PortfolioSelection,
+    PrioritisationPortfolio,
+)
+from .policies import (
+    can_assess_portfolio,
+    can_manage_exercise,
+    can_manage_portfolio,
+    can_submit_evaluation,
+)
 
 APPLICATION_LABEL_FORMAT = "Application {index}"
 
@@ -34,7 +52,11 @@ def scoring_options_for_exercise(*, exercise, viewer):
     the round closes" rule. A manager always sees the real title, since they
     administer eligibility/outcome regardless of blinding.
     """
-    active_options = list(exercise.decision.options.filter(status=DecisionOption.Status.ACTIVE).order_by("created_at", "id"))
+    active_options = list(
+        exercise.decision.options.filter(status=DecisionOption.Status.ACTIVE).order_by(
+            "created_at", "id"
+        )
+    )
     reveal = (
         not exercise.blind_applicant_identity
         or exercise.status in {EvaluationExercise.Status.CLOSED, EvaluationExercise.Status.ARCHIVED}
@@ -42,11 +64,17 @@ def scoring_options_for_exercise(*, exercise, viewer):
     )
     rows = []
     for index, option in enumerate(active_options):
-        rows.append({
-            "id": str(option.id),
-            "title": option.title if reveal else APPLICATION_LABEL_FORMAT.format(index=chr(65 + index) if index < 26 else index + 1),
-            "blinded": not reveal,
-        })
+        rows.append(
+            {
+                "id": str(option.id),
+                "title": option.title
+                if reveal
+                else APPLICATION_LABEL_FORMAT.format(
+                    index=chr(65 + index) if index < 26 else index + 1
+                ),
+                "blinded": not reveal,
+            }
+        )
     return rows
 
 
@@ -56,37 +84,76 @@ class EvaluationServiceError(ValidationError):
 
 def _active_member(*, organisation, user_id):
     try:
-        return Membership.objects.select_related("user").get(organisation=organisation, user_id=user_id, status=Membership.Status.ACTIVE).user
+        return (
+            Membership.objects.select_related("user")
+            .get(organisation=organisation, user_id=user_id, status=Membership.Status.ACTIVE)
+            .user
+        )
     except Membership.DoesNotExist as exc:
         raise EvaluationServiceError({"owner_id": "Choose an active organisation member."}) from exc
 
 
 @transaction.atomic
 def create_exercise(*, actor, decision, owner_id, **fields):
-    membership = decision.organisation.memberships.filter(user=actor, status=Membership.Status.ACTIVE).first()
-    if membership is None or not (membership.role in {Membership.Role.OWNER, Membership.Role.ADMIN} or decision.owner_id == actor.id):
-        raise PermissionDenied("Only the decision owner or an organisation manager may create an evaluation.")
-    exercise = EvaluationExercise(organisation=decision.organisation, decision=decision, owner=_active_member(organisation=decision.organisation, user_id=owner_id), created_by=actor, **fields)
+    membership = decision.organisation.memberships.filter(
+        user=actor, status=Membership.Status.ACTIVE
+    ).first()
+    if membership is None or not (
+        membership.role in {Membership.Role.OWNER, Membership.Role.ADMIN}
+        or decision.owner_id == actor.id
+    ):
+        raise PermissionDenied(
+            "Only the decision owner or an organisation manager may create an evaluation."
+        )
+    exercise = EvaluationExercise(
+        organisation=decision.organisation,
+        decision=decision,
+        owner=_active_member(organisation=decision.organisation, user_id=owner_id),
+        created_by=actor,
+        **fields,
+    )
     exercise.full_clean(validate_unique=False, validate_constraints=False)
     exercise.save()
-    record_event(action="evaluation.exercise_created", object_type="evaluations.EvaluationExercise", object_id=str(exercise.id), actor=actor, organisation=decision.organisation, metadata={"decision_id": str(decision.id), "method": exercise.method})
+    record_event(
+        action="evaluation.exercise_created",
+        object_type="evaluations.EvaluationExercise",
+        object_id=str(exercise.id),
+        actor=actor,
+        organisation=decision.organisation,
+        metadata={"decision_id": str(decision.id), "method": exercise.method},
+    )
     return exercise
 
 
 @transaction.atomic
 def update_exercise(*, actor, exercise, fields):
-    exercise = EvaluationExercise.objects.select_for_update().select_related("decision", "organisation", "owner").get(id=exercise.id)
+    exercise = (
+        EvaluationExercise.objects.select_for_update()
+        .select_related("decision", "organisation", "owner")
+        .get(id=exercise.id)
+    )
     if not can_manage_exercise(actor=actor, exercise=exercise):
         raise PermissionDenied("You cannot manage this evaluation.")
     if exercise.status == EvaluationExercise.Status.ARCHIVED:
         raise EvaluationServiceError("Archived evaluations cannot be changed.")
-    requested_status=fields.get("status")
+    requested_status = fields.get("status")
     if requested_status is not None and requested_status != exercise.status:
-        if not (exercise.status == EvaluationExercise.Status.CLOSED and requested_status == EvaluationExercise.Status.ARCHIVED):
-            raise EvaluationServiceError({"status": "Evaluation status is controlled by round transitions; only a closed exercise may be archived here."})
-    editable_after_start={"owner_id", "status"}
-    if exercise.status != EvaluationExercise.Status.DRAFT and any(key not in editable_after_start for key in fields):
-        raise EvaluationServiceError("Evaluation governance can be changed only before the first round opens.")
+        if not (
+            exercise.status == EvaluationExercise.Status.CLOSED
+            and requested_status == EvaluationExercise.Status.ARCHIVED
+        ):
+            raise EvaluationServiceError(
+                {
+                    "status": "Evaluation status is controlled by round transitions; only a closed exercise may be archived here."
+                }
+            )
+    editable_after_start = {"owner_id", "status"}
+    if exercise.status != EvaluationExercise.Status.DRAFT and any(
+        key not in editable_after_start for key in fields
+    ):
+        raise EvaluationServiceError(
+            "Evaluation governance can be changed only before the first round opens."
+        )
     for key, value in fields.items():
         if key == "owner_id":
             exercise.owner = _active_member(organisation=exercise.organisation, user_id=value)
@@ -94,7 +161,14 @@ def update_exercise(*, actor, exercise, fields):
             setattr(exercise, key, value)
     exercise.full_clean(validate_unique=False, validate_constraints=False)
     exercise.save()
-    record_event(action="evaluation.exercise_updated", object_type="evaluations.EvaluationExercise", object_id=str(exercise.id), actor=actor, organisation=exercise.organisation, metadata={"fields": sorted(fields)})
+    record_event(
+        action="evaluation.exercise_updated",
+        object_type="evaluations.EvaluationExercise",
+        object_id=str(exercise.id),
+        actor=actor,
+        organisation=exercise.organisation,
+        metadata={"fields": sorted(fields)},
+    )
     return exercise
 
 
@@ -109,14 +183,27 @@ def create_criterion(*, actor, exercise, **fields):
     try:
         criterion.save()
     except IntegrityError as exc:
-        raise EvaluationServiceError({"title": "Criterion titles must be unique within an exercise."}) from exc
-    record_event(action="evaluation.criterion_created", object_type="evaluations.EvaluationCriterion", object_id=str(criterion.id), actor=actor, organisation=exercise.organisation, metadata={"exercise_id": str(exercise.id), "weight": criterion.weight})
+        raise EvaluationServiceError(
+            {"title": "Criterion titles must be unique within an exercise."}
+        ) from exc
+    record_event(
+        action="evaluation.criterion_created",
+        object_type="evaluations.EvaluationCriterion",
+        object_id=str(criterion.id),
+        actor=actor,
+        organisation=exercise.organisation,
+        metadata={"exercise_id": str(exercise.id), "weight": criterion.weight},
+    )
     return criterion
 
 
 @transaction.atomic
 def create_round(*, actor, exercise, title=""):
-    exercise = EvaluationExercise.objects.select_for_update().select_related("decision", "organisation", "owner").get(id=exercise.id)
+    exercise = (
+        EvaluationExercise.objects.select_for_update()
+        .select_related("decision", "organisation", "owner")
+        .get(id=exercise.id)
+    )
     if not can_manage_exercise(actor=actor, exercise=exercise):
         raise PermissionDenied("You cannot manage this evaluation.")
     if exercise.status == EvaluationExercise.Status.ARCHIVED:
@@ -126,24 +213,43 @@ def create_round(*, actor, exercise, title=""):
     if exercise.method != EvaluationExercise.Method.DELPHI and exercise.rounds.exists():
         raise EvaluationServiceError("Only Delphi exercises may contain multiple rounds.")
     number = (exercise.rounds.aggregate(value=Max("number"))["value"] or 0) + 1
-    item = EvaluationRound(organisation=exercise.organisation, exercise=exercise, number=number, title=title)
+    item = EvaluationRound(
+        organisation=exercise.organisation, exercise=exercise, number=number, title=title
+    )
     item.full_clean(validate_unique=False, validate_constraints=False)
     item.save()
-    record_event(action="evaluation.round_created", object_type="evaluations.EvaluationRound", object_id=str(item.id), actor=actor, organisation=exercise.organisation, metadata={"exercise_id": str(exercise.id), "number": number})
+    record_event(
+        action="evaluation.round_created",
+        object_type="evaluations.EvaluationRound",
+        object_id=str(item.id),
+        actor=actor,
+        organisation=exercise.organisation,
+        metadata={"exercise_id": str(exercise.id), "number": number},
+    )
     return item
 
 
 @transaction.atomic
 def transition_round(*, actor, round, status, feedback_summary=""):
-    item = EvaluationRound.objects.select_for_update().select_related("exercise__decision", "exercise__organisation", "exercise__owner").get(id=round.id)
+    item = (
+        EvaluationRound.objects.select_for_update()
+        .select_related("exercise__decision", "exercise__organisation", "exercise__owner")
+        .get(id=round.id)
+    )
     if not can_manage_exercise(actor=actor, exercise=item.exercise):
         raise PermissionDenied("You cannot manage this evaluation round.")
     if status == EvaluationRound.Status.OPEN:
         if item.status != EvaluationRound.Status.DRAFT:
             raise EvaluationServiceError("Only a draft round can be opened.")
         exercise = item.exercise
-        if exercise.method in {EvaluationExercise.Method.SCORECARD, EvaluationExercise.Method.DELPHI} and not exercise.criteria.exists():
-            raise EvaluationServiceError("Add at least one weighted criterion before opening this round.")
+        if (
+            exercise.method
+            in {EvaluationExercise.Method.SCORECARD, EvaluationExercise.Method.DELPHI}
+            and not exercise.criteria.exists()
+        ):
+            raise EvaluationServiceError(
+                "Add at least one weighted criterion before opening this round."
+            )
         if not exercise.decision.options.filter(status=DecisionOption.Status.ACTIVE).exists():
             raise EvaluationServiceError("The decision needs at least one active option.")
         item.status = status
@@ -164,7 +270,14 @@ def transition_round(*, actor, round, status, feedback_summary=""):
         raise EvaluationServiceError("Use the explicit open or closed transition.")
     item.full_clean(validate_unique=False, validate_constraints=False)
     item.save()
-    record_event(action=f"evaluation.round_{status}", object_type="evaluations.EvaluationRound", object_id=str(item.id), actor=actor, organisation=item.organisation, metadata={"exercise_id": str(item.exercise_id), "number": item.number})
+    record_event(
+        action=f"evaluation.round_{status}",
+        object_type="evaluations.EvaluationRound",
+        object_id=str(item.id),
+        actor=actor,
+        organisation=item.organisation,
+        metadata={"exercise_id": str(item.exercise_id), "number": item.number},
+    )
     recipients = [
         participant.user
         for participant in item.exercise.decision.participants.filter(status="active")
@@ -200,9 +313,15 @@ def transition_round(*, actor, round, status, feedback_summary=""):
 
 
 def _validate_responses(*, exercise, responses):
-    active_options = {str(item.id): item for item in exercise.decision.options.filter(status=DecisionOption.Status.ACTIVE)}
+    active_options = {
+        str(item.id): item
+        for item in exercise.decision.options.filter(status=DecisionOption.Status.ACTIVE)
+    }
     criteria = {str(item.id): item for item in exercise.criteria.all()}
-    expected_scorecard = exercise.method in {EvaluationExercise.Method.SCORECARD, EvaluationExercise.Method.DELPHI}
+    expected_scorecard = exercise.method in {
+        EvaluationExercise.Method.SCORECARD,
+        EvaluationExercise.Method.DELPHI,
+    }
     is_ranked_choice = exercise.method == EvaluationExercise.Method.RANKED_CHOICE
     cleaned = []
     seen = set()
@@ -210,20 +329,28 @@ def _validate_responses(*, exercise, responses):
     for value in responses:
         option = active_options.get(str(value["option_id"]))
         if option is None:
-            raise EvaluationServiceError({"responses": "Every response must use an active option from this decision."})
+            raise EvaluationServiceError(
+                {"responses": "Every response must use an active option from this decision."}
+            )
         criterion = None
         if value.get("criterion_id"):
             criterion = criteria.get(str(value["criterion_id"]))
             if criterion is None:
-                raise EvaluationServiceError({"responses": "Every criterion must belong to this evaluation."})
+                raise EvaluationServiceError(
+                    {"responses": "Every criterion must belong to this evaluation."}
+                )
         key = (option.id, criterion.id if criterion else None)
         if key in seen:
-            raise EvaluationServiceError({"responses": "Each option and criterion may be answered once."})
+            raise EvaluationServiceError(
+                {"responses": "Each option and criterion may be answered once."}
+            )
         seen.add(key)
         if expected_scorecard and criterion is None:
             raise EvaluationServiceError({"responses": "Scorecard responses require a criterion."})
         if expected_scorecard and (value.get("score") is None or value.get("vote")):
-            raise EvaluationServiceError({"responses": "Scorecard responses require a score and do not use ballots."})
+            raise EvaluationServiceError(
+                {"responses": "Scorecard responses require a score and do not use ballots."}
+            )
         if not expected_scorecard and criterion is not None:
             raise EvaluationServiceError({"responses": "Ballot responses do not use criteria."})
         if not expected_scorecard and value.get("score") is not None:
@@ -233,24 +360,36 @@ def _validate_responses(*, exercise, responses):
             if rank is None:
                 raise EvaluationServiceError({"responses": "Every option must receive a rank."})
             if rank < 1 or rank > len(active_options):
-                raise EvaluationServiceError({"responses": "Ranks must run from 1 to the number of active options, with no gaps or repeats."})
+                raise EvaluationServiceError(
+                    {
+                        "responses": "Ranks must run from 1 to the number of active options, with no gaps or repeats."
+                    }
+                )
             if rank in ranks_used:
-                raise EvaluationServiceError({"responses": "Each rank may be used once - this is a strict preference order."})
+                raise EvaluationServiceError(
+                    {"responses": "Each rank may be used once - this is a strict preference order."}
+                )
             ranks_used.add(rank)
             if value.get("vote"):
-                raise EvaluationServiceError({"responses": "Ranked-choice responses do not use a vote."})
+                raise EvaluationServiceError(
+                    {"responses": "Ranked-choice responses do not use a vote."}
+                )
         elif exercise.method == EvaluationExercise.Method.APPROVAL and value.get("vote") not in {
             EvaluationResponse.Vote.APPROVE,
             EvaluationResponse.Vote.ABSTAIN,
         }:
-            raise EvaluationServiceError({"responses": "Approval rounds accept only approve or abstain."})
+            raise EvaluationServiceError(
+                {"responses": "Approval rounds accept only approve or abstain."}
+            )
         elif exercise.method == EvaluationExercise.Method.CONSENT and value.get("vote") not in {
             EvaluationResponse.Vote.CONSENT,
             EvaluationResponse.Vote.CONCERN,
             EvaluationResponse.Vote.OBJECT,
             EvaluationResponse.Vote.ABSTAIN,
         }:
-            raise EvaluationServiceError({"responses": "Consent rounds accept consent, concern, objection, or abstention."})
+            raise EvaluationServiceError(
+                {"responses": "Consent rounds accept consent, concern, objection, or abstention."}
+            )
         cleaned.append((option, criterion, value))
     if not cleaned:
         raise EvaluationServiceError({"responses": "Submit at least one response."})
@@ -259,30 +398,70 @@ def _validate_responses(*, exercise, responses):
 
 @transaction.atomic
 def save_submission(*, actor, round, confidence, overall_rationale, responses, submit=True):
-    item = EvaluationRound.objects.select_for_update().select_related("exercise__decision", "exercise__organisation", "exercise__owner").prefetch_related("exercise__criteria", "exercise__decision__options").get(id=round.id)
+    item = (
+        EvaluationRound.objects.select_for_update()
+        .select_related("exercise__decision", "exercise__organisation", "exercise__owner")
+        .prefetch_related("exercise__criteria", "exercise__decision__options")
+        .get(id=round.id)
+    )
     if item.status != EvaluationRound.Status.OPEN:
         raise EvaluationServiceError("This evaluation round is not open.")
     if not can_submit_evaluation(actor=actor, exercise=item.exercise):
         raise PermissionDenied("Only active, non-observer decision participants may contribute.")
     cleaned = _validate_responses(exercise=item.exercise, responses=responses)
     if submit:
-        active_option_count=item.exercise.decision.options.filter(status=DecisionOption.Status.ACTIVE).count()
-        expected_count=active_option_count * (item.exercise.criteria.count() if item.exercise.method in {EvaluationExercise.Method.SCORECARD, EvaluationExercise.Method.DELPHI} else 1)
+        active_option_count = item.exercise.decision.options.filter(
+            status=DecisionOption.Status.ACTIVE
+        ).count()
+        expected_count = active_option_count * (
+            item.exercise.criteria.count()
+            if item.exercise.method
+            in {EvaluationExercise.Method.SCORECARD, EvaluationExercise.Method.DELPHI}
+            else 1
+        )
         if len(cleaned) != expected_count:
-            raise EvaluationServiceError({"responses": "A submitted evaluation must answer every active option and applicable criterion. Save a draft for incomplete work."})
-    submission, _ = EvaluationSubmission.objects.select_for_update().get_or_create(round=item, submitted_by=actor, defaults={"organisation": item.organisation})
+            raise EvaluationServiceError(
+                {
+                    "responses": "A submitted evaluation must answer every active option and applicable criterion. Save a draft for incomplete work."
+                }
+            )
+    submission, _ = EvaluationSubmission.objects.select_for_update().get_or_create(
+        round=item, submitted_by=actor, defaults={"organisation": item.organisation}
+    )
     submission.confidence = confidence
     submission.overall_rationale = overall_rationale
-    submission.status = EvaluationSubmission.Status.SUBMITTED if submit else EvaluationSubmission.Status.DRAFT
+    submission.status = (
+        EvaluationSubmission.Status.SUBMITTED if submit else EvaluationSubmission.Status.DRAFT
+    )
     submission.submitted_at = timezone.now() if submit else None
     submission.full_clean(validate_unique=False, validate_constraints=False)
     submission.save()
     submission.responses.all().delete()
     for option, criterion, value in cleaned:
-        response = EvaluationResponse(organisation=item.organisation, submission=submission, option=option, criterion=criterion, score=value.get("score"), vote=value.get("vote", ""), rank=value.get("rank"), rationale=value.get("rationale", ""))
+        response = EvaluationResponse(
+            organisation=item.organisation,
+            submission=submission,
+            option=option,
+            criterion=criterion,
+            score=value.get("score"),
+            vote=value.get("vote", ""),
+            rank=value.get("rank"),
+            rationale=value.get("rationale", ""),
+        )
         response.full_clean(validate_unique=False, validate_constraints=False)
         response.save()
-    record_event(action="evaluation.submission_submitted" if submit else "evaluation.submission_saved", object_type="evaluations.EvaluationSubmission", object_id=str(submission.id), actor=actor, organisation=item.organisation, metadata={"round_id": str(item.id), "response_count": len(cleaned), "status": submission.status})
+    record_event(
+        action="evaluation.submission_submitted" if submit else "evaluation.submission_saved",
+        object_type="evaluations.EvaluationSubmission",
+        object_id=str(submission.id),
+        actor=actor,
+        organisation=item.organisation,
+        metadata={
+            "round_id": str(item.id),
+            "response_count": len(cleaned),
+            "status": submission.status,
+        },
+    )
     return submission
 
 
@@ -295,25 +474,65 @@ def create_minority_report(*, actor, exercise, round_id=None, **fields):
         try:
             round = exercise.rounds.get(id=round_id)
         except EvaluationRound.DoesNotExist as exc:
-            raise EvaluationServiceError({"round_id": "Select a round from this exercise."}) from exc
-    report = MinorityReport(organisation=exercise.organisation, exercise=exercise, round=round, author=actor, **fields)
+            raise EvaluationServiceError(
+                {"round_id": "Select a round from this exercise."}
+            ) from exc
+    report = MinorityReport(
+        organisation=exercise.organisation, exercise=exercise, round=round, author=actor, **fields
+    )
     report.full_clean(validate_unique=False, validate_constraints=False)
     report.save()
-    record_event(action="evaluation.minority_report_published", object_type="evaluations.MinorityReport", object_id=str(report.id), actor=actor, organisation=exercise.organisation, metadata={"exercise_id": str(exercise.id), "round_id": str(round.id) if round else None})
+    record_event(
+        action="evaluation.minority_report_published",
+        object_type="evaluations.MinorityReport",
+        object_id=str(report.id),
+        actor=actor,
+        organisation=exercise.organisation,
+        metadata={"exercise_id": str(exercise.id), "round_id": str(round.id) if round else None},
+    )
     return report
 
 
 def evaluation_results(*, round, viewer):
     exercise = round.exercise
-    submitted = list(round.submissions.filter(status=EvaluationSubmission.Status.SUBMITTED).prefetch_related("responses__option", "responses__criterion", "submitted_by"))
-    eligible = exercise.decision.participants.filter(status="active").exclude(role="observer").values("user_id").distinct().count()
+    submitted = list(
+        round.submissions.filter(status=EvaluationSubmission.Status.SUBMITTED).prefetch_related(
+            "responses__option", "responses__criterion", "submitted_by"
+        )
+    )
+    eligible = (
+        exercise.decision.participants.filter(status="active")
+        .exclude(role="observer")
+        .values("user_id")
+        .distinct()
+        .count()
+    )
     hidden = exercise.blind_results_until_close and round.status != EvaluationRound.Status.CLOSED
-    base = {"hidden": hidden, "round_id": str(round.id), "submission_count": len(submitted), "eligible_count": eligible, "quorum_count": exercise.quorum_count, "quorum_met": len(submitted) >= exercise.quorum_count, "method": exercise.method, "options": [], "criterion_sensitivity": [], "tornado": None, "uncertainty_narrative": "", "ranked_choice_rounds": []}
+    base = {
+        "hidden": hidden,
+        "round_id": str(round.id),
+        "submission_count": len(submitted),
+        "eligible_count": eligible,
+        "quorum_count": exercise.quorum_count,
+        "quorum_met": len(submitted) >= exercise.quorum_count,
+        "method": exercise.method,
+        "options": [],
+        "criterion_sensitivity": [],
+        "tornado": None,
+        "uncertainty_narrative": "",
+        "ranked_choice_rounds": [],
+    }
     if hidden:
         return base
     conflicts = list(conflicts_for_decision(decision=exercise.decision))
-    decision_wide_conflicts = {c.participant.user_id for c in conflicts if c.scope == ConflictOfInterest.Scope.DECISION}
-    option_conflicts = {(c.participant.user_id, c.option_id) for c in conflicts if c.scope == ConflictOfInterest.Scope.OPTION}
+    decision_wide_conflicts = {
+        c.participant.user_id for c in conflicts if c.scope == ConflictOfInterest.Scope.DECISION
+    }
+    option_conflicts = {
+        (c.participant.user_id, c.option_id)
+        for c in conflicts
+        if c.scope == ConflictOfInterest.Scope.OPTION
+    }
     excluded_emails_by_option = defaultdict(set)
 
     def _is_conflicted(user_id, option_id):
@@ -322,76 +541,118 @@ def evaluation_results(*, round, viewer):
     if exercise.method in {EvaluationExercise.Method.SCORECARD, EvaluationExercise.Method.DELPHI}:
         criteria = list(exercise.criteria.all())
         total_weight = sum((c.weight for c in criteria), Decimal("0")) or Decimal("1")
-        values = defaultdict(lambda: defaultdict(list))
+        values: dict[Any, dict[Any, list[float]]] = defaultdict(lambda: defaultdict(list))
         confidences = defaultdict(list)
         option_map = {}
-        per_submission_scores = defaultdict(lambda: defaultdict(dict))
+        per_submission_scores: dict[Any, dict[Any, dict[Any, float]]] = defaultdict(
+            lambda: defaultdict(dict)
+        )
         for submission in submitted:
             for response in submission.responses.all():
                 if response.criterion_id and response.score is not None:
                     if _is_conflicted(submission.submitted_by_id, response.option_id):
-                        excluded_emails_by_option[response.option_id].add(submission.submitted_by.email)
+                        excluded_emails_by_option[response.option_id].add(
+                            submission.submitted_by.email
+                        )
                         continue
                     values[response.option_id][response.criterion_id].append(float(response.score))
                     confidences[response.option_id].append(submission.confidence)
                     option_map[response.option_id] = response.option
-                    per_submission_scores[submission.id][response.option_id][response.criterion_id] = float(response.score)
-        rows=[]
+                    per_submission_scores[submission.id][response.option_id][
+                        response.criterion_id
+                    ] = float(response.score)
+        rows = []
         for option_id, option in option_map.items():
-            weighted=0.0
-            coverage=0.0
-            criterion_rows=[]
+            weighted = 0.0
+            coverage = 0.0
+            criterion_rows = []
             for criterion in criteria:
-                raw=values[option_id].get(criterion.id, [])
-                avg=mean(raw) if raw else None
-                normalised=None
+                raw = values[option_id].get(criterion.id, [])
+                avg = mean(raw) if raw else None
+                normalised = None
                 if avg is not None:
-                    span=criterion.scale_max-criterion.scale_min
-                    normalised=(avg-criterion.scale_min)/span*100
+                    span = criterion.scale_max - criterion.scale_min
+                    normalised = (avg - criterion.scale_min) / span * 100
                     if not criterion.higher_is_better:
-                        normalised=100-normalised
-                    weighted += normalised * float(criterion.weight/total_weight)
-                    coverage += float(criterion.weight/total_weight)
-                criterion_rows.append({"criterion_id": str(criterion.id), "title": criterion.title, "mean_score": round_number(avg), "normalised_score": round_number(normalised), "response_count": len(raw)})
-            individual_scores = _individual_weighted_scores(option_id=option_id, criteria=criteria, total_weight=total_weight, per_submission_scores=per_submission_scores)
+                        normalised = 100 - normalised
+                    weighted += normalised * float(criterion.weight / total_weight)
+                    coverage += float(criterion.weight / total_weight)
+                criterion_rows.append(
+                    {
+                        "criterion_id": str(criterion.id),
+                        "title": criterion.title,
+                        "mean_score": round_number(avg),
+                        "normalised_score": round_number(normalised),
+                        "response_count": len(raw),
+                    }
+                )
+            individual_scores = _individual_weighted_scores(
+                option_id=option_id,
+                criteria=criteria,
+                total_weight=total_weight,
+                per_submission_scores=per_submission_scores,
+            )
             dispersion = pstdev(individual_scores) if len(individual_scores) >= 2 else None
-            rows.append({
-                "option_id": str(option.id),
-                "title": option.title,
-                "weighted_score": builtins.round(weighted/coverage,2) if coverage else None,
-                "confidence": builtins.round(mean(confidences[option_id]),2) if confidences[option_id] else None,
-                "score_stdev": round_number(dispersion),
-                "score_min": round_number(min(individual_scores)) if individual_scores else None,
-                "score_max": round_number(max(individual_scores)) if individual_scores else None,
-                "disagreement": _disagreement_label(dispersion),
-                "criteria": criterion_rows,
-                "excluded_response_count": len(excluded_emails_by_option.get(option_id, ())),
-                "conflicted_reviewer_emails": sorted(excluded_emails_by_option.get(option_id, ())),
-            })
-        rows.sort(key=lambda x: (x["weighted_score"] is not None, x["weighted_score"] or -1), reverse=True)
-        base["options"]=rows
-        base["criterion_sensitivity"]=_sensitivity(rows=rows, criteria=criteria, values=values)
-        base["tornado"]=_tornado(rows=rows, criteria=criteria, values=values)
-        base["uncertainty_narrative"]=_uncertainty_narrative(rows=rows, criterion_sensitivity=base["criterion_sensitivity"])
+            rows.append(
+                {
+                    "option_id": str(option.id),
+                    "title": option.title,
+                    "weighted_score": builtins.round(weighted / coverage, 2) if coverage else None,
+                    "confidence": builtins.round(mean(confidences[option_id]), 2)
+                    if confidences[option_id]
+                    else None,
+                    "score_stdev": round_number(dispersion),
+                    "score_min": round_number(min(individual_scores))
+                    if individual_scores
+                    else None,
+                    "score_max": round_number(max(individual_scores))
+                    if individual_scores
+                    else None,
+                    "disagreement": _disagreement_label(dispersion),
+                    "criteria": criterion_rows,
+                    "excluded_response_count": len(excluded_emails_by_option.get(option_id, ())),
+                    "conflicted_reviewer_emails": sorted(
+                        excluded_emails_by_option.get(option_id, ())
+                    ),
+                }
+            )
+        rows.sort(
+            key=lambda x: (x["weighted_score"] is not None, x["weighted_score"] or -1), reverse=True
+        )
+        base["options"] = rows
+        base["criterion_sensitivity"] = _sensitivity(rows=rows, criteria=criteria, values=values)
+        base["tornado"] = _tornado(rows=rows, criteria=criteria, values=values)
+        base["uncertainty_narrative"] = _uncertainty_narrative(
+            rows=rows, criterion_sensitivity=base["criterion_sensitivity"]
+        )
     elif exercise.method == EvaluationExercise.Method.RANKED_CHOICE:
         option_map = {}
         ballots = []
         for submission in submitted:
-            if any(_is_conflicted(submission.submitted_by_id, response.option_id) for response in submission.responses.all()):
+            if any(
+                _is_conflicted(submission.submitted_by_id, response.option_id)
+                for response in submission.responses.all()
+            ):
                 for response in submission.responses.all():
                     excluded_emails_by_option[response.option_id].add(submission.submitted_by.email)
                 continue
-            preferences = sorted(submission.responses.all(), key=lambda r: r.rank if r.rank is not None else 999)
+            preferences = sorted(
+                submission.responses.all(), key=lambda r: r.rank if r.rank is not None else 999
+            )
             ballot = [response.option_id for response in preferences if response.rank is not None]
             for response in preferences:
                 option_map[response.option_id] = response.option
             if ballot:
                 ballots.append(ballot)
-        base["options"], base["ranked_choice_rounds"] = _instant_runoff(option_map=option_map, ballots=ballots)
+        base["options"], base["ranked_choice_rounds"] = _instant_runoff(
+            option_map=option_map, ballots=ballots
+        )
         for row in base["options"]:
             option_uuid = next((oid for oid in option_map if str(oid) == row["option_id"]), None)
             row["excluded_response_count"] = len(excluded_emails_by_option.get(option_uuid, ()))
-            row["conflicted_reviewer_emails"] = sorted(excluded_emails_by_option.get(option_uuid, ()))
+            row["conflicted_reviewer_emails"] = sorted(
+                excluded_emails_by_option.get(option_uuid, ())
+            )
         if base["options"]:
             winner = base["options"][0]
             base["uncertainty_narrative"] = (
@@ -399,35 +660,70 @@ def evaluation_results(*, round, viewer):
                 f"{len(base.get('ranked_choice_rounds', []))} elimination round(s)."
             )
     else:
-        grouped=defaultdict(list); option_map={}
+        grouped = defaultdict(list)
+        option_map = {}
         for submission in submitted:
             for response in submission.responses.all():
                 if _is_conflicted(submission.submitted_by_id, response.option_id):
                     excluded_emails_by_option[response.option_id].add(submission.submitted_by.email)
                     continue
-                grouped[response.option_id].append(response.vote); option_map[response.option_id]=response.option
-        rows=[]
+                grouped[response.option_id].append(response.vote)
+                option_map[response.option_id] = response.option
+        rows = []
         for option_id, votes in grouped.items():
-            non_abstain=[v for v in votes if v != EvaluationResponse.Vote.ABSTAIN]
-            approvals=sum(v in {EvaluationResponse.Vote.APPROVE, EvaluationResponse.Vote.CONSENT} for v in non_abstain)
-            objections=sum(v == EvaluationResponse.Vote.OBJECT for v in non_abstain)
-            approval_rate=(approvals/len(non_abstain)*100) if non_abstain else 0
-            objection_rate=(objections/len(non_abstain)*100) if non_abstain else 0
-            passes=approval_rate >= float(exercise.approval_threshold) if exercise.method == EvaluationExercise.Method.APPROVAL else objection_rate <= float(exercise.objection_threshold)
+            non_abstain = [v for v in votes if v != EvaluationResponse.Vote.ABSTAIN]
+            approvals = sum(
+                v in {EvaluationResponse.Vote.APPROVE, EvaluationResponse.Vote.CONSENT}
+                for v in non_abstain
+            )
+            objections = sum(v == EvaluationResponse.Vote.OBJECT for v in non_abstain)
+            approval_rate = (approvals / len(non_abstain) * 100) if non_abstain else 0
+            objection_rate = (objections / len(non_abstain) * 100) if non_abstain else 0
+            passes = (
+                approval_rate >= float(exercise.approval_threshold)
+                if exercise.method == EvaluationExercise.Method.APPROVAL
+                else objection_rate <= float(exercise.objection_threshold)
+            )
             if non_abstain:
                 majority_count = Counter(non_abstain).most_common(1)[0][1]
-                dissent_rate = builtins.round((len(non_abstain) - majority_count) / len(non_abstain) * 100, 2)
+                dissent_rate = builtins.round(
+                    (len(non_abstain) - majority_count) / len(non_abstain) * 100, 2
+                )
             else:
                 dissent_rate = 0
-            rows.append({"option_id": str(option_id), "title": option_map[option_id].title, "vote_count": len(votes), "approval_rate": builtins.round(approval_rate,2), "objection_rate": builtins.round(objection_rate,2), "dissent_rate": dissent_rate, "passes_threshold": passes, "breakdown": {choice: votes.count(choice) for choice, _ in EvaluationResponse.Vote.choices}, "excluded_response_count": len(excluded_emails_by_option.get(option_id, ())), "conflicted_reviewer_emails": sorted(excluded_emails_by_option.get(option_id, ()))})
-        rows.sort(key=lambda x: (x["passes_threshold"], x["approval_rate"], -x["objection_rate"]), reverse=True)
-        base["options"]=rows
+            rows.append(
+                {
+                    "option_id": str(option_id),
+                    "title": option_map[option_id].title,
+                    "vote_count": len(votes),
+                    "approval_rate": builtins.round(approval_rate, 2),
+                    "objection_rate": builtins.round(objection_rate, 2),
+                    "dissent_rate": dissent_rate,
+                    "passes_threshold": passes,
+                    "breakdown": {
+                        choice: votes.count(choice) for choice, _ in EvaluationResponse.Vote.choices
+                    },
+                    "excluded_response_count": len(excluded_emails_by_option.get(option_id, ())),
+                    "conflicted_reviewer_emails": sorted(
+                        excluded_emails_by_option.get(option_id, ())
+                    ),
+                }
+            )
+        rows.sort(
+            key=lambda x: (x["passes_threshold"], x["approval_rate"], -x["objection_rate"]),
+            reverse=True,
+        )
+        base["options"] = rows
         if rows:
             leader = rows[0]
             if leader["dissent_rate"] > 0:
-                base["uncertainty_narrative"] = f"“{leader['title']}” currently leads, but {leader['dissent_rate']}% of non-abstaining votes dissented from the majority position."
+                base["uncertainty_narrative"] = (
+                    f"“{leader['title']}” currently leads, but {leader['dissent_rate']}% of non-abstaining votes dissented from the majority position."
+                )
             else:
-                base["uncertainty_narrative"] = f"“{leader['title']}” currently leads with no recorded dissent among non-abstaining votes."
+                base["uncertainty_narrative"] = (
+                    f"“{leader['title']}” currently leads with no recorded dissent among non-abstaining votes."
+                )
     return base
 
 
@@ -481,7 +777,9 @@ def _simulate_scores(*, criteria, values, weights, total):
             if not raw:
                 continue
             avg = mean(raw)
-            normalised = (avg - criterion.scale_min) / (criterion.scale_max - criterion.scale_min) * 100
+            normalised = (
+                (avg - criterion.scale_min) / (criterion.scale_max - criterion.scale_min) * 100
+            )
             if not criterion.higher_is_better:
                 normalised = 100 - normalised
             fraction = float(weights[criterion.id] / total)
@@ -500,46 +798,77 @@ def _perturbed_weights(*, criteria, changed, factor):
 def _sensitivity(*, rows, criteria, values):
     if not rows or not criteria:
         return []
-    base_rank={row["option_id"]: index+1 for index,row in enumerate(rows)}
-    rank_ranges={key:[rank] for key,rank in base_rank.items()}
+    base_rank = {row["option_id"]: index + 1 for index, row in enumerate(rows)}
+    rank_ranges = {key: [rank] for key, rank in base_rank.items()}
     for changed in criteria:
         for factor in (Decimal("0.75"), Decimal("1.25")):
             weights, total = _perturbed_weights(criteria=criteria, changed=changed, factor=factor)
-            scores = _simulate_scores(criteria=criteria, values=values, weights=weights, total=total)
+            scores = _simulate_scores(
+                criteria=criteria, values=values, weights=weights, total=total
+            )
             simulated = sorted(
-                ((str(option_id), score if score is not None else -1.0) for option_id, score in scores.items()),
+                (
+                    (str(option_id), score if score is not None else -1.0)
+                    for option_id, score in scores.items()
+                ),
                 key=lambda pair: pair[1],
                 reverse=True,
             )
             for index, (option_id, _) in enumerate(simulated):
                 rank_ranges[option_id].append(index + 1)
-    return [{"option_id": oid, "base_rank": base_rank[oid], "best_rank": min(ranks), "worst_rank": max(ranks), "stable": min(ranks)==max(ranks)} for oid,ranks in rank_ranges.items()]
+    return [
+        {
+            "option_id": oid,
+            "base_rank": base_rank[oid],
+            "best_rank": min(ranks),
+            "worst_rank": max(ranks),
+            "stable": min(ranks) == max(ranks),
+        }
+        for oid, ranks in rank_ranges.items()
+    ]
 
 
 def _tornado(*, rows, criteria, values):
     """Per-criterion impact on the current leader's own score under a +/-25% weight change."""
     if not rows or not criteria:
         return None
-    leader_id = next((option_id for option_id in values if str(option_id) == rows[0]["option_id"]), None)
+    leader_id = next(
+        (option_id for option_id in values if str(option_id) == rows[0]["option_id"]), None
+    )
     if leader_id is None:
         return None
     bars = []
     for changed in criteria:
-        low_weights, low_total = _perturbed_weights(criteria=criteria, changed=changed, factor=Decimal("0.75"))
-        high_weights, high_total = _perturbed_weights(criteria=criteria, changed=changed, factor=Decimal("1.25"))
-        low_score = _simulate_scores(criteria=criteria, values=values, weights=low_weights, total=low_total).get(leader_id)
-        high_score = _simulate_scores(criteria=criteria, values=values, weights=high_weights, total=high_total).get(leader_id)
+        low_weights, low_total = _perturbed_weights(
+            criteria=criteria, changed=changed, factor=Decimal("0.75")
+        )
+        high_weights, high_total = _perturbed_weights(
+            criteria=criteria, changed=changed, factor=Decimal("1.25")
+        )
+        low_score = _simulate_scores(
+            criteria=criteria, values=values, weights=low_weights, total=low_total
+        ).get(leader_id)
+        high_score = _simulate_scores(
+            criteria=criteria, values=values, weights=high_weights, total=high_total
+        ).get(leader_id)
         if low_score is None or high_score is None:
             continue
-        bars.append({
-            "criterion_id": str(changed.id),
-            "title": changed.title,
-            "score_low": round_number(min(low_score, high_score)),
-            "score_high": round_number(max(low_score, high_score)),
-            "impact": round_number(abs(high_score - low_score)),
-        })
+        bars.append(
+            {
+                "criterion_id": str(changed.id),
+                "title": changed.title,
+                "score_low": round_number(min(low_score, high_score)),
+                "score_high": round_number(max(low_score, high_score)),
+                "impact": round_number(abs(high_score - low_score)),
+            }
+        )
     bars.sort(key=lambda item: item["impact"], reverse=True)
-    return {"option_id": rows[0]["option_id"], "option_title": rows[0]["title"], "base_score": rows[0]["weighted_score"], "criteria": bars}
+    return {
+        "option_id": rows[0]["option_id"],
+        "option_title": rows[0]["title"],
+        "base_score": rows[0]["weighted_score"],
+        "criteria": bars,
+    }
 
 
 def _instant_runoff(*, option_map, ballots):
@@ -554,10 +883,15 @@ def _instant_runoff(*, option_map, ballots):
         return [], []
     if len(all_ids) == 1 or not ballots:
         oid = all_ids[0]
-        return [{
-            "option_id": str(oid), "title": option_map[oid].title, "final_rank": 1,
-            "first_round_votes": len(ballots), "eliminated_in_round": None,
-        }], []
+        return [
+            {
+                "option_id": str(oid),
+                "title": option_map[oid].title,
+                "final_rank": 1,
+                "first_round_votes": len(ballots),
+                "eliminated_in_round": None,
+            }
+        ], []
 
     remaining = set(all_ids)
     elimination_order = []
@@ -580,7 +914,12 @@ def _instant_runoff(*, option_map, ballots):
             first_round_tally = dict(tally)
         last_tally = tally
         active_votes = sum(tally.values())
-        entry = {"round_number": round_number, "tallies": {str(k): v for k, v in tally.items()}, "exhausted_ballots": exhausted, "eliminated_option_id": None}
+        entry = {
+            "round_number": round_number,
+            "tallies": {str(k): v for k, v in tally.items()},
+            "exhausted_ballots": exhausted,
+            "eliminated_option_id": None,
+        }
         if active_votes == 0:
             rounds.append(entry)
             break
@@ -608,17 +947,25 @@ def _instant_runoff(*, option_map, ballots):
         key=lambda oid: last_tally.get(oid, 0),
         reverse=True,
     )
-    final_order = ([winner_id] if winner_id is not None else []) + runner_ups + list(reversed(elimination_order))
+    final_order = (
+        ([winner_id] if winner_id is not None else [])
+        + runner_ups
+        + list(reversed(elimination_order))
+    )
     rows = []
     for rank, oid in enumerate(final_order, start=1):
-        elim_round = next((r["round_number"] for r in rounds if r.get("eliminated_option_id") == str(oid)), None)
-        rows.append({
-            "option_id": str(oid),
-            "title": option_map[oid].title,
-            "final_rank": rank,
-            "first_round_votes": (first_round_tally or {}).get(oid, 0),
-            "eliminated_in_round": elim_round,
-        })
+        elim_round = next(
+            (r["round_number"] for r in rounds if r.get("eliminated_option_id") == str(oid)), None
+        )
+        rows.append(
+            {
+                "option_id": str(oid),
+                "title": option_map[oid].title,
+                "final_rank": rank,
+                "first_round_votes": (first_round_tally or {}).get(oid, 0),
+                "eliminated_in_round": elim_round,
+            }
+        )
     return rows, rounds
 
 
@@ -650,116 +997,289 @@ def _uncertainty_narrative(*, rows, criterion_sensitivity):
 
 @transaction.atomic
 def create_portfolio(*, actor, organisation, owner_id, **fields):
-    membership=organisation.memberships.filter(user=actor,status=Membership.Status.ACTIVE).first()
+    membership = organisation.memberships.filter(
+        user=actor, status=Membership.Status.ACTIVE
+    ).first()
     if membership is None or membership.role not in {Membership.Role.OWNER, Membership.Role.ADMIN}:
         raise PermissionDenied("Only organisation managers may create a prioritisation portfolio.")
-    item=PrioritisationPortfolio(organisation=organisation,owner=_active_member(organisation=organisation,user_id=owner_id),created_by=actor,**fields)
-    item.full_clean(validate_unique=False,validate_constraints=False); item.save()
-    record_event(action="prioritisation.portfolio_created",object_type="evaluations.PrioritisationPortfolio",object_id=str(item.id),actor=actor,organisation=organisation,metadata={"title":item.title})
+    item = PrioritisationPortfolio(
+        organisation=organisation,
+        owner=_active_member(organisation=organisation, user_id=owner_id),
+        created_by=actor,
+        **fields,
+    )
+    item.full_clean(validate_unique=False, validate_constraints=False)
+    item.save()
+    record_event(
+        action="prioritisation.portfolio_created",
+        object_type="evaluations.PrioritisationPortfolio",
+        object_id=str(item.id),
+        actor=actor,
+        organisation=organisation,
+        metadata={"title": item.title},
+    )
     return item
 
 
 @transaction.atomic
 def update_portfolio(*, actor, portfolio, fields):
-    item=PrioritisationPortfolio.objects.select_for_update().select_related("organisation","owner").get(id=portfolio.id)
-    if not can_manage_portfolio(actor=actor,portfolio=item): raise PermissionDenied("You cannot manage this portfolio.")
+    item = (
+        PrioritisationPortfolio.objects.select_for_update()
+        .select_related("organisation", "owner")
+        .get(id=portfolio.id)
+    )
+    if not can_manage_portfolio(actor=actor, portfolio=item):
+        raise PermissionDenied("You cannot manage this portfolio.")
     if item.status == PrioritisationPortfolio.Status.ARCHIVED:
         raise EvaluationServiceError("Archived portfolios cannot be changed.")
-    requested_status=fields.get("status")
+    requested_status = fields.get("status")
     if requested_status is not None and requested_status != item.status:
-        allowed={(PrioritisationPortfolio.Status.DRAFT,PrioritisationPortfolio.Status.OPEN),(PrioritisationPortfolio.Status.OPEN,PrioritisationPortfolio.Status.CLOSED),(PrioritisationPortfolio.Status.CLOSED,PrioritisationPortfolio.Status.ARCHIVED)}
-        if (item.status,requested_status) not in allowed:
-            raise EvaluationServiceError({"status":"Use the governed draft, open, closed, and archived sequence."})
+        allowed = {
+            (PrioritisationPortfolio.Status.DRAFT, PrioritisationPortfolio.Status.OPEN),
+            (PrioritisationPortfolio.Status.OPEN, PrioritisationPortfolio.Status.CLOSED),
+            (PrioritisationPortfolio.Status.CLOSED, PrioritisationPortfolio.Status.ARCHIVED),
+        }
+        if (item.status, requested_status) not in allowed:
+            raise EvaluationServiceError(
+                {"status": "Use the governed draft, open, closed, and archived sequence."}
+            )
         if requested_status == PrioritisationPortfolio.Status.OPEN:
-            if not item.criteria.exists() or not item.candidates.filter(status=PortfolioCandidate.Status.ACTIVE).exists():
-                raise EvaluationServiceError({"status":"Add at least one criterion and one active candidate before opening assessment."})
-    editable_after_open={"owner_id","status"}
-    if item.status != PrioritisationPortfolio.Status.DRAFT and any(key not in editable_after_open for key in fields):
-        raise EvaluationServiceError("Portfolio governance and constraints can be changed only while draft.")
-    for key,value in fields.items():
-        if key=="owner_id": item.owner=_active_member(organisation=item.organisation,user_id=value)
-        else: setattr(item,key,value)
-    item.full_clean(validate_unique=False,validate_constraints=False); item.save()
-    record_event(action="prioritisation.portfolio_updated",object_type="evaluations.PrioritisationPortfolio",object_id=str(item.id),actor=actor,organisation=item.organisation,metadata={"fields":sorted(fields)})
+            if (
+                not item.criteria.exists()
+                or not item.candidates.filter(status=PortfolioCandidate.Status.ACTIVE).exists()
+            ):
+                raise EvaluationServiceError(
+                    {
+                        "status": "Add at least one criterion and one active candidate before opening assessment."
+                    }
+                )
+    editable_after_open = {"owner_id", "status"}
+    if item.status != PrioritisationPortfolio.Status.DRAFT and any(
+        key not in editable_after_open for key in fields
+    ):
+        raise EvaluationServiceError(
+            "Portfolio governance and constraints can be changed only while draft."
+        )
+    for key, value in fields.items():
+        if key == "owner_id":
+            item.owner = _active_member(organisation=item.organisation, user_id=value)
+        else:
+            setattr(item, key, value)
+    item.full_clean(validate_unique=False, validate_constraints=False)
+    item.save()
+    record_event(
+        action="prioritisation.portfolio_updated",
+        object_type="evaluations.PrioritisationPortfolio",
+        object_id=str(item.id),
+        actor=actor,
+        organisation=item.organisation,
+        metadata={"fields": sorted(fields)},
+    )
     return item
 
 
 @transaction.atomic
 def add_portfolio_criterion(*, actor, portfolio, **fields):
-    if not can_manage_portfolio(actor=actor,portfolio=portfolio): raise PermissionDenied("You cannot manage this portfolio.")
-    if portfolio.status != PrioritisationPortfolio.Status.DRAFT: raise EvaluationServiceError("Criteria can be added only while the portfolio is draft.")
-    item=PortfolioCriterion(organisation=portfolio.organisation,portfolio=portfolio,**fields); item.full_clean(validate_unique=False,validate_constraints=False); item.save()
-    record_event(action="prioritisation.criterion_created",object_type="evaluations.PortfolioCriterion",object_id=str(item.id),actor=actor,organisation=portfolio.organisation,metadata={"portfolio_id":str(portfolio.id),"weight":item.weight})
+    if not can_manage_portfolio(actor=actor, portfolio=portfolio):
+        raise PermissionDenied("You cannot manage this portfolio.")
+    if portfolio.status != PrioritisationPortfolio.Status.DRAFT:
+        raise EvaluationServiceError("Criteria can be added only while the portfolio is draft.")
+    item = PortfolioCriterion(organisation=portfolio.organisation, portfolio=portfolio, **fields)
+    item.full_clean(validate_unique=False, validate_constraints=False)
+    item.save()
+    record_event(
+        action="prioritisation.criterion_created",
+        object_type="evaluations.PortfolioCriterion",
+        object_id=str(item.id),
+        actor=actor,
+        organisation=portfolio.organisation,
+        metadata={"portfolio_id": str(portfolio.id), "weight": item.weight},
+    )
     return item
 
 
 @transaction.atomic
 def add_candidate(*, actor, portfolio, decision_id, **fields):
-    if not can_manage_portfolio(actor=actor,portfolio=portfolio): raise PermissionDenied("You cannot manage this portfolio.")
-    try: decision=portfolio.organisation.decisions.get(id=decision_id)
-    except Exception as exc: raise EvaluationServiceError({"decision_id":"Select a decision from this organisation."}) from exc
-    item=PortfolioCandidate(organisation=portfolio.organisation,portfolio=portfolio,decision=decision,added_by=actor,**fields); item.full_clean(validate_unique=False,validate_constraints=False)
-    try: item.save()
-    except IntegrityError as exc: raise EvaluationServiceError({"decision_id":"This decision is already in the portfolio."}) from exc
-    record_event(action="prioritisation.candidate_added",object_type="evaluations.PortfolioCandidate",object_id=str(item.id),actor=actor,organisation=portfolio.organisation,metadata={"portfolio_id":str(portfolio.id),"decision_id":str(decision.id)})
+    if not can_manage_portfolio(actor=actor, portfolio=portfolio):
+        raise PermissionDenied("You cannot manage this portfolio.")
+    try:
+        decision = portfolio.organisation.decisions.get(id=decision_id)
+    except Exception as exc:
+        raise EvaluationServiceError(
+            {"decision_id": "Select a decision from this organisation."}
+        ) from exc
+    item = PortfolioCandidate(
+        organisation=portfolio.organisation,
+        portfolio=portfolio,
+        decision=decision,
+        added_by=actor,
+        **fields,
+    )
+    item.full_clean(validate_unique=False, validate_constraints=False)
+    try:
+        item.save()
+    except IntegrityError as exc:
+        raise EvaluationServiceError(
+            {"decision_id": "This decision is already in the portfolio."}
+        ) from exc
+    record_event(
+        action="prioritisation.candidate_added",
+        object_type="evaluations.PortfolioCandidate",
+        object_id=str(item.id),
+        actor=actor,
+        organisation=portfolio.organisation,
+        metadata={"portfolio_id": str(portfolio.id), "decision_id": str(decision.id)},
+    )
     return item
 
 
 @transaction.atomic
 def save_portfolio_assessment(*, actor, candidate, criterion_id, **fields):
-    portfolio=candidate.portfolio
-    if portfolio.status != PrioritisationPortfolio.Status.OPEN: raise EvaluationServiceError("The portfolio is not open for assessment.")
-    if not can_assess_portfolio(actor=actor,portfolio=portfolio): raise PermissionDenied("Contributors or managers may assess portfolio candidates.")
-    try: criterion=portfolio.criteria.get(id=criterion_id)
-    except PortfolioCriterion.DoesNotExist as exc: raise EvaluationServiceError({"criterion_id":"Select a criterion from this portfolio."}) from exc
-    item,_=PortfolioAssessment.objects.update_or_create(candidate=candidate,criterion=criterion,assessor=actor,defaults={"organisation":portfolio.organisation,**fields})
-    item.full_clean(validate_unique=False,validate_constraints=False); item.save()
-    record_event(action="prioritisation.assessment_saved",object_type="evaluations.PortfolioAssessment",object_id=str(item.id),actor=actor,organisation=portfolio.organisation,metadata={"candidate_id":str(candidate.id),"criterion_id":str(criterion.id)})
+    portfolio = candidate.portfolio
+    if portfolio.status != PrioritisationPortfolio.Status.OPEN:
+        raise EvaluationServiceError("The portfolio is not open for assessment.")
+    if not can_assess_portfolio(actor=actor, portfolio=portfolio):
+        raise PermissionDenied("Contributors or managers may assess portfolio candidates.")
+    try:
+        criterion = portfolio.criteria.get(id=criterion_id)
+    except PortfolioCriterion.DoesNotExist as exc:
+        raise EvaluationServiceError(
+            {"criterion_id": "Select a criterion from this portfolio."}
+        ) from exc
+    item, _ = PortfolioAssessment.objects.update_or_create(
+        candidate=candidate,
+        criterion=criterion,
+        assessor=actor,
+        defaults={"organisation": portfolio.organisation, **fields},
+    )
+    item.full_clean(validate_unique=False, validate_constraints=False)
+    item.save()
+    record_event(
+        action="prioritisation.assessment_saved",
+        object_type="evaluations.PortfolioAssessment",
+        object_id=str(item.id),
+        actor=actor,
+        organisation=portfolio.organisation,
+        metadata={"candidate_id": str(candidate.id), "criterion_id": str(criterion.id)},
+    )
     return item
 
 
 @transaction.atomic
 def set_selection(*, actor, candidate, **fields):
-    if not can_manage_portfolio(actor=actor,portfolio=candidate.portfolio): raise PermissionDenied("You cannot finalise this portfolio.")
+    if not can_manage_portfolio(actor=actor, portfolio=candidate.portfolio):
+        raise PermissionDenied("You cannot finalise this portfolio.")
     if candidate.portfolio.status != PrioritisationPortfolio.Status.CLOSED:
-        raise EvaluationServiceError("Close collective assessment before recording authority selections.")
-    item,_=PortfolioSelection.objects.update_or_create(candidate=candidate,defaults={"organisation":candidate.organisation,"selected_by":actor,"selected_at":timezone.now(),**fields})
-    item.full_clean(validate_unique=False,validate_constraints=False); item.save(); record_event(action="prioritisation.selection_recorded",object_type="evaluations.PortfolioSelection",object_id=str(item.id),actor=actor,organisation=candidate.organisation,metadata={"candidate_id":str(candidate.id),"selected":item.selected}); return item
+        raise EvaluationServiceError(
+            "Close collective assessment before recording authority selections."
+        )
+    item, _ = PortfolioSelection.objects.update_or_create(
+        candidate=candidate,
+        defaults={
+            "organisation": candidate.organisation,
+            "selected_by": actor,
+            "selected_at": timezone.now(),
+            **fields,
+        },
+    )
+    item.full_clean(validate_unique=False, validate_constraints=False)
+    item.save()
+    record_event(
+        action="prioritisation.selection_recorded",
+        object_type="evaluations.PortfolioSelection",
+        object_id=str(item.id),
+        actor=actor,
+        organisation=candidate.organisation,
+        metadata={"candidate_id": str(candidate.id), "selected": item.selected},
+    )
+    return item
 
 
 def portfolio_recommendation(*, portfolio):
-    if portfolio.blind_results_until_close and portfolio.status == PrioritisationPortfolio.Status.OPEN:
+    if (
+        portfolio.blind_results_until_close
+        and portfolio.status == PrioritisationPortfolio.Status.OPEN
+    ):
         return {
             "hidden": True,
             "portfolio_id": str(portfolio.id),
-            "budget_limit": float(portfolio.budget_limit) if portfolio.budget_limit is not None else None,
-            "capacity_limit": float(portfolio.capacity_limit) if portfolio.capacity_limit is not None else None,
+            "budget_limit": float(portfolio.budget_limit)
+            if portfolio.budget_limit is not None
+            else None,
+            "capacity_limit": float(portfolio.capacity_limit)
+            if portfolio.capacity_limit is not None
+            else None,
             "recommended_budget": 0,
             "recommended_capacity": 0,
             "candidates": [],
             "warning": "Assessment results remain sealed until the portfolio closes.",
         }
-    criteria=list(portfolio.criteria.all()); candidates=list(portfolio.candidates.filter(status=PortfolioCandidate.Status.ACTIVE).select_related("decision").prefetch_related("assessments")); total_weight=sum((c.weight for c in criteria),Decimal("0")) or Decimal("1")
-    rows=[]
+    criteria = list(portfolio.criteria.all())
+    candidates = list(
+        portfolio.candidates.filter(status=PortfolioCandidate.Status.ACTIVE)
+        .select_related("decision")
+        .prefetch_related("assessments")
+    )
+    total_weight = sum((c.weight for c in criteria), Decimal("0")) or Decimal("1")
+    rows = []
     for candidate in candidates:
-        weighted=0.0; coverage=0.0; assessors=set(); confidence=[]
+        weighted = 0.0
+        coverage = 0.0
+        assessors: set[Any] = set()
+        confidence: list[Any] = []
         for criterion in criteria:
-            items=[a for a in candidate.assessments.all() if a.criterion_id==criterion.id]
+            items = [a for a in candidate.assessments.all() if a.criterion_id == criterion.id]
             if items:
-                avg=mean(float(a.score) for a in items); normalised=avg if criterion.higher_is_better else 100-avg; fraction=float(criterion.weight/total_weight); weighted+=normalised*fraction; coverage+=fraction; assessors.update(a.assessor_id for a in items); confidence.extend(a.confidence for a in items)
-        score=weighted/coverage if coverage else 0
-        rows.append({"candidate_id":str(candidate.id),"decision_id":str(candidate.decision_id),"title":candidate.decision.title,"score":round(score,2),"assessor_count":len(assessors),"confidence":round(mean(confidence),2) if confidence else None,"budget_required":float(candidate.budget_required),"capacity_required":float(candidate.capacity_required),"mandatory":candidate.mandatory,"recommended":False,"constraint_reason":""})
-    rows.sort(key=lambda x:(x["mandatory"],x["score"]),reverse=True)
-    budget=float(portfolio.budget_limit) if portfolio.budget_limit is not None else None; capacity=float(portfolio.capacity_limit) if portfolio.capacity_limit is not None else None; used_budget=used_capacity=0.0
+                avg = mean(float(a.score) for a in items)
+                normalised = avg if criterion.higher_is_better else 100 - avg
+                fraction = float(criterion.weight / total_weight)
+                weighted += normalised * fraction
+                coverage += fraction
+                assessors.update(a.assessor_id for a in items)
+                confidence.extend(a.confidence for a in items)
+        score = weighted / coverage if coverage else 0
+        rows.append(
+            {
+                "candidate_id": str(candidate.id),
+                "decision_id": str(candidate.decision_id),
+                "title": candidate.decision.title,
+                "score": round(score, 2),
+                "assessor_count": len(assessors),
+                "confidence": round(mean(confidence), 2) if confidence else None,
+                "budget_required": float(candidate.budget_required),
+                "capacity_required": float(candidate.capacity_required),
+                "mandatory": candidate.mandatory,
+                "recommended": False,
+                "constraint_reason": "",
+            }
+        )
+    rows.sort(key=lambda x: (x["mandatory"], x["score"]), reverse=True)
+    budget = float(portfolio.budget_limit) if portfolio.budget_limit is not None else None
+    capacity = float(portfolio.capacity_limit) if portfolio.capacity_limit is not None else None
+    used_budget = used_capacity = 0.0
     for row in rows:
-        fits_budget=budget is None or used_budget+row["budget_required"]<=budget
-        fits_capacity=capacity is None or used_capacity+row["capacity_required"]<=capacity
+        fits_budget = budget is None or used_budget + row["budget_required"] <= budget
+        fits_capacity = capacity is None or used_capacity + row["capacity_required"] <= capacity
         if row["mandatory"] or (fits_budget and fits_capacity):
-            row["recommended"]=True; used_budget+=row["budget_required"]; used_capacity+=row["capacity_required"]
-            if row["mandatory"] and not (fits_budget and fits_capacity): row["constraint_reason"]="Mandatory candidate exceeds one or more constraints."
+            row["recommended"] = True
+            used_budget += row["budget_required"]
+            used_capacity += row["capacity_required"]
+            if row["mandatory"] and not (fits_budget and fits_capacity):
+                row["constraint_reason"] = "Mandatory candidate exceeds one or more constraints."
         else:
-            reasons=[]
-            if not fits_budget: reasons.append("budget")
-            if not fits_capacity: reasons.append("capacity")
-            row["constraint_reason"]="Excluded by " + " and ".join(reasons) + " constraint."
-    return {"hidden": False, "portfolio_id":str(portfolio.id),"budget_limit":budget,"capacity_limit":capacity,"recommended_budget":round(used_budget,2),"recommended_capacity":round(used_capacity,2),"candidates":rows,"warning":"This is an explainable greedy recommendation, not an automatic organisational decision."}
+            reasons = []
+            if not fits_budget:
+                reasons.append("budget")
+            if not fits_capacity:
+                reasons.append("capacity")
+            row["constraint_reason"] = "Excluded by " + " and ".join(reasons) + " constraint."
+    return {
+        "hidden": False,
+        "portfolio_id": str(portfolio.id),
+        "budget_limit": budget,
+        "capacity_limit": capacity,
+        "recommended_budget": round(used_budget, 2),
+        "recommended_capacity": round(used_capacity, 2),
+        "candidates": rows,
+        "warning": "This is an explainable greedy recommendation, not an automatic organisational decision.",
+    }

@@ -38,8 +38,8 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-      - run: python -m pip install --upgrade pip
-      - run: python -m pip install -e '.[dev]'
+          cache-dependency-path: backend/requirements-dev.lock
+      - run: python -m pip install --require-hashes -r requirements-dev.lock
       - run: python manage.py makemigrations --check --dry-run
       - run: ruff check .
       - run: mypy crowdsmarter apps
@@ -55,7 +55,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - run: npm install
+      - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test -- --run

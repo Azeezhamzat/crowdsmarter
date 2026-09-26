@@ -15,12 +15,22 @@ class LookupConfigurationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = OrganisationLookupConfiguration
-        fields = ["id", "organisation_id", "provider_key", "provider_key_label", "api_key_is_set", "created_at", "updated_at"]
+        fields = [
+            "id",
+            "organisation_id",
+            "provider_key",
+            "provider_key_label",
+            "api_key_is_set",
+            "created_at",
+            "updated_at",
+        ]
         read_only_fields = fields
 
 
 class SetLookupProviderSerializer(StrictSerializer):
-    provider_key = serializers.ChoiceField(choices=OrganisationLookupConfiguration.ProviderKey.choices)
+    provider_key = serializers.ChoiceField(
+        choices=OrganisationLookupConfiguration.ProviderKey.choices
+    )
 
 
 class SetLookupApiKeySerializer(StrictSerializer):

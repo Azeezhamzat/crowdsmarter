@@ -19,7 +19,7 @@ function renderPage() {
 afterEach(() => vi.restoreAllMocks());
 
 describe("RequestDemoPage", () => {
-  it("submits a tailored demo request and shows its reference", async () => {
+  it("submits a facilitation enquiry and shows its reference", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(new Response(JSON.stringify({ detail: "CSRF cookie set." }), { status: 200, headers: { "content-type": "application/json" } }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ detail: "Thank you. Your request has been received.", reference: "request-123" }), { status: 202, headers: { "content-type": "application/json" } }));
@@ -30,14 +30,34 @@ describe("RequestDemoPage", () => {
     fireEvent.change(screen.getByLabelText("Work email *"), { target: { value: "AMINA@EXAMPLE.COM" } });
     fireEvent.change(screen.getByLabelText("Organisation *"), { target: { value: "Northstar Strategy" } });
     fireEvent.change(screen.getByLabelText("Role or job title"), { target: { value: "Strategy Director" } });
+    fireEvent.change(screen.getByLabelText(/where is the decision getting difficult/i), { target: { value: "collective_intelligence" } });
     fireEvent.change(screen.getByLabelText(/what decision challenge/i), { target: { value: "We need to test options across uncertain futures." } });
     fireEvent.click(screen.getByLabelText(/I consent to being contacted/i));
-    fireEvent.click(screen.getByRole("button", { name: /request demonstration/i }));
+    fireEvent.click(screen.getByRole("button", { name: /send decision enquiry/i }));
 
     expect(await screen.findByRole("heading", { name: /thank you/i })).toBeInTheDocument();
     expect(screen.getByText("request-123")).toBeInTheDocument();
-    const submitted = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body));
+    const requestBody = fetchMock.mock.calls[1]?.[1]?.body;
+    expect(typeof requestBody).toBe("string");
+    const submitted = JSON.parse(typeof requestBody === "string" ? requestBody : "{}") as Record<string, unknown>;
     expect(submitted.work_email).toBe("amina@example.com");
+    expect(submitted.primary_need).toBe("collective_intelligence");
     expect(submitted.consent_to_contact).toBe(true);
+  });
+
+  it("requires a decision challenge and a problem area before submission", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+    renderPage();
+
+    fireEvent.change(screen.getByLabelText("Full name *"), { target: { value: "Amina Yusuf" } });
+    fireEvent.change(screen.getByLabelText("Work email *"), { target: { value: "amina@example.com" } });
+    fireEvent.change(screen.getByLabelText("Organisation *"), { target: { value: "Northstar Strategy" } });
+    fireEvent.change(screen.getByLabelText(/what decision challenge/i), { target: { value: "Too little detail" } });
+    fireEvent.click(screen.getByLabelText(/I consent to being contacted/i));
+    fireEvent.click(screen.getByRole("button", { name: /send decision enquiry/i }));
+
+    expect(await screen.findByText("Select the closest description of the decision challenge.")).toBeInTheDocument();
+    expect(screen.getByText("Tell us enough about the decision to prepare a useful conversation.")).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

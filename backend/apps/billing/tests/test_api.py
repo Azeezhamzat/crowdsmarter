@@ -7,9 +7,7 @@ from apps.organisations.models import Membership
 
 
 @pytest.mark.django_db
-def test_plan_list_is_visible_to_any_authenticated_user(
-    api_client, user_factory
-):  # type: ignore[no-untyped-def]
+def test_plan_list_is_visible_to_any_authenticated_user(api_client, user_factory):  # type: ignore[no-untyped-def]
     api_client.force_authenticate(user_factory())
 
     response = api_client.get(reverse("billing:plans"))
@@ -34,9 +32,7 @@ def test_subscription_view_returns_404_for_non_member(
 
 
 @pytest.mark.django_db
-def test_subscription_view_returns_plan_and_usage_for_member(
-    api_client, organisation_factory
-):  # type: ignore[no-untyped-def]
+def test_subscription_view_returns_plan_and_usage_for_member(api_client, organisation_factory):  # type: ignore[no-untyped-def]
     organisation = organisation_factory()
     create_subscription_for_organisation(organisation=organisation, actor=organisation.created_by)
     api_client.force_authenticate(organisation.created_by)
@@ -53,9 +49,7 @@ def test_subscription_view_returns_plan_and_usage_for_member(
 
 
 @pytest.mark.django_db
-def test_change_plan_via_api_requires_owner(
-    api_client, organisation_factory, user_factory
-):  # type: ignore[no-untyped-def]
+def test_change_plan_via_api_requires_owner(api_client, organisation_factory, user_factory):  # type: ignore[no-untyped-def]
     organisation = organisation_factory()
     create_subscription_for_organisation(organisation=organisation, actor=organisation.created_by)
     member = user_factory()
@@ -77,9 +71,7 @@ def test_change_plan_via_api_requires_owner(
 
 
 @pytest.mark.django_db
-def test_change_plan_via_api_as_owner(
-    api_client, organisation_factory
-):  # type: ignore[no-untyped-def]
+def test_change_plan_via_api_as_owner(api_client, organisation_factory):  # type: ignore[no-untyped-def]
     organisation = organisation_factory()
     create_subscription_for_organisation(organisation=organisation, actor=organisation.created_by)
     api_client.force_authenticate(organisation.created_by)
@@ -95,9 +87,7 @@ def test_change_plan_via_api_as_owner(
 
 
 @pytest.mark.django_db
-def test_change_plan_via_api_rejects_unknown_fields(
-    api_client, organisation_factory
-):  # type: ignore[no-untyped-def]
+def test_change_plan_via_api_rejects_unknown_fields(api_client, organisation_factory):  # type: ignore[no-untyped-def]
     organisation = organisation_factory()
     create_subscription_for_organisation(organisation=organisation, actor=organisation.created_by)
     api_client.force_authenticate(organisation.created_by)
@@ -112,9 +102,7 @@ def test_change_plan_via_api_rejects_unknown_fields(
 
 
 @pytest.mark.django_db
-def test_set_billing_contact_via_api(
-    api_client, organisation_factory
-):  # type: ignore[no-untyped-def]
+def test_set_billing_contact_via_api(api_client, organisation_factory):  # type: ignore[no-untyped-def]
     organisation = organisation_factory()
     create_subscription_for_organisation(organisation=organisation, actor=organisation.created_by)
     api_client.force_authenticate(organisation.created_by)

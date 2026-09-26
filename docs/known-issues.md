@@ -1,5 +1,15 @@
 # Known issues
 
+## 2026-08-30 readiness update
+
+The historical phase notes below remain as an audit trail, but two statements
+are now superseded. `Organisation.retention_days` is consumed by the delayed
+deletion request and the new daily preview/report task; permanent destructive
+deletion and automated legal holds remain intentionally unimplemented pending
+policy approval. The repository also now has a locally exercised centralised
+logging/metrics/dashboard/alert foundation, but external alert delivery,
+multiprocess metrics, error tracking, and independent review remain open.
+
 Tracked as of Phase 19 (2026-08-03). Move an item to a release note once it
 is resolved; do not delete history from this file, mark it resolved instead.
 
@@ -342,32 +352,25 @@ afterwards, but this account hit the identical `AuditEvent.actor`
   split across a compound JSX expression; one `getByText` was ambiguous
   because the same name legitimately appears twice in the rendered page (a
   canvas summary and an owner-select dropdown option).
-- Frontend `npm audit`: `brace-expansion` DoS fixed via `npm audit fix`
-  (non-breaking).
+- Frontend `npm audit`: `brace-expansion` DoS fixed by removing an unsafe
+  cross-major override and regenerating the lockfile with patched compatible
+  transitive releases. This preserves ESLint's older `minimatch` contract.
 
-## Newly discovered, not yet fixed
+## Resolved in the 2026-08-27 release audit
 
-### `npm run lint` fails, independent of anything in Phase 19
+### Frontend lint, dependency locking, and initial bundle size
 
-93 ESLint errors across ~20 files (`@typescript-eslint/no-misused-promises`
-on async handlers passed where a void return is expected,
-`@typescript-eslint/no-unnecessary-type-assertion`,
-`react-hooks/set-state-in-effect`, `@typescript-eslint/consistent-type-imports`,
-one `@typescript-eslint/triple-slash-reference`). Confirmed pre-existing and
-unrelated to the react-router migration: stashing every Phase 19 change and
-re-running lint against the original code produced *386* errors, not fewer —
-this is accumulated tech debt, not a regression. `.github/workflows/ci.yml`
-runs `npm run lint` as a required step, meaning CI has likely never been
-green on this repository. Out of scope to fix here; needs its own pass.
+The accumulated ESLint backlog is cleared: the configured gate now exits
+without errors or warnings. React Hook Form subscriptions use `useWatch()`,
+which is compatible with the optional React Compiler. Backend production and
+development requirements are hash-locked, the npm lockfile is consistent
+with `npm ci`, and the dependency audit reports no known npm vulnerabilities.
+Route-level lazy loading reduced the shared initial JavaScript chunk from
+about 1.06 MB to about 360 kB; pages now load their own small feature chunks
+on demand.
 
 ## Deferred, not started
 
-- Backend dependency lockfile (`pip-compile` or `uv lock`) — needs a
-  Dockerfile change to install the tool, out of scope for this phase's
-  "fix what's broken" boundary; flagged for a follow-up.
-- Frontend production bundle is ~938 kB (one chunk); route-level code
-  splitting was not attempted this phase — it's a performance concern, not a
-  correctness one.
 - ADR duplicate numbering (0014, 0015, 0016 each shared by two unrelated
   ADRs) — content is fine, only numbering collides; needs a renumbering pass
   with a documented mapping.

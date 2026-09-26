@@ -163,9 +163,7 @@ class InvitationAcceptView(APIView):
         raw_token = self._raw_token(request)
         invitation = self._get_invitation(raw_token)
         data = dict(InvitationPublicSerializer(invitation).data)
-        data["current_user_email"] = (
-            request.user.email if request.user.is_authenticated else None
-        )
+        data["current_user_email"] = request.user.email if request.user.is_authenticated else None
         return _no_store(Response(data))
 
     def post(self, request):  # type: ignore[no-untyped-def]

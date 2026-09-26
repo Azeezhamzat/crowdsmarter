@@ -5,9 +5,7 @@ from apps.foresight.mapping_services import create_canvas, create_driver
 
 
 @pytest.mark.django_db
-def test_scenario_api_builds_workspace_and_rejects_unknown_fields(
-    api_client, organisation_factory
-):  # type: ignore[no-untyped-def]
+def test_scenario_api_builds_workspace_and_rejects_unknown_fields(api_client, organisation_factory):  # type: ignore[no-untyped-def]
     organisation = organisation_factory()
     actor = organisation.created_by
     api_client.force_authenticate(actor)
@@ -105,9 +103,7 @@ def test_scenario_api_builds_workspace_and_rejects_unknown_fields(
 
 
 @pytest.mark.django_db
-def test_scenario_workspace_is_tenant_isolated(
-    api_client, user_factory, organisation_factory
-):  # type: ignore[no-untyped-def]
+def test_scenario_workspace_is_tenant_isolated(api_client, user_factory, organisation_factory):  # type: ignore[no-untyped-def]
     organisation = organisation_factory()
     api_client.force_authenticate(user_factory())
     response = api_client.get(

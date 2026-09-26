@@ -34,9 +34,7 @@ def test_canvas_api_creates_driver_and_returns_workspace(api_client, organisatio
     )
     assert driver_response.status_code == 201
 
-    workspace = api_client.get(
-        reverse("foresight:canvas-detail", kwargs={"canvas_id": canvas_id})
-    )
+    workspace = api_client.get(reverse("foresight:canvas-detail", kwargs={"canvas_id": canvas_id}))
     assert workspace.status_code == 200
     loop_response = api_client.post(
         reverse("foresight:canvas-feedback-loops", kwargs={"canvas_id": canvas_id}),
@@ -79,6 +77,9 @@ def test_canvas_api_is_tenant_isolated(api_client, user_factory, organisation_fa
     organisation = organisation_factory()
     api_client.force_authenticate(user_factory())
 
-    assert api_client.get(
-        reverse("foresight:canvases", kwargs={"organisation_id": organisation.id})
-    ).status_code == 404
+    assert (
+        api_client.get(
+            reverse("foresight:canvases", kwargs={"organisation_id": organisation.id})
+        ).status_code
+        == 404
+    )

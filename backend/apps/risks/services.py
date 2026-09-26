@@ -12,9 +12,9 @@ from apps.audit.services import record_event
 from apps.decision_options.models import DecisionOption
 from apps.decisions.models import Decision
 from apps.decisions.reasoning_policies import can_contribute_reasoning, can_edit_reasoning
-from apps.organisations.models import Membership
 from apps.notifications.models import Notification
 from apps.notifications.services import create_notification
+from apps.organisations.models import Membership
 
 from .models import Risk
 
@@ -38,11 +38,15 @@ def _owner(*, decision: Decision, owner_id: Any | None, actor: User) -> User:
     if owner_id is None:
         return actor
     try:
-        return Membership.objects.select_related("user").get(
-            organisation=decision.organisation,
-            user_id=owner_id,
-            status=Membership.Status.ACTIVE,
-        ).user
+        return (
+            Membership.objects.select_related("user")
+            .get(
+                organisation=decision.organisation,
+                user_id=owner_id,
+                status=Membership.Status.ACTIVE,
+            )
+            .user
+        )
     except Membership.DoesNotExist as exc:
         raise RiskServiceError(
             {"owner_id": "The owner must be an active organisation member."}
@@ -82,8 +86,11 @@ def create_risk(
             dedup_key=f"risk-owner:{risk.id}:{risk.owner_id}",
         )
     record_event(
-        action="risk.created", object_type="risk", object_id=str(risk.id),
-        actor=actor, organisation=decision.organisation,
+        action="risk.created",
+        object_type="risk",
+        object_id=str(risk.id),
+        actor=actor,
+        organisation=decision.organisation,
         metadata={"decision_id": str(decision.id), "title": risk.title, "score": risk.score},
     )
     return risk
@@ -91,11 +98,7 @@ def create_risk(
 
 @transaction.atomic
 def update_risk(*, actor: User, risk: Risk, fields: dict[str, Any]) -> Risk:
-    risk = (
-        Risk.objects.select_for_update()
-        .select_related("decision__organisation")
-        .get(id=risk.id)
-    )
+    risk = Risk.objects.select_for_update().select_related("decision__organisation").get(id=risk.id)
     if not can_edit_reasoning(
         actor=actor,
         decision=risk.decision,
@@ -130,8 +133,11 @@ def update_risk(*, actor: User, risk: Risk, fields: dict[str, Any]) -> Risk:
         )
     after = {field: getattr(risk, field) for field in before}
     record_event(
-        action="risk.updated", object_type="risk", object_id=str(risk.id),
-        actor=actor, organisation=risk.organisation,
+        action="risk.updated",
+        object_type="risk",
+        object_id=str(risk.id),
+        actor=actor,
+        organisation=risk.organisation,
         metadata={"decision_id": str(risk.decision_id), "before": before, "after": after},
     )
     return risk

@@ -20,10 +20,26 @@ class EvidenceSerializer(serializers.ModelSerializer):
     class Meta:
         model = Evidence
         fields = [
-            "id", "decision_id", "option_id", "source_id", "title", "summary", "source_type",
-            "source_type_label", "source_reference", "source_url", "stance",
-            "stance_label", "strength", "strength_label", "status", "status_label",
-            "created_by", "can_edit", "created_at", "updated_at",
+            "id",
+            "decision_id",
+            "option_id",
+            "source_id",
+            "title",
+            "summary",
+            "source_type",
+            "source_type_label",
+            "source_reference",
+            "source_url",
+            "stance",
+            "stance_label",
+            "strength",
+            "strength_label",
+            "status",
+            "status_label",
+            "created_by",
+            "can_edit",
+            "created_at",
+            "updated_at",
         ]
         read_only_fields = fields
 
@@ -48,18 +64,22 @@ class EvidenceCreateSerializer(StrictSerializer):
     source_reference = serializers.CharField(
         max_length=500, trim_whitespace=True, allow_blank=True, required=False, default=""
     )
-    source_url = serializers.URLField(
-        max_length=1000, allow_blank=True, required=False, default=""
-    )
+    source_url = serializers.URLField(max_length=1000, allow_blank=True, required=False, default="")
     stance = serializers.ChoiceField(choices=Evidence.Stance.choices)
     strength = serializers.ChoiceField(
         choices=Evidence.Strength.choices, required=False, default=Evidence.Strength.MODERATE
     )
 
     def validate(self, attrs):  # type: ignore[no-untyped-def]
-        if not attrs.get("source_id") and not attrs.get("source_reference") and not attrs.get("source_url"):
+        if (
+            not attrs.get("source_id")
+            and not attrs.get("source_reference")
+            and not attrs.get("source_url")
+        ):
             raise serializers.ValidationError(
-                {"source_reference": "Provide a structured source, source reference, or source URL."}
+                {
+                    "source_reference": "Provide a structured source, source reference, or source URL."
+                }
             )
         return attrs
 

@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { getOrganisationPortfolio } from "../portfolio/api";
 import { lookupOrganisation } from "../org-enrichment/api";
-import { archiveIdea, getOrganiserSession, promoteIdea, setSessionState, shortlistIdea } from "./api";
+import { getOrganiserSession, promoteIdea, setSessionState, shortlistIdea } from "./api";
 import { OpenSessionOrganiserPage } from "./OpenSessionOrganiserPage";
 
 vi.mock("../portfolio/api", () => ({ getOrganisationPortfolio: vi.fn() }));

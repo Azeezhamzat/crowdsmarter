@@ -30,9 +30,7 @@ def finalised_decision(decision_factory):  # type: ignore[no-untyped-def]
 
 
 @pytest.mark.django_db
-def test_review_api_runs_all_post_decision_commands(
-    api_client, decision_factory
-):  # type: ignore[no-untyped-def]
+def test_review_api_runs_all_post_decision_commands(api_client, decision_factory):  # type: ignore[no-untyped-def]
     decision = finalised_decision(decision_factory)
     api_client.force_authenticate(decision.owner)
     commitment = reverse("reviews:commitment", kwargs={"decision_id": decision.id})
@@ -96,9 +94,7 @@ def test_review_api_runs_all_post_decision_commands(
 
 
 @pytest.mark.django_db
-def test_review_api_is_tenant_isolated(
-    api_client, user_factory, decision_factory
-):  # type: ignore[no-untyped-def]
+def test_review_api_is_tenant_isolated(api_client, user_factory, decision_factory):  # type: ignore[no-untyped-def]
     decision = finalised_decision(decision_factory)
     api_client.force_authenticate(user_factory())
     response = api_client.get(reverse("reviews:detail", kwargs={"decision_id": decision.id}))

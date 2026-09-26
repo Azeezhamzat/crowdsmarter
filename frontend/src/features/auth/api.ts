@@ -87,6 +87,27 @@ export async function changePassword(input: {
   });
 }
 
+export async function requestEmailChange(input: {
+  new_email: string;
+  current_password: string;
+}): Promise<{ detail: string; development_verification_url?: string }> {
+  return apiRequest<{ detail: string; development_verification_url?: string }>("/auth/email/change/", {
+    method: "POST",
+    body: JSON.stringify({
+      new_email: input.new_email.trim().toLowerCase(),
+      current_password: input.current_password,
+    }),
+  });
+}
+
+export async function confirmEmailChange(token: string): Promise<{ detail: string; email: string }> {
+  await ensureCsrfCookie();
+  return apiRequest<{ detail: string; email: string }>("/auth/email/change/confirm/", {
+    method: "POST",
+    body: JSON.stringify({ token }),
+  });
+}
+
 export async function requestPasswordReset(input: { email: string }): Promise<{
   detail: string;
   development_reset_url?: string;

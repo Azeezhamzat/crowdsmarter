@@ -81,12 +81,20 @@ def validate_public_feed_url(url: str, *, debug: bool = False) -> str:
         raise FeedFetchError(
             "Production feed retrieval requires FORESIGHT_FEED_ALLOWED_DOMAINS to be configured."
         )
-    if allowed and hostname not in allowed and not any(hostname.endswith(f".{item}") for item in allowed):
+    if (
+        allowed
+        and hostname not in allowed
+        and not any(hostname.endswith(f".{item}") for item in allowed)
+    ):
         raise FeedFetchError("This feed domain is not in the organisation deployment allowlist.")
     try:
         addresses = {
             result[4][0]
-            for result in socket.getaddrinfo(hostname, parsed.port or (443 if parsed.scheme == "https" else 80), type=socket.SOCK_STREAM)
+            for result in socket.getaddrinfo(
+                hostname,
+                parsed.port or (443 if parsed.scheme == "https" else 80),
+                type=socket.SOCK_STREAM,
+            )
         }
     except socket.gaierror as exc:
         raise FeedFetchError("The feed hostname could not be resolved.") from exc
@@ -94,7 +102,16 @@ def validate_public_feed_url(url: str, *, debug: bool = False) -> str:
         raise FeedFetchError("The feed hostname did not resolve to an address.")
     for address in addresses:
         ip = ipaddress.ip_address(address)
-        if any((ip.is_private, ip.is_loopback, ip.is_link_local, ip.is_multicast, ip.is_reserved, ip.is_unspecified)):
+        if any(
+            (
+                ip.is_private,
+                ip.is_loopback,
+                ip.is_link_local,
+                ip.is_multicast,
+                ip.is_reserved,
+                ip.is_unspecified,
+            )
+        ):
             raise FeedFetchError("Feeds cannot resolve to private or local network addresses.")
     return parsed.geturl()
 
@@ -211,7 +228,9 @@ def fetch_feed(
             )
     except HTTPError as exc:
         if exc.code == 304:
-            return FeedDocument(entries=(), etag=etag, last_modified=last_modified, not_modified=True)
+            return FeedDocument(
+                entries=(), etag=etag, last_modified=last_modified, not_modified=True
+            )
         raise FeedFetchError(f"The feed returned HTTP {exc.code}.") from exc
     except (URLError, TimeoutError, OSError) as exc:
         raise FeedFetchError("The feed could not be retrieved safely.") from exc

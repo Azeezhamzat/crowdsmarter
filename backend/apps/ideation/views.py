@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from django.conf import settings
 from django.core.exceptions import PermissionDenied
 from django.shortcuts import get_object_or_404
 from django.utils.decorators import method_decorator
@@ -59,7 +60,9 @@ def _participant_from_request(request, session: OpenSession):  # type: ignore[no
 def _public_session_response(session: OpenSession, *, participant=None) -> Response:
     ideas = services.ideas_for_session(session=session)
     voted = services.voted_idea_ids(session=session, participant=participant)
-    data = OpenSessionPublicSerializer(session, context={"ideas": ideas, "voted_idea_ids": voted}).data
+    data = OpenSessionPublicSerializer(
+        session, context={"ideas": ideas, "voted_idea_ids": voted}
+    ).data
     response = Response(data)
     response["Cache-Control"] = "no-store"
     return response
@@ -97,7 +100,15 @@ class SessionJoinView(APIView):
         session = services.public_session_by_slug(public_slug=public_slug)
         serializer = SessionJoinSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        participant, raw_token = services.identify_participant(session=session, **serializer.validated_data)
+        participant, raw_token = services.identify_participant(
+            session=session,
+            existing_token=request.META.get(PARTICIPANT_TOKEN_HEADER, "").strip(),
+            applicant_token=request.COOKIES.get(
+                settings.APPLICANT_SESSION_COOKIE_NAME,
+                "",
+            ).strip(),
+            **serializer.validated_data,
+        )
         response = Response(
             {"participant_token": raw_token, "name": participant.name},
             status=status.HTTP_201_CREATED,
@@ -205,7 +216,9 @@ class OrganisationSessionListCreateView(APIView):
 def _organiser_session_response(request, session: OpenSession) -> Response:
     ideas = services.ideas_for_session(session=session)
     voted = services.voted_idea_ids(session=session, user=request.user)
-    data = OpenSessionOrganiserSerializer(session, context={"ideas": ideas, "voted_idea_ids": voted}).data
+    data = OpenSessionOrganiserSerializer(
+        session, context={"ideas": ideas, "voted_idea_ids": voted}
+    ).data
     return Response(data)
 
 

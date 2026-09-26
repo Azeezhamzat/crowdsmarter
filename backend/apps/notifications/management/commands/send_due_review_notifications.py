@@ -8,6 +8,4 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):  # type: ignore[no-untyped-def]
         delivered = deliver_due_review_notifications()
-        self.stdout.write(
-            self.style.SUCCESS(f"Created {delivered} due-review notification(s).")
-        )
+        self.stdout.write(self.style.SUCCESS(f"Created {delivered} due-review notification(s)."))

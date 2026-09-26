@@ -23,13 +23,19 @@ class DecisionAnalysisServiceError(ValidationError):
 
 def _active_member(*, decision: Decision, user_id: Any) -> User:
     try:
-        return Membership.objects.select_related("user").get(
-            organisation=decision.organisation,
-            user_id=user_id,
-            status=Membership.Status.ACTIVE,
-        ).user
+        return (
+            Membership.objects.select_related("user")
+            .get(
+                organisation=decision.organisation,
+                user_id=user_id,
+                status=Membership.Status.ACTIVE,
+            )
+            .user
+        )
     except Membership.DoesNotExist as exc:
-        raise DecisionAnalysisServiceError({"owner_id": "Choose an active organisation member."}) from exc
+        raise DecisionAnalysisServiceError(
+            {"owner_id": "Choose an active organisation member."}
+        ) from exc
 
 
 @transaction.atomic
@@ -51,19 +57,31 @@ def create_issue(*, actor: User, decision: Decision, owner_id: Any, **fields: An
         object_id=str(issue.id),
         actor=actor,
         organisation=decision.organisation,
-        metadata={"decision_id": str(decision.id), "issue_type": issue.issue_type, "severity": issue.severity},
+        metadata={
+            "decision_id": str(decision.id),
+            "issue_type": issue.issue_type,
+            "severity": issue.severity,
+        },
     )
     return issue
 
 
 @transaction.atomic
 def update_issue(*, actor: User, issue: DecisionIssue, fields: dict[str, Any]) -> DecisionIssue:
-    issue = DecisionIssue.objects.select_for_update().select_related("decision__organisation").get(id=issue.id)
+    issue = (
+        DecisionIssue.objects.select_for_update()
+        .select_related("decision__organisation")
+        .get(id=issue.id)
+    )
     if not can_edit_issue(actor=actor, issue=issue):
-        raise PermissionDenied("Only the assigned owner or an accountable decision authority may update this issue.")
+        raise PermissionDenied(
+            "Only the assigned owner or an accountable decision authority may update this issue."
+        )
     if "owner_id" in fields:
         if not can_manage_analysis(actor=actor, decision=issue.decision):
-            raise PermissionDenied("Only an accountable decision authority may transfer issue ownership.")
+            raise PermissionDenied(
+                "Only an accountable decision authority may transfer issue ownership."
+            )
         issue.owner = _active_member(decision=issue.decision, user_id=fields.pop("owner_id"))
     requested_status = fields.pop("status", None)
     for name, value in fields.items():
@@ -90,13 +108,25 @@ def update_issue(*, actor: User, issue: DecisionIssue, fields: dict[str, Any]) -
 
 
 @transaction.atomic
-def create_quality_review(*, actor: User, decision: Decision, **fields: Any) -> DecisionQualityReview:
-    decision = Decision.objects.select_for_update().select_related("organisation").get(id=decision.id)
+def create_quality_review(
+    *, actor: User, decision: Decision, **fields: Any
+) -> DecisionQualityReview:
+    decision = (
+        Decision.objects.select_for_update().select_related("organisation").get(id=decision.id)
+    )
     if not can_manage_analysis(actor=actor, decision=decision):
         raise PermissionDenied("Only accountable decision authorities may author a quality review.")
-    if DecisionQualityReview.objects.filter(decision=decision, status=DecisionQualityReview.Status.DRAFT).exists():
+    if DecisionQualityReview.objects.filter(
+        decision=decision, status=DecisionQualityReview.Status.DRAFT
+    ).exists():
         raise DecisionAnalysisServiceError("Complete or publish the existing draft review first.")
-    version = (DecisionQualityReview.objects.filter(decision=decision).order_by("-version").values_list("version", flat=True).first() or 0) + 1
+    version = (
+        DecisionQualityReview.objects.filter(decision=decision)
+        .order_by("-version")
+        .values_list("version", flat=True)
+        .first()
+        or 0
+    ) + 1
     review = DecisionQualityReview(
         organisation=decision.organisation,
         decision=decision,
@@ -118,8 +148,14 @@ def create_quality_review(*, actor: User, decision: Decision, **fields: Any) -> 
 
 
 @transaction.atomic
-def update_quality_review(*, actor: User, review: DecisionQualityReview, fields: dict[str, Any]) -> DecisionQualityReview:
-    review = DecisionQualityReview.objects.select_for_update().select_related("decision__organisation").get(id=review.id)
+def update_quality_review(
+    *, actor: User, review: DecisionQualityReview, fields: dict[str, Any]
+) -> DecisionQualityReview:
+    review = (
+        DecisionQualityReview.objects.select_for_update()
+        .select_related("decision__organisation")
+        .get(id=review.id)
+    )
     if not can_manage_analysis(actor=actor, decision=review.decision):
         raise PermissionDenied("Only accountable decision authorities may update this review.")
     if review.status != DecisionQualityReview.Status.DRAFT:
@@ -144,19 +180,37 @@ def update_quality_review(*, actor: User, review: DecisionQualityReview, fields:
         object_id=str(review.id),
         actor=actor,
         organisation=review.organisation,
-        metadata={"decision_id": str(review.decision_id), "version": review.version, "status": review.status},
+        metadata={
+            "decision_id": str(review.decision_id),
+            "version": review.version,
+            "status": review.status,
+        },
     )
     return review
 
 
 @transaction.atomic
-def create_executive_summary(*, actor: User, decision: Decision, **fields: Any) -> ExecutiveDecisionSummary:
-    decision = Decision.objects.select_for_update().select_related("organisation").get(id=decision.id)
+def create_executive_summary(
+    *, actor: User, decision: Decision, **fields: Any
+) -> ExecutiveDecisionSummary:
+    decision = (
+        Decision.objects.select_for_update().select_related("organisation").get(id=decision.id)
+    )
     if not can_manage_analysis(actor=actor, decision=decision):
-        raise PermissionDenied("Only accountable decision authorities may author an executive summary.")
-    if ExecutiveDecisionSummary.objects.filter(decision=decision, status=ExecutiveDecisionSummary.Status.DRAFT).exists():
+        raise PermissionDenied(
+            "Only accountable decision authorities may author an executive summary."
+        )
+    if ExecutiveDecisionSummary.objects.filter(
+        decision=decision, status=ExecutiveDecisionSummary.Status.DRAFT
+    ).exists():
         raise DecisionAnalysisServiceError("Complete or approve the existing draft summary first.")
-    version = (ExecutiveDecisionSummary.objects.filter(decision=decision).order_by("-version").values_list("version", flat=True).first() or 0) + 1
+    version = (
+        ExecutiveDecisionSummary.objects.filter(decision=decision)
+        .order_by("-version")
+        .values_list("version", flat=True)
+        .first()
+        or 0
+    ) + 1
     summary = ExecutiveDecisionSummary(
         organisation=decision.organisation,
         decision=decision,
@@ -178,8 +232,14 @@ def create_executive_summary(*, actor: User, decision: Decision, **fields: Any) 
 
 
 @transaction.atomic
-def update_executive_summary(*, actor: User, summary: ExecutiveDecisionSummary, fields: dict[str, Any]) -> ExecutiveDecisionSummary:
-    summary = ExecutiveDecisionSummary.objects.select_for_update().select_related("decision__organisation").get(id=summary.id)
+def update_executive_summary(
+    *, actor: User, summary: ExecutiveDecisionSummary, fields: dict[str, Any]
+) -> ExecutiveDecisionSummary:
+    summary = (
+        ExecutiveDecisionSummary.objects.select_for_update()
+        .select_related("decision__organisation")
+        .get(id=summary.id)
+    )
     if not can_manage_analysis(actor=actor, decision=summary.decision):
         raise PermissionDenied("Only accountable decision authorities may update this summary.")
     if summary.status != ExecutiveDecisionSummary.Status.DRAFT:
@@ -205,6 +265,10 @@ def update_executive_summary(*, actor: User, summary: ExecutiveDecisionSummary, 
         object_id=str(summary.id),
         actor=actor,
         organisation=summary.organisation,
-        metadata={"decision_id": str(summary.decision_id), "version": summary.version, "status": summary.status},
+        metadata={
+            "decision_id": str(summary.decision_id),
+            "version": summary.version,
+            "status": summary.status,
+        },
     )
     return summary

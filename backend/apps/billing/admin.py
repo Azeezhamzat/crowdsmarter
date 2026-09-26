@@ -7,7 +7,14 @@ from .models import OrganisationSubscription, Plan
 class PlanAdmin(admin.ModelAdmin):
     """Packaging tiers are internal configuration, editable by platform staff."""
 
-    list_display = ("name", "key", "order", "is_active", "max_active_decisions", "max_active_members")
+    list_display = (
+        "name",
+        "key",
+        "order",
+        "is_active",
+        "max_active_decisions",
+        "max_active_members",
+    )
     list_filter = ("is_active", "support_level")
     search_fields = ("key", "name")
     ordering = ("order",)

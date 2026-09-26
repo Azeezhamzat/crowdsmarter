@@ -8,9 +8,7 @@ from apps.workspaces.services import create_workspace, update_workspace
 
 
 @pytest.mark.django_db
-def test_manager_creates_workspace_and_audit(
-    user_factory, organisation_factory
-):  # type: ignore[no-untyped-def]
+def test_manager_creates_workspace_and_audit(user_factory, organisation_factory):  # type: ignore[no-untyped-def]
     owner = user_factory()
     organisation = organisation_factory(owner=owner)
 
@@ -32,9 +30,7 @@ def test_manager_creates_workspace_and_audit(
 
 
 @pytest.mark.django_db
-def test_contributor_cannot_create_workspace(
-    user_factory, organisation_factory
-):  # type: ignore[no-untyped-def]
+def test_contributor_cannot_create_workspace(user_factory, organisation_factory):  # type: ignore[no-untyped-def]
     owner = user_factory()
     contributor = user_factory()
     organisation = organisation_factory(owner=owner)
@@ -67,6 +63,5 @@ def test_manager_updates_workspace(workspace_factory):  # type: ignore[no-untype
 
     assert updated.name == "Executive decisions"
     assert (
-        Workspace.objects.get(id=workspace.id).description
-        == "Material cross-functional decisions."
+        Workspace.objects.get(id=workspace.id).description == "Material cross-functional decisions."
     )

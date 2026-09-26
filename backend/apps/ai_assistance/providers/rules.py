@@ -16,7 +16,6 @@ from .base import (
     SimilarDecision,
 )
 
-
 _TOKEN_PATTERN = re.compile(r"[a-z0-9]{3,}")
 _DUPLICATE_EVIDENCE_THRESHOLD = 0.6
 
@@ -86,9 +85,7 @@ class RuleBasedAIProvider:
                         related_id=option["id"],
                     )
                 )
-        if evidence and not any(
-            item["stance"] in {"challenges", "mixed"} for item in evidence
-        ):
+        if evidence and not any(item["stance"] in {"challenges", "mixed"} for item in evidence):
             missing_evidence.append(
                 ReviewFinding(
                     severity="medium",
@@ -149,9 +146,9 @@ class RuleBasedAIProvider:
             supports = [item for item in items if item["stance"] == "supports"]
             challenges = [item for item in items if item["stance"] == "challenges"]
             if supports and challenges:
-                high_strength = any(
-                    item["strength"] == "high" for item in supports
-                ) and any(item["strength"] == "high" for item in challenges)
+                high_strength = any(item["strength"] == "high" for item in supports) and any(
+                    item["strength"] == "high" for item in challenges
+                )
                 target = option_names.get(related_id, "the overall decision")
                 contradictory_evidence.append(
                     ReviewFinding(
@@ -163,9 +160,7 @@ class RuleBasedAIProvider:
                             "reconcile the difference rather than average it away."
                         ),
                         related_type=(
-                            "decision_option"
-                            if related_id != "decision"
-                            else "decision"
+                            "decision_option" if related_id != "decision" else "decision"
                         ),
                         related_id="" if related_id == "decision" else related_id,
                     )
@@ -488,7 +483,9 @@ class RuleBasedAIProvider:
                 )
             )
 
-        return AnalyticsNarrative(headline=headline, observations=observations, generated_by=self.label)
+        return AnalyticsNarrative(
+            headline=headline, observations=observations, generated_by=self.label
+        )
 
     def test_connection(self) -> ProviderConnectionResult:
         return ProviderConnectionResult(

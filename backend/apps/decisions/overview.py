@@ -8,13 +8,12 @@ from django.utils import timezone
 from apps.collaboration.models import DiscussionEntry
 from apps.decision_options.models import DecisionOption
 from apps.decision_options.services import budget_summary
-from apps.participants.models import Participant
 from apps.foresight.models import SignalDecisionLink, StrategicImplication
+from apps.participants.models import Participant
 from apps.risks.models import Risk
 
 from .models import Decision
 from .reasoning import reasoning_summary
-
 
 STATUS_ORDER = [value for value, _ in Decision.Status.choices]
 
@@ -44,8 +43,7 @@ def _next_action(decision: Decision, blockers: list[str], unresolved: int) -> di
         return {
             "label": "Move into framing",
             "description": (
-                "The core frame is present. Review it and record why formal "
-                "framing should begin."
+                "The core frame is present. Review it and record why formal framing should begin."
             ),
             "route": f"/decisions/{decision.id}#lifecycle",
         }
@@ -62,8 +60,7 @@ def _next_action(decision: Decision, blockers: list[str], unresolved: int) -> di
         return {
             "label": "Build the reasoning record",
             "description": (
-                "Develop options, evidence, assumptions, risks, and resolve "
-                "material questions."
+                "Develop options, evidence, assumptions, risks, and resolve material questions."
             ),
             "route": f"/decisions/{decision.id}/reasoning/options",
         }
@@ -78,8 +75,7 @@ def _next_action(decision: Decision, blockers: list[str], unresolved: int) -> di
             return {
                 "label": "Resolve open questions and concerns",
                 "description": (
-                    f"{unresolved} unresolved discussion item(s) still need an "
-                    "explicit response."
+                    f"{unresolved} unresolved discussion item(s) still need an explicit response."
                 ),
                 "route": f"/decisions/{decision.id}/collaboration",
             }
@@ -113,8 +109,7 @@ def _next_action(decision: Decision, blockers: list[str], unresolved: int) -> di
         return {
             "label": "Maintain implementation accountability",
             "description": (
-                "Keep the implementation record current and prepare attributable "
-                "outcome evidence."
+                "Keep the implementation record current and prepare attributable outcome evidence."
             ),
             "route": f"/decisions/{decision.id}/outcomes",
         }
@@ -210,7 +205,8 @@ def decision_overview(decision: Decision) -> dict:
     is_overdue = bool(
         decision.target_decision_date
         and decision.target_decision_date < today
-        and decision.status not in {
+        and decision.status
+        not in {
             Decision.Status.DECISION_FINALISED,
             Decision.Status.COMMITMENT,
             Decision.Status.IMPLEMENTATION,
@@ -227,13 +223,16 @@ def decision_overview(decision: Decision) -> dict:
         },
         "next_action": _next_action(decision, reasoning["blockers"], unresolved),
         "framing": {
-            "completed": sum(bool(value) for value in (
-                decision.decision_question,
-                decision.purpose,
-                decision.context,
-                decision.scope,
-                decision.contribution_guidance,
-            )),
+            "completed": sum(
+                bool(value)
+                for value in (
+                    decision.decision_question,
+                    decision.purpose,
+                    decision.context,
+                    decision.scope,
+                    decision.contribution_guidance,
+                )
+            ),
             "total": 5,
             "missing": [
                 label
@@ -262,7 +261,9 @@ def decision_overview(decision: Decision) -> dict:
             ],
         },
         "discussion": {"unresolved": unresolved},
-        "budget": budget_summary(decision=decision) if decision.source_template_key == "grant_round" else None,
+        "budget": budget_summary(decision=decision)
+        if decision.source_template_key == "grant_round"
+        else None,
         "options": options,
         "material_risks": risks,
         "linked_signals": linked_signals,

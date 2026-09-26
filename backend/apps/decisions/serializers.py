@@ -157,7 +157,7 @@ class DecisionCreateSerializer(StrictSerializer):
     purpose = serializers.CharField(
         max_length=8000, trim_whitespace=True, allow_blank=True, required=False, default=""
     )
-    context = serializers.CharField(
+    context = serializers.CharField(  # type: ignore[assignment]  # API field shadows DRF Field.context.
         max_length=12000, trim_whitespace=True, allow_blank=True, required=False, default=""
     )
     scope = serializers.CharField(
@@ -180,7 +180,9 @@ class DecisionCreateSerializer(StrictSerializer):
 
     def validate(self, attrs):  # type: ignore[no-untyped-def]
         if attrs.get("method_version_id") and attrs.get("template_key") not in {"", "blank"}:
-            raise serializers.ValidationError("Choose either a built-in template or an organisation method.")
+            raise serializers.ValidationError(
+                "Choose either a built-in template or an organisation method."
+            )
         return attrs
 
 
@@ -194,7 +196,7 @@ class DecisionUpdateSerializer(StrictSerializer):
     purpose = serializers.CharField(
         max_length=8000, trim_whitespace=True, allow_blank=True, required=False
     )
-    context = serializers.CharField(
+    context = serializers.CharField(  # type: ignore[assignment]  # API field shadows DRF Field.context.
         max_length=12000, trim_whitespace=True, allow_blank=True, required=False
     )
     scope = serializers.CharField(
