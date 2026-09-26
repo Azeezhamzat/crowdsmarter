@@ -9,6 +9,10 @@ from .views import (
     EvaluationRoundTransitionView,
     EvaluationScoringOptionsView,
     EvaluationSubmissionView,
+    ForecastingLeaderboardView,
+    ForecastQuestionCreateView,
+    ForecastQuestionResolveView,
+    ForecastSubmitView,
     MinorityReportCreateView,
     PortfolioAssessmentView,
     PortfolioCandidateCreateView,
@@ -64,6 +68,26 @@ urlpatterns = [
         "evaluations/<uuid:exercise_id>/minority-reports/",
         MinorityReportCreateView.as_view(),
         name="evaluation-minority-reports",
+    ),
+    path(
+        "evaluations/<uuid:exercise_id>/forecast-questions/",
+        ForecastQuestionCreateView.as_view(),
+        name="evaluation-forecast-questions",
+    ),
+    path(
+        "forecast-questions/<uuid:question_id>/forecast/",
+        ForecastSubmitView.as_view(),
+        name="forecast-submit",
+    ),
+    path(
+        "forecast-questions/<uuid:question_id>/resolve/",
+        ForecastQuestionResolveView.as_view(),
+        name="forecast-question-resolve",
+    ),
+    path(
+        "organisations/<uuid:organisation_id>/forecasting-leaderboard/",
+        ForecastingLeaderboardView.as_view(),
+        name="forecasting-leaderboard",
     ),
     path(
         "organisations/<uuid:organisation_id>/prioritisations/",

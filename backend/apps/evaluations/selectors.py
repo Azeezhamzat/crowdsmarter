@@ -5,7 +5,13 @@ from django.shortcuts import get_object_or_404
 from apps.decisions.selectors import decision_for_user
 from apps.organisations.models import Organisation
 
-from .models import EvaluationExercise, EvaluationRound, PortfolioCandidate, PrioritisationPortfolio
+from .models import (
+    EvaluationExercise,
+    EvaluationRound,
+    ForecastQuestion,
+    PortfolioCandidate,
+    PrioritisationPortfolio,
+)
 
 
 def exercises_for_decision(*, user, decision_id):
@@ -13,7 +19,9 @@ def exercises_for_decision(*, user, decision_id):
     return (
         EvaluationExercise.objects.filter(decision=decision)
         .select_related("decision", "organisation", "owner", "created_by")
-        .prefetch_related("criteria", "rounds")
+        .prefetch_related(
+            "criteria", "rounds", "forecast_questions__forecasts__forecaster", "forecast_questions__resolved_by"
+        )
     )
 
 
@@ -35,6 +43,8 @@ def exercise_workspace_for_user(*, user, exercise_id):
             "rounds__submissions__responses__option",
             "rounds__submissions__responses__criterion",
             "minority_reports__author",
+            "forecast_questions__forecasts__forecaster",
+            "forecast_questions__resolved_by",
         )
         .filter(organisation__memberships__user=user, organisation__memberships__status="active"),
         id=exercise_id,
@@ -47,6 +57,15 @@ def round_for_user(*, user, round_id):
             "exercise__decision", "exercise__organisation", "exercise__owner"
         ).filter(organisation__memberships__user=user, organisation__memberships__status="active"),
         id=round_id,
+    )
+
+
+def forecast_question_for_user(*, user, question_id):
+    return get_object_or_404(
+        ForecastQuestion.objects.select_related(
+            "exercise__decision", "exercise__organisation", "exercise__owner"
+        ).filter(organisation__memberships__user=user, organisation__memberships__status="active"),
+        id=question_id,
     )
 
 

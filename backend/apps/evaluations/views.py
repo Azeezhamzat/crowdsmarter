@@ -14,6 +14,7 @@ from .selectors import (
     exercise_for_user,
     exercise_workspace_for_user,
     exercises_for_decision,
+    forecast_question_for_user,
     portfolio_for_user,
     portfolios_for_organisation,
     round_for_user,
@@ -30,6 +31,11 @@ from .serializers import (
     EvaluationScoringOptionSerializer,
     EvaluationSubmissionSerializer,
     EvaluationSubmissionWriteSerializer,
+    ForecastQuestionResolveSerializer,
+    ForecastQuestionSerializer,
+    ForecastQuestionWriteSerializer,
+    ForecastSerializer,
+    ForecastWriteSerializer,
     MinorityReportSerializer,
     MinorityReportWriteSerializer,
     PortfolioAssessmentSerializer,
@@ -49,14 +55,18 @@ from .services import (
     add_portfolio_criterion,
     create_criterion,
     create_exercise,
+    create_forecast_question,
     create_minority_report,
     create_portfolio,
     create_round,
     evaluation_results,
+    forecasting_leaderboard,
+    resolve_forecast_question,
     save_portfolio_assessment,
     save_submission,
     scoring_options_for_exercise,
     set_selection,
+    submit_forecast,
     transition_round,
     update_exercise,
     update_portfolio,
@@ -179,6 +189,56 @@ class MinorityReportCreateView(APIView):
             actor=request.user, exercise=exercise, **serializer.validated_data
         )
         return Response(MinorityReportSerializer(item).data, status=status.HTTP_201_CREATED)
+
+
+class ForecastQuestionCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, exercise_id):
+        exercise = exercise_for_user(user=request.user, exercise_id=exercise_id)
+        serializer = ForecastQuestionWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        item = create_forecast_question(
+            actor=request.user, exercise=exercise, **serializer.validated_data
+        )
+        return Response(
+            ForecastQuestionSerializer(item, context={"request": request}).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class ForecastSubmitView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def put(self, request, question_id):
+        item = forecast_question_for_user(user=request.user, question_id=question_id)
+        serializer = ForecastWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        forecast = submit_forecast(actor=request.user, question=item, **serializer.validated_data)
+        return Response(ForecastSerializer(forecast, context={"request": request}).data)
+
+
+class ForecastQuestionResolveView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, question_id):
+        item = forecast_question_for_user(user=request.user, question_id=question_id)
+        serializer = ForecastQuestionResolveSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        item = resolve_forecast_question(
+            actor=request.user, question=item, **serializer.validated_data
+        )
+        return Response(ForecastQuestionSerializer(item, context={"request": request}).data)
+
+
+class ForecastingLeaderboardView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, organisation_id):
+        organisation = get_object_or_404(
+            Organisation.objects.for_user(request.user), id=organisation_id
+        )
+        return Response(forecasting_leaderboard(organisation=organisation))
 
 
 class PrioritisationPortfolioListCreateView(APIView):

@@ -6,6 +6,8 @@ from .models import (
     EvaluationResponse,
     EvaluationRound,
     EvaluationSubmission,
+    Forecast,
+    ForecastQuestion,
     MinorityReport,
     PortfolioAssessment,
     PortfolioCandidate,
@@ -26,5 +28,7 @@ for model in [
     PortfolioCandidate,
     PortfolioAssessment,
     PortfolioSelection,
+    ForecastQuestion,
+    Forecast,
 ]:
     admin.site.register(model)

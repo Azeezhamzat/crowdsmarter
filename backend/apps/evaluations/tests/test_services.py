@@ -2,22 +2,32 @@ import pytest
 from django.core.exceptions import PermissionDenied
 
 from apps.decision_options.services import create_option
-from apps.evaluations.models import EvaluationExercise, EvaluationRound, PrioritisationPortfolio
+from apps.evaluations.models import (
+    EvaluationExercise,
+    EvaluationRound,
+    ForecastQuestion,
+    PrioritisationPortfolio,
+)
 from apps.evaluations.services import (
     EvaluationServiceError,
     add_candidate,
     add_portfolio_criterion,
     create_criterion,
     create_exercise,
+    create_forecast_question,
     create_minority_report,
     create_portfolio,
     create_round,
     evaluation_results,
+    forecasting_leaderboard,
     portfolio_recommendation,
+    resolve_forecast_question,
     save_portfolio_assessment,
     save_submission,
     scoring_options_for_exercise,
+    submit_forecast,
     transition_round,
+    update_exercise,
     update_portfolio,
 )
 from apps.organisations.models import Membership
@@ -1121,3 +1131,445 @@ def test_blind_applicant_identity_hides_titles_until_managers_or_close(
     exercise.save(update_fields=["status", "updated_at"])
     closed_view = scoring_options_for_exercise(exercise=exercise, viewer=contributor)
     assert all(not row["blinded"] for row in closed_view)
+
+
+def _open_forecasting_exercise(*, owner, decision, **overrides):
+    exercise = create_exercise(
+        actor=owner,
+        decision=decision,
+        owner_id=owner.id,
+        title=overrides.pop("title", "Calibration tournament"),
+        purpose=overrides.pop("purpose", "Forecast outcomes before they happen."),
+        method="forecasting",
+        quorum_count=overrides.pop("quorum_count", 1),
+        **overrides,
+    )
+    return update_exercise(
+        actor=owner, exercise=exercise, fields={"status": EvaluationExercise.Status.OPEN}
+    )
+
+
+@pytest.mark.django_db
+def test_create_forecast_question_requires_forecasting_method(
+    organisation_factory, decision_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    exercise = create_exercise(
+        actor=owner,
+        decision=decision,
+        owner_id=owner.id,
+        title="Scorecard",
+        purpose="p",
+        method="scorecard",
+        quorum_count=1,
+    )
+    with pytest.raises(EvaluationServiceError):
+        create_forecast_question(actor=owner, exercise=exercise, question_text="Will X happen?")
+
+
+@pytest.mark.django_db
+def test_create_forecast_question_permission_denied_for_non_manager(
+    organisation_factory, decision_factory, user_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    contributor = user_factory(email="contributor@example.com")
+    Membership.objects.create(
+        organisation=organisation,
+        user=contributor,
+        role=Membership.Role.CONTRIBUTOR,
+        status=Membership.Status.ACTIVE,
+    )
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    Participant.objects.create(
+        organisation=organisation,
+        decision=decision,
+        user=contributor,
+        role=Participant.Role.CONTRIBUTOR,
+        added_by=owner,
+    )
+    exercise = _open_forecasting_exercise(owner=owner, decision=decision)
+    with pytest.raises(PermissionDenied):
+        create_forecast_question(
+            actor=contributor, exercise=exercise, question_text="Will X happen?"
+        )
+
+
+@pytest.mark.django_db
+def test_create_forecast_question_rejected_once_exercise_closed(
+    organisation_factory, decision_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    exercise = _open_forecasting_exercise(owner=owner, decision=decision)
+    exercise = update_exercise(
+        actor=owner, exercise=exercise, fields={"status": EvaluationExercise.Status.CLOSED}
+    )
+    with pytest.raises(EvaluationServiceError):
+        create_forecast_question(actor=owner, exercise=exercise, question_text="Will X happen?")
+
+
+@pytest.mark.django_db
+def test_update_exercise_forecasting_status_transitions_follow_governed_sequence(
+    organisation_factory, decision_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    exercise = create_exercise(
+        actor=owner,
+        decision=decision,
+        owner_id=owner.id,
+        title="Forecasting",
+        purpose="p",
+        method="forecasting",
+        quorum_count=1,
+    )
+    with pytest.raises(EvaluationServiceError):
+        update_exercise(
+            actor=owner, exercise=exercise, fields={"status": EvaluationExercise.Status.CLOSED}
+        )
+    exercise = update_exercise(
+        actor=owner, exercise=exercise, fields={"status": EvaluationExercise.Status.OPEN}
+    )
+    exercise = update_exercise(
+        actor=owner, exercise=exercise, fields={"status": EvaluationExercise.Status.CLOSED}
+    )
+    exercise = update_exercise(
+        actor=owner, exercise=exercise, fields={"status": EvaluationExercise.Status.ARCHIVED}
+    )
+    assert exercise.status == EvaluationExercise.Status.ARCHIVED
+
+
+@pytest.mark.django_db
+def test_create_round_rejects_forecasting_exercise(
+    organisation_factory, decision_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    exercise = _open_forecasting_exercise(owner=owner, decision=decision)
+    with pytest.raises(EvaluationServiceError):
+        create_round(actor=owner, exercise=exercise, title="Round one")
+
+
+@pytest.mark.django_db
+def test_submit_forecast_happy_path_and_revision_overwrites_prior_probability(
+    organisation_factory, decision_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    exercise = _open_forecasting_exercise(owner=owner, decision=decision)
+    question = create_forecast_question(
+        actor=owner, exercise=exercise, question_text="Will the pilot launch on time?"
+    )
+
+    forecast = submit_forecast(actor=owner, question=question, probability=20)
+    assert forecast.probability == 20
+
+    revised = submit_forecast(actor=owner, question=question, probability=90)
+    assert revised.id == forecast.id
+    assert revised.probability == 90
+    assert question.forecasts.count() == 1
+
+
+@pytest.mark.django_db
+def test_submit_forecast_rejects_non_participant(
+    organisation_factory, decision_factory, user_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    outsider = user_factory(email="outsider@example.com")
+    Membership.objects.create(
+        organisation=organisation,
+        user=outsider,
+        role=Membership.Role.CONTRIBUTOR,
+        status=Membership.Status.ACTIVE,
+    )
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    exercise = _open_forecasting_exercise(owner=owner, decision=decision)
+    question = create_forecast_question(
+        actor=owner, exercise=exercise, question_text="Will X happen?"
+    )
+    with pytest.raises(PermissionDenied):
+        submit_forecast(actor=outsider, question=question, probability=50)
+
+
+@pytest.mark.django_db
+def test_submit_forecast_rejects_observer(
+    organisation_factory, decision_factory, user_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    observer = user_factory(email="observer@example.com")
+    Membership.objects.create(
+        organisation=organisation,
+        user=observer,
+        role=Membership.Role.VIEWER,
+        status=Membership.Status.ACTIVE,
+    )
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    Participant.objects.create(
+        organisation=organisation,
+        decision=decision,
+        user=observer,
+        role=Participant.Role.OBSERVER,
+        added_by=owner,
+    )
+    exercise = _open_forecasting_exercise(owner=owner, decision=decision)
+    question = create_forecast_question(
+        actor=owner, exercise=exercise, question_text="Will X happen?"
+    )
+    with pytest.raises(PermissionDenied):
+        submit_forecast(actor=observer, question=question, probability=50)
+
+
+@pytest.mark.django_db
+def test_submit_forecast_rejects_when_question_already_resolved(
+    organisation_factory, decision_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    exercise = _open_forecasting_exercise(owner=owner, decision=decision)
+    question = create_forecast_question(
+        actor=owner, exercise=exercise, question_text="Will X happen?"
+    )
+    resolve_forecast_question(actor=owner, question=question, outcome=True)
+    with pytest.raises(EvaluationServiceError):
+        submit_forecast(actor=owner, question=question, probability=50)
+
+
+@pytest.mark.django_db
+def test_submit_forecast_rejects_when_exercise_not_open(
+    organisation_factory, decision_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    exercise = create_exercise(
+        actor=owner,
+        decision=decision,
+        owner_id=owner.id,
+        title="Forecasting",
+        purpose="p",
+        method="forecasting",
+        quorum_count=1,
+    )
+    # A draft exercise cannot accept forecast questions in the first place, so open it
+    # briefly to create the question, then close it back down before forecasting.
+    exercise = update_exercise(
+        actor=owner, exercise=exercise, fields={"status": EvaluationExercise.Status.OPEN}
+    )
+    question = create_forecast_question(
+        actor=owner, exercise=exercise, question_text="Will X happen?"
+    )
+    exercise = update_exercise(
+        actor=owner, exercise=exercise, fields={"status": EvaluationExercise.Status.CLOSED}
+    )
+    with pytest.raises(EvaluationServiceError):
+        submit_forecast(actor=owner, question=question, probability=50)
+
+
+@pytest.mark.django_db
+def test_resolve_forecast_question_computes_brier_scores(
+    organisation_factory, decision_factory, user_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    contributor = user_factory(email="contributor@example.com")
+    Membership.objects.create(
+        organisation=organisation,
+        user=contributor,
+        role=Membership.Role.CONTRIBUTOR,
+        status=Membership.Status.ACTIVE,
+    )
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    Participant.objects.create(
+        organisation=organisation,
+        decision=decision,
+        user=contributor,
+        role=Participant.Role.CONTRIBUTOR,
+        added_by=owner,
+    )
+    exercise = _open_forecasting_exercise(owner=owner, decision=decision)
+    question = create_forecast_question(
+        actor=owner, exercise=exercise, question_text="Will the grant renew?"
+    )
+    submit_forecast(actor=owner, question=question, probability=80)
+    submit_forecast(actor=contributor, question=question, probability=30)
+
+    resolved = resolve_forecast_question(actor=owner, question=question, outcome=True)
+
+    assert resolved.status == ForecastQuestion.Status.RESOLVED
+    assert resolved.outcome is True
+    assert resolved.resolved_by == owner
+
+    owner_forecast = resolved.forecasts.get(forecaster=owner)
+    contributor_forecast = resolved.forecasts.get(forecaster=contributor)
+    assert float(owner_forecast.brier_score) == pytest.approx(0.04)
+    assert float(contributor_forecast.brier_score) == pytest.approx(0.49)
+
+
+@pytest.mark.django_db
+def test_resolve_forecast_question_with_zero_forecasts(
+    organisation_factory, decision_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    exercise = _open_forecasting_exercise(owner=owner, decision=decision)
+    question = create_forecast_question(
+        actor=owner, exercise=exercise, question_text="Will X happen?"
+    )
+    resolved = resolve_forecast_question(actor=owner, question=question, outcome=False)
+    assert resolved.status == ForecastQuestion.Status.RESOLVED
+    assert resolved.forecasts.count() == 0
+
+
+@pytest.mark.django_db
+def test_resolve_forecast_question_twice_raises(
+    organisation_factory, decision_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    exercise = _open_forecasting_exercise(owner=owner, decision=decision)
+    question = create_forecast_question(
+        actor=owner, exercise=exercise, question_text="Will X happen?"
+    )
+    resolve_forecast_question(actor=owner, question=question, outcome=True)
+    with pytest.raises(EvaluationServiceError):
+        resolve_forecast_question(actor=owner, question=question, outcome=False)
+
+
+@pytest.mark.django_db
+def test_resolve_forecast_question_permission_denied_for_non_manager(
+    organisation_factory, decision_factory, user_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    contributor = user_factory(email="contributor@example.com")
+    Membership.objects.create(
+        organisation=organisation,
+        user=contributor,
+        role=Membership.Role.CONTRIBUTOR,
+        status=Membership.Status.ACTIVE,
+    )
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    Participant.objects.create(
+        organisation=organisation,
+        decision=decision,
+        user=contributor,
+        role=Participant.Role.CONTRIBUTOR,
+        added_by=owner,
+    )
+    exercise = _open_forecasting_exercise(owner=owner, decision=decision)
+    question = create_forecast_question(
+        actor=owner, exercise=exercise, question_text="Will X happen?"
+    )
+    with pytest.raises(PermissionDenied):
+        resolve_forecast_question(actor=contributor, question=question, outcome=True)
+
+
+@pytest.mark.django_db
+def test_forecasting_leaderboard_orders_by_mean_brier_score_across_multiple_questions(
+    organisation_factory, decision_factory, user_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    contributor = user_factory(email="contributor@example.com")
+    Membership.objects.create(
+        organisation=organisation,
+        user=contributor,
+        role=Membership.Role.CONTRIBUTOR,
+        status=Membership.Status.ACTIVE,
+    )
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    Participant.objects.create(
+        organisation=organisation,
+        decision=decision,
+        user=contributor,
+        role=Participant.Role.CONTRIBUTOR,
+        added_by=owner,
+    )
+    exercise = _open_forecasting_exercise(owner=owner, decision=decision)
+
+    question_one = create_forecast_question(
+        actor=owner, exercise=exercise, question_text="Will milestone one land on time?"
+    )
+    submit_forecast(actor=owner, question=question_one, probability=90)
+    submit_forecast(actor=contributor, question=question_one, probability=20)
+    resolve_forecast_question(actor=owner, question=question_one, outcome=True)
+    # owner brier: 0.01, contributor brier: 0.64
+
+    question_two = create_forecast_question(
+        actor=owner, exercise=exercise, question_text="Will milestone two land on time?"
+    )
+    submit_forecast(actor=owner, question=question_two, probability=90)
+    submit_forecast(actor=contributor, question=question_two, probability=20)
+    resolve_forecast_question(actor=owner, question=question_two, outcome=False)
+    # owner brier: 0.81, contributor brier: 0.04
+    # owner mean = 0.41, contributor mean = 0.34 -> contributor is better calibrated overall,
+    # even though the owner "won" the very first question - this is the point of the metric.
+
+    leaderboard = forecasting_leaderboard(organisation=organisation)
+
+    assert [row["email"] for row in leaderboard] == [contributor.email, owner.email]
+    assert leaderboard[0]["mean_brier_score"] == pytest.approx(0.34)
+    assert leaderboard[0]["resolved_question_count"] == 2
+    assert leaderboard[0]["rank"] == 1
+    assert leaderboard[1]["mean_brier_score"] == pytest.approx(0.41)
+    assert leaderboard[1]["rank"] == 2
+
+
+@pytest.mark.django_db
+def test_forecasting_leaderboard_excludes_other_organisations_and_unresolved_questions(
+    organisation_factory, decision_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    other_organisation = organisation_factory()
+    owner = organisation.created_by
+    other_owner = other_organisation.created_by
+
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    exercise = _open_forecasting_exercise(owner=owner, decision=decision)
+    resolved_question = create_forecast_question(
+        actor=owner, exercise=exercise, question_text="Will X happen?"
+    )
+    submit_forecast(actor=owner, question=resolved_question, probability=70)
+    resolve_forecast_question(actor=owner, question=resolved_question, outcome=True)
+
+    unresolved_question = create_forecast_question(
+        actor=owner, exercise=exercise, question_text="Will Y happen?"
+    )
+    submit_forecast(actor=owner, question=unresolved_question, probability=40)
+
+    other_decision = decision_factory(
+        workspace=other_organisation.workspaces.get(is_default=True), owner=other_owner
+    )
+    other_exercise = _open_forecasting_exercise(owner=other_owner, decision=other_decision)
+    other_question = create_forecast_question(
+        actor=other_owner, exercise=other_exercise, question_text="Will Z happen?"
+    )
+    submit_forecast(actor=other_owner, question=other_question, probability=10)
+    resolve_forecast_question(actor=other_owner, question=other_question, outcome=True)
+
+    leaderboard = forecasting_leaderboard(organisation=organisation)
+
+    assert len(leaderboard) == 1
+    assert leaderboard[0]["email"] == owner.email
+    assert leaderboard[0]["resolved_question_count"] == 1
+    assert leaderboard[0]["mean_brier_score"] == pytest.approx(0.09)
+
+
+@pytest.mark.django_db
+def test_forecasting_leaderboard_empty_when_no_resolved_questions(
+    organisation_factory,
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    assert forecasting_leaderboard(organisation=organisation) == []

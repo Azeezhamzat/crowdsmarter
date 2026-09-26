@@ -19,6 +19,7 @@ class EvaluationExercise(UUIDTimeStampedModel):
         CONSENT = "consent", "Consent and objections"
         DELPHI = "delphi", "Delphi evaluation"
         RANKED_CHOICE = "ranked_choice", "Ranked-choice (instant runoff)"
+        FORECASTING = "forecasting", "Calibrated forecasting"
 
     class Status(models.TextChoices):
         DRAFT = "draft", "Draft"
@@ -583,4 +584,108 @@ class PortfolioSelection(UUIDTimeStampedModel):
         ):
             raise ValidationError(
                 {"organisation": "The selection must share the candidate organisation."}
+            )
+
+
+class ForecastQuestion(UUIDTimeStampedModel):
+    """A yes/no question forecasters assign a probability to, within a forecasting exercise."""
+
+    class Status(models.TextChoices):
+        OPEN = "open", "Open"
+        RESOLVED = "resolved", "Resolved"
+
+    organisation = models.ForeignKey(
+        "organisations.Organisation", on_delete=models.CASCADE, related_name="forecast_questions"
+    )
+    exercise = models.ForeignKey(
+        EvaluationExercise, on_delete=models.CASCADE, related_name="forecast_questions"
+    )
+    question_text = models.CharField(max_length=300)
+    resolution_criteria = models.TextField(blank=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.OPEN)
+    outcome = models.BooleanField(null=True, blank=True)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+    resolved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="resolved_forecast_questions",
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        ordering = ["-created_at", "id"]
+        indexes = [
+            models.Index(fields=["exercise", "status"], name="forecast_question_status_idx"),
+        ]
+
+    def clean(self) -> None:
+        super().clean()
+        self.question_text = self.question_text.strip()
+        self.resolution_criteria = self.resolution_criteria.strip()
+        if (
+            self.exercise_id
+            and self.organisation_id
+            and self.exercise.organisation_id != self.organisation_id
+        ):
+            raise ValidationError(
+                {"organisation": "The question must share the exercise organisation."}
+            )
+        if self.exercise_id and self.exercise.method != EvaluationExercise.Method.FORECASTING:
+            raise ValidationError(
+                {
+                    "exercise": "Forecast questions may only be added to a calibrated-forecasting exercise."
+                }
+            )
+        if self.status == self.Status.RESOLVED and (
+            self.outcome is None or self.resolved_at is None or self.resolved_by_id is None
+        ):
+            raise ValidationError(
+                "A resolved question requires an outcome, a resolution time, and who resolved it."
+            )
+        if self.status == self.Status.OPEN and (
+            self.outcome is not None or self.resolved_at is not None or self.resolved_by_id is not None
+        ):
+            raise ValidationError("An open question cannot carry resolution metadata.")
+
+
+class Forecast(UUIDTimeStampedModel):
+    """One participant's current probability estimate for a forecast question."""
+
+    organisation = models.ForeignKey(
+        "organisations.Organisation", on_delete=models.CASCADE, related_name="forecasts"
+    )
+    question = models.ForeignKey(
+        ForecastQuestion, on_delete=models.CASCADE, related_name="forecasts"
+    )
+    forecaster = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="forecasts"
+    )
+    probability = models.DecimalField(max_digits=5, decimal_places=2)
+    brier_score = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+
+    class Meta:
+        ordering = ["-updated_at", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["question", "forecaster"], name="one_forecast_per_question_per_forecaster"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(probability__gte=0, probability__lte=100),
+                name="forecast_probability_range",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["organisation", "forecaster"], name="forecast_org_forecaster_idx"),
+        ]
+
+    def clean(self) -> None:
+        super().clean()
+        if (
+            self.question_id
+            and self.organisation_id
+            and self.question.organisation_id != self.organisation_id
+        ):
+            raise ValidationError(
+                {"organisation": "The forecast must share the question organisation."}
             )

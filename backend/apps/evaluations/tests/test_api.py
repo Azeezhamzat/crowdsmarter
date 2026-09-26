@@ -110,3 +110,232 @@ def test_scoring_options_endpoint_blinds_titles_for_non_managers(
     )
     assert manager_response.json()[0]["title"] == "Named Applicant Org"
     assert manager_response.json()[0]["blinded"] is False
+
+
+@pytest.mark.django_db
+def test_forecast_question_api_is_strict_and_tenant_safe(
+    api_client, organisation_factory, decision_factory, user_factory
+):  # type: ignore[no-untyped-def]
+    from apps.evaluations.models import EvaluationExercise
+    from apps.evaluations.services import create_exercise, update_exercise
+
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    exercise = create_exercise(
+        actor=owner,
+        decision=decision,
+        owner_id=owner.id,
+        title="Forecasting",
+        purpose="p",
+        method="forecasting",
+        quorum_count=1,
+    )
+    exercise = update_exercise(
+        actor=owner, exercise=exercise, fields={"status": EvaluationExercise.Status.OPEN}
+    )
+
+    api_client.force_authenticate(owner)
+    strict_response = api_client.post(
+        reverse("evaluations:evaluation-forecast-questions", kwargs={"exercise_id": exercise.id}),
+        {"question_text": "Will the pilot launch on time?", "unexpected_field": True},
+        format="json",
+    )
+    assert strict_response.status_code == 400
+    assert "unexpected_field" in strict_response.json()
+
+    created = api_client.post(
+        reverse("evaluations:evaluation-forecast-questions", kwargs={"exercise_id": exercise.id}),
+        {"question_text": "Will the pilot launch on time?"},
+        format="json",
+    )
+    assert created.status_code == 201
+    assert created.json()["status"] == "open"
+
+    api_client.force_authenticate(user_factory())
+    hidden = api_client.post(
+        reverse("evaluations:evaluation-forecast-questions", kwargs={"exercise_id": exercise.id}),
+        {"question_text": "Will X happen?"},
+        format="json",
+    )
+    assert hidden.status_code == 404
+
+
+@pytest.mark.django_db
+def test_forecast_submission_hides_other_forecasts_until_resolution(
+    api_client, organisation_factory, decision_factory, user_factory
+):  # type: ignore[no-untyped-def]
+    from apps.evaluations.models import EvaluationExercise
+    from apps.evaluations.services import create_exercise, create_forecast_question, update_exercise
+    from apps.organisations.models import Membership
+    from apps.participants.models import Participant
+
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    contributor = user_factory(email="forecaster@example.com")
+    Membership.objects.create(
+        organisation=organisation,
+        user=contributor,
+        role=Membership.Role.CONTRIBUTOR,
+        status=Membership.Status.ACTIVE,
+    )
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    Participant.objects.create(
+        organisation=organisation,
+        decision=decision,
+        user=contributor,
+        role=Participant.Role.CONTRIBUTOR,
+        added_by=owner,
+    )
+    exercise = create_exercise(
+        actor=owner,
+        decision=decision,
+        owner_id=owner.id,
+        title="Forecasting",
+        purpose="p",
+        method="forecasting",
+        quorum_count=1,
+    )
+    exercise = update_exercise(
+        actor=owner, exercise=exercise, fields={"status": EvaluationExercise.Status.OPEN}
+    )
+    question = create_forecast_question(
+        actor=owner, exercise=exercise, question_text="Will X happen?"
+    )
+
+    api_client.force_authenticate(owner)
+    owner_response = api_client.put(
+        reverse("evaluations:forecast-submit", kwargs={"question_id": question.id}),
+        {"probability": "70.00"},
+        format="json",
+    )
+    assert owner_response.status_code == 200
+    assert owner_response.json()["probability"] == "70.00"
+
+    api_client.force_authenticate(contributor)
+    contributor_response = api_client.put(
+        reverse("evaluations:forecast-submit", kwargs={"question_id": question.id}),
+        {"probability": "30.00"},
+        format="json",
+    )
+    assert contributor_response.status_code == 200
+
+    detail = api_client.get(
+        reverse("evaluations:evaluation-detail", kwargs={"exercise_id": exercise.id})
+    )
+    question_payload = detail.json()["forecast_questions"][0]
+    assert len(question_payload["forecasts"]) == 1
+    assert question_payload["forecasts"][0]["respondent"]["user"]["email"] == contributor.email
+
+    api_client.force_authenticate(owner)
+    resolve_response = api_client.patch(
+        reverse("evaluations:forecast-question-resolve", kwargs={"question_id": question.id}),
+        {"outcome": True},
+        format="json",
+    )
+    assert resolve_response.status_code == 200
+    assert resolve_response.json()["status"] == "resolved"
+
+    detail_after = api_client.get(
+        reverse("evaluations:evaluation-detail", kwargs={"exercise_id": exercise.id})
+    )
+    resolved_payload = detail_after.json()["forecast_questions"][0]
+    assert len(resolved_payload["forecasts"]) == 2
+
+
+@pytest.mark.django_db
+def test_forecast_question_resolve_api_rejects_non_manager(
+    api_client, organisation_factory, decision_factory, user_factory
+):  # type: ignore[no-untyped-def]
+    from apps.evaluations.models import EvaluationExercise
+    from apps.evaluations.services import create_exercise, create_forecast_question, update_exercise
+    from apps.organisations.models import Membership
+    from apps.participants.models import Participant
+
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    contributor = user_factory(email="contributor@example.com")
+    Membership.objects.create(
+        organisation=organisation,
+        user=contributor,
+        role=Membership.Role.CONTRIBUTOR,
+        status=Membership.Status.ACTIVE,
+    )
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    Participant.objects.create(
+        organisation=organisation,
+        decision=decision,
+        user=contributor,
+        role=Participant.Role.CONTRIBUTOR,
+        added_by=owner,
+    )
+    exercise = create_exercise(
+        actor=owner,
+        decision=decision,
+        owner_id=owner.id,
+        title="Forecasting",
+        purpose="p",
+        method="forecasting",
+        quorum_count=1,
+    )
+    exercise = update_exercise(
+        actor=owner, exercise=exercise, fields={"status": EvaluationExercise.Status.OPEN}
+    )
+    question = create_forecast_question(
+        actor=owner, exercise=exercise, question_text="Will X happen?"
+    )
+
+    api_client.force_authenticate(contributor)
+    response = api_client.patch(
+        reverse("evaluations:forecast-question-resolve", kwargs={"question_id": question.id}),
+        {"outcome": True},
+        format="json",
+    )
+    assert response.status_code == 403
+
+
+@pytest.mark.django_db
+def test_forecasting_leaderboard_api(
+    api_client, organisation_factory, decision_factory
+):  # type: ignore[no-untyped-def]
+    from apps.evaluations.models import EvaluationExercise
+    from apps.evaluations.services import (
+        create_exercise,
+        create_forecast_question,
+        resolve_forecast_question,
+        submit_forecast,
+        update_exercise,
+    )
+
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    exercise = create_exercise(
+        actor=owner,
+        decision=decision,
+        owner_id=owner.id,
+        title="Forecasting",
+        purpose="p",
+        method="forecasting",
+        quorum_count=1,
+    )
+    exercise = update_exercise(
+        actor=owner, exercise=exercise, fields={"status": EvaluationExercise.Status.OPEN}
+    )
+    question = create_forecast_question(
+        actor=owner, exercise=exercise, question_text="Will X happen?"
+    )
+    submit_forecast(actor=owner, question=question, probability=90)
+    resolve_forecast_question(actor=owner, question=question, outcome=True)
+
+    api_client.force_authenticate(owner)
+    response = api_client.get(
+        reverse(
+            "evaluations:forecasting-leaderboard", kwargs={"organisation_id": organisation.id}
+        )
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body[0]["email"] == owner.email
+    assert body[0]["rank"] == 1
+    assert body[0]["mean_brier_score"] == pytest.approx(0.01)

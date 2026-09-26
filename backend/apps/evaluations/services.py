@@ -4,15 +4,16 @@ from __future__ import annotations
 
 import builtins
 from collections import Counter, defaultdict
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from statistics import mean, pstdev
 from typing import Any
 
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import IntegrityError, transaction
-from django.db.models import Max
+from django.db.models import Avg, Count, Max
 from django.utils import timezone
 
+from apps.accounts.models import User
 from apps.audit.services import record_event
 from apps.decision_options.models import DecisionOption
 from apps.notifications.models import Notification
@@ -27,6 +28,8 @@ from .models import (
     EvaluationResponse,
     EvaluationRound,
     EvaluationSubmission,
+    Forecast,
+    ForecastQuestion,
     MinorityReport,
     PortfolioAssessment,
     PortfolioCandidate,
@@ -138,7 +141,17 @@ def update_exercise(*, actor, exercise, fields):
         raise EvaluationServiceError("Archived evaluations cannot be changed.")
     requested_status = fields.get("status")
     if requested_status is not None and requested_status != exercise.status:
-        if not (
+        if exercise.method == EvaluationExercise.Method.FORECASTING:
+            allowed = {
+                (EvaluationExercise.Status.DRAFT, EvaluationExercise.Status.OPEN),
+                (EvaluationExercise.Status.OPEN, EvaluationExercise.Status.CLOSED),
+                (EvaluationExercise.Status.CLOSED, EvaluationExercise.Status.ARCHIVED),
+            }
+            if (exercise.status, requested_status) not in allowed:
+                raise EvaluationServiceError(
+                    {"status": "Use the governed draft, open, closed, and archived sequence."}
+                )
+        elif not (
             exercise.status == EvaluationExercise.Status.CLOSED
             and requested_status == EvaluationExercise.Status.ARCHIVED
         ):
@@ -206,6 +219,8 @@ def create_round(*, actor, exercise, title=""):
     )
     if not can_manage_exercise(actor=actor, exercise=exercise):
         raise PermissionDenied("You cannot manage this evaluation.")
+    if exercise.method == EvaluationExercise.Method.FORECASTING:
+        raise EvaluationServiceError("Calibrated-forecasting exercises do not use rounds.")
     if exercise.status == EvaluationExercise.Status.ARCHIVED:
         raise EvaluationServiceError("Archived evaluations cannot receive new rounds.")
     if exercise.rounds.filter(status=EvaluationRound.Status.OPEN).exists():
@@ -1283,3 +1298,141 @@ def portfolio_recommendation(*, portfolio):
         "candidates": rows,
         "warning": "This is an explainable greedy recommendation, not an automatic organisational decision.",
     }
+
+
+@transaction.atomic
+def create_forecast_question(*, actor, exercise, question_text, resolution_criteria=""):
+    exercise = (
+        EvaluationExercise.objects.select_for_update()
+        .select_related("decision", "organisation", "owner")
+        .get(id=exercise.id)
+    )
+    if not can_manage_exercise(actor=actor, exercise=exercise):
+        raise PermissionDenied("You cannot manage this evaluation.")
+    if exercise.method != EvaluationExercise.Method.FORECASTING:
+        raise EvaluationServiceError(
+            "Only a calibrated-forecasting exercise accepts forecast questions."
+        )
+    if exercise.status in {EvaluationExercise.Status.CLOSED, EvaluationExercise.Status.ARCHIVED}:
+        raise EvaluationServiceError("Add forecast questions before the exercise closes.")
+    question = ForecastQuestion(
+        organisation=exercise.organisation,
+        exercise=exercise,
+        question_text=question_text,
+        resolution_criteria=resolution_criteria,
+    )
+    question.full_clean(validate_unique=False, validate_constraints=False)
+    question.save()
+    record_event(
+        action="evaluation.forecast_question_created",
+        object_type="evaluations.ForecastQuestion",
+        object_id=str(question.id),
+        actor=actor,
+        organisation=exercise.organisation,
+        metadata={"exercise_id": str(exercise.id)},
+    )
+    return question
+
+
+@transaction.atomic
+def submit_forecast(*, actor, question, probability):
+    question = (
+        ForecastQuestion.objects.select_for_update()
+        .select_related("exercise__decision", "exercise__organisation", "exercise__owner")
+        .get(id=question.id)
+    )
+    exercise = question.exercise
+    if not can_submit_evaluation(actor=actor, exercise=exercise):
+        raise PermissionDenied("Only active, non-observer decision participants may forecast.")
+    if question.status != ForecastQuestion.Status.OPEN:
+        raise EvaluationServiceError("This question has already resolved.")
+    if exercise.status != EvaluationExercise.Status.OPEN:
+        raise EvaluationServiceError("This forecasting exercise is not open.")
+    forecast, _ = Forecast.objects.update_or_create(
+        question=question,
+        forecaster=actor,
+        defaults={"organisation": question.organisation, "probability": probability},
+    )
+    forecast.full_clean(validate_unique=False, validate_constraints=False)
+    forecast.save()
+    record_event(
+        action="evaluation.forecast_submitted",
+        object_type="evaluations.Forecast",
+        object_id=str(forecast.id),
+        actor=actor,
+        organisation=question.organisation,
+        metadata={"question_id": str(question.id), "probability": forecast.probability},
+    )
+    return forecast
+
+
+@transaction.atomic
+def resolve_forecast_question(*, actor, question, outcome):
+    question = (
+        ForecastQuestion.objects.select_for_update()
+        .select_related("exercise__decision", "exercise__organisation", "exercise__owner")
+        .get(id=question.id)
+    )
+    exercise = question.exercise
+    if not can_manage_exercise(actor=actor, exercise=exercise):
+        raise PermissionDenied("You cannot resolve this forecasting question.")
+    if question.status != ForecastQuestion.Status.OPEN:
+        raise EvaluationServiceError("This question has already resolved.")
+    question.status = ForecastQuestion.Status.RESOLVED
+    question.outcome = outcome
+    question.resolved_at = timezone.now()
+    question.resolved_by = actor
+    question.full_clean(validate_unique=False, validate_constraints=False)
+    question.save()
+    target = Decimal("1") if outcome else Decimal("0")
+    forecasts = list(question.forecasts.all())
+    for forecast in forecasts:
+        brier = (forecast.probability / Decimal("100") - target) ** 2
+        forecast.brier_score = brier.quantize(Decimal("0.000001"), rounding=ROUND_HALF_UP)
+        forecast.save(update_fields=["brier_score", "updated_at"])
+    record_event(
+        action="evaluation.forecast_question_resolved",
+        object_type="evaluations.ForecastQuestion",
+        object_id=str(question.id),
+        actor=actor,
+        organisation=question.organisation,
+        metadata={
+            "exercise_id": str(exercise.id),
+            "outcome": outcome,
+            "forecast_count": len(forecasts),
+        },
+    )
+    return question
+
+
+def forecasting_leaderboard(*, organisation):
+    """Mean Brier score per forecaster across every resolved question in this organisation.
+
+    Lower is better - this ranks calibration across every question someone
+    has ever forecast, not just whether they happened to guess right once.
+    """
+    aggregates = list(
+        Forecast.objects.filter(organisation=organisation, brier_score__isnull=False)
+        .values("forecaster_id")
+        .annotate(mean_brier_score=Avg("brier_score"), question_count=Count("question", distinct=True))
+        .order_by("mean_brier_score", "forecaster_id")
+    )
+    forecasters = {
+        user.id: user
+        for user in User.objects.filter(id__in=[row["forecaster_id"] for row in aggregates])
+    }
+    rows = []
+    for index, row in enumerate(aggregates):
+        forecaster = forecasters[row["forecaster_id"]]
+        rows.append(
+            {
+                "forecaster_id": str(forecaster.id),
+                "email": forecaster.email,
+                "first_name": forecaster.first_name,
+                "last_name": forecaster.last_name,
+                "mean_brier_score": round_number(float(row["mean_brier_score"])),
+                "resolved_question_count": row["question_count"],
+                "rank": index + 1,
+            }
+        )
+    return rows

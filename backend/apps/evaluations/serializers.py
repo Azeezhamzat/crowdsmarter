@@ -13,6 +13,8 @@ from .models import (
     EvaluationResponse,
     EvaluationRound,
     EvaluationSubmission,
+    Forecast,
+    ForecastQuestion,
     MinorityReport,
     PortfolioAssessment,
     PortfolioCandidate,
@@ -183,6 +185,84 @@ class MinorityReportSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class ForecastSerializer(serializers.ModelSerializer):
+    respondent = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Forecast
+        fields = [
+            "id",
+            "question_id",
+            "respondent",
+            "probability",
+            "brier_score",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = fields
+
+    def get_respondent(self, obj):
+        exercise = obj.question.exercise
+        request = self.context.get("request")
+        if exercise.anonymity == EvaluationExercise.Anonymity.PEER_ANONYMOUS and (
+            request is None or request.user.id != obj.forecaster_id
+        ):
+            ids = list(
+                obj.question.forecasts.order_by("created_at", "id").values_list("id", flat=True)
+            )
+            return {"anonymous": True, "label": f"Forecaster {ids.index(obj.id) + 1}"}
+        return {"anonymous": False, "user": DecisionUserSerializer(obj.forecaster).data}
+
+
+class ForecastQuestionSerializer(serializers.ModelSerializer):
+    status_label = serializers.CharField(source="get_status_display", read_only=True)
+    resolved_by = DecisionUserSerializer(read_only=True)
+    forecasts = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ForecastQuestion
+        fields = [
+            "id",
+            "exercise_id",
+            "question_text",
+            "resolution_criteria",
+            "status",
+            "status_label",
+            "outcome",
+            "resolved_at",
+            "resolved_by",
+            "forecasts",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = fields
+
+    def get_forecasts(self, obj):
+        exercise = obj.exercise
+        if exercise.blind_results_until_close and obj.status != ForecastQuestion.Status.RESOLVED:
+            request = self.context.get("request")
+            mine = (
+                obj.forecasts.filter(forecaster=request.user) if request else obj.forecasts.none()
+            )
+            return ForecastSerializer(mine, many=True, context=self.context).data
+        return ForecastSerializer(obj.forecasts.all(), many=True, context=self.context).data
+
+
+class ForecastQuestionWriteSerializer(StrictSerializer):
+    question_text = serializers.CharField(max_length=300)
+    resolution_criteria = serializers.CharField(required=False, allow_blank=True, max_length=8000)
+
+
+class ForecastQuestionResolveSerializer(StrictSerializer):
+    outcome = serializers.BooleanField()
+
+
+class ForecastWriteSerializer(StrictSerializer):
+    probability = serializers.DecimalField(
+        max_digits=5, decimal_places=2, min_value=0, max_value=100
+    )
+
+
 class EvaluationExerciseSerializer(serializers.ModelSerializer):
     owner = DecisionUserSerializer(read_only=True)
     created_by = DecisionUserSerializer(read_only=True)
@@ -191,6 +271,7 @@ class EvaluationExerciseSerializer(serializers.ModelSerializer):
     criteria = EvaluationCriterionSerializer(many=True, read_only=True)
     rounds = EvaluationRoundSerializer(many=True, read_only=True)
     minority_reports = MinorityReportSerializer(many=True, read_only=True)
+    forecast_questions = ForecastQuestionSerializer(many=True, read_only=True)
     can_manage = serializers.SerializerMethodField()
     can_submit = serializers.SerializerMethodField()
 
@@ -217,6 +298,7 @@ class EvaluationExerciseSerializer(serializers.ModelSerializer):
             "criteria",
             "rounds",
             "minority_reports",
+            "forecast_questions",
             "can_manage",
             "can_submit",
             "created_at",
