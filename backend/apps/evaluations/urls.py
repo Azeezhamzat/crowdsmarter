@@ -13,6 +13,8 @@ from .views import (
     ForecastQuestionCreateView,
     ForecastQuestionResolveView,
     ForecastSubmitView,
+    LiquidDemocracyTallyView,
+    LiquidVoteCastView,
     MinorityReportCreateView,
     PortfolioAssessmentView,
     PortfolioCandidateCreateView,
@@ -88,6 +90,16 @@ urlpatterns = [
         "organisations/<uuid:organisation_id>/forecasting-leaderboard/",
         ForecastingLeaderboardView.as_view(),
         name="forecasting-leaderboard",
+    ),
+    path(
+        "evaluations/<uuid:exercise_id>/liquid-vote/",
+        LiquidVoteCastView.as_view(),
+        name="liquid-vote",
+    ),
+    path(
+        "evaluations/<uuid:exercise_id>/liquid-tally/",
+        LiquidDemocracyTallyView.as_view(),
+        name="liquid-tally",
     ),
     path(
         "organisations/<uuid:organisation_id>/prioritisations/",

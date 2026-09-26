@@ -406,3 +406,86 @@ def test_quadratic_voting_full_flow_and_budget_rejection_via_api(
     assert row["net_votes"] == -7
     assert row["oppose_votes"] == 7
     assert row["credits_spent"] == 49
+
+
+@pytest.mark.django_db
+def test_liquid_democracy_vote_delegation_and_tally_via_api(
+    api_client, organisation_factory, decision_factory, user_factory
+):  # type: ignore[no-untyped-def]
+    from apps.decision_options.services import create_option
+    from apps.evaluations.models import EvaluationExercise
+    from apps.evaluations.services import create_exercise, update_exercise
+    from apps.organisations.models import Membership
+    from apps.participants.models import Participant
+
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    delegator = user_factory(email="delegator@example.com")
+    Membership.objects.create(
+        organisation=organisation,
+        user=delegator,
+        role=Membership.Role.CONTRIBUTOR,
+        status=Membership.Status.ACTIVE,
+    )
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    Participant.objects.create(
+        organisation=organisation,
+        decision=decision,
+        user=delegator,
+        role=Participant.Role.CONTRIBUTOR,
+        added_by=owner,
+    )
+    option = create_option(actor=owner, decision=decision, title="Option A", description="d")
+    exercise = create_exercise(
+        actor=owner,
+        decision=decision,
+        owner_id=owner.id,
+        title="Liquid democracy",
+        purpose="p",
+        method="liquid_democracy",
+        quorum_count=1,
+    )
+    exercise = update_exercise(
+        actor=owner, exercise=exercise, fields={"status": EvaluationExercise.Status.OPEN}
+    )
+
+    api_client.force_authenticate(owner)
+    strict_response = api_client.put(
+        reverse("evaluations:liquid-vote", kwargs={"exercise_id": exercise.id}),
+        {"option_id": str(option.id), "extra_field": True},
+        format="json",
+    )
+    assert strict_response.status_code == 400
+
+    both_response = api_client.put(
+        reverse("evaluations:liquid-vote", kwargs={"exercise_id": exercise.id}),
+        {"option_id": str(option.id), "delegate_to_id": str(delegator.id)},
+        format="json",
+    )
+    assert both_response.status_code == 400
+
+    direct_response = api_client.put(
+        reverse("evaluations:liquid-vote", kwargs={"exercise_id": exercise.id}),
+        {"option_id": str(option.id)},
+        format="json",
+    )
+    assert direct_response.status_code == 200
+    assert direct_response.json()["option_id"] == str(option.id)
+
+    api_client.force_authenticate(delegator)
+    delegate_response = api_client.put(
+        reverse("evaluations:liquid-vote", kwargs={"exercise_id": exercise.id}),
+        {"delegate_to_id": str(owner.id)},
+        format="json",
+    )
+    assert delegate_response.status_code == 200
+    assert delegate_response.json()["delegate_to"]["email"] == owner.email
+
+    tally_response = api_client.get(
+        reverse("evaluations:liquid-tally", kwargs={"exercise_id": exercise.id})
+    )
+    assert tally_response.status_code == 200
+    body = tally_response.json()
+    assert body["options"][0]["option_id"] == str(option.id)
+    assert body["options"][0]["delegated_vote_count"] == 1
+    assert body["direct_voters"][0]["delegated_vote_count"] == 1

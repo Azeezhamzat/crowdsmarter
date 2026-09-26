@@ -15,6 +15,7 @@ from .models import (
     EvaluationSubmission,
     Forecast,
     ForecastQuestion,
+    LiquidVote,
     MinorityReport,
     PortfolioAssessment,
     PortfolioCandidate,
@@ -649,3 +650,35 @@ class PortfolioSelectionWriteSerializer(StrictSerializer):
         required=False, allow_null=True, max_digits=12, decimal_places=2, min_value=0
     )
     rationale = serializers.CharField(required=False, allow_blank=True, max_length=12000)
+
+
+class LiquidVoteSerializer(serializers.ModelSerializer):
+    voter = DecisionUserSerializer(read_only=True)
+    option_title = serializers.CharField(source="option.title", read_only=True, allow_null=True)
+    delegate_to = DecisionUserSerializer(read_only=True)
+
+    class Meta:
+        model = LiquidVote
+        fields = [
+            "id",
+            "exercise_id",
+            "voter",
+            "option_id",
+            "option_title",
+            "delegate_to",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = fields
+
+
+class LiquidVoteWriteSerializer(StrictSerializer):
+    option_id = serializers.UUIDField(required=False, allow_null=True)
+    delegate_to_id = serializers.UUIDField(required=False, allow_null=True)
+
+    def validate(self, attrs):
+        if bool(attrs.get("option_id")) == bool(attrs.get("delegate_to_id")):
+            raise serializers.ValidationError(
+                "Provide exactly one of option_id (a direct vote) or delegate_to_id (a delegation)."
+            )
+        return attrs

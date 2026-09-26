@@ -7,12 +7,14 @@ from apps.evaluations.models import (
     EvaluationRound,
     EvaluationSubmission,
     ForecastQuestion,
+    LiquidVote,
     PrioritisationPortfolio,
 )
 from apps.evaluations.services import (
     EvaluationServiceError,
     add_candidate,
     add_portfolio_criterion,
+    cast_liquid_vote,
     create_criterion,
     create_exercise,
     create_forecast_question,
@@ -21,6 +23,7 @@ from apps.evaluations.services import (
     create_round,
     evaluation_results,
     forecasting_leaderboard,
+    liquid_democracy_tally,
     portfolio_recommendation,
     resolve_forecast_question,
     save_portfolio_assessment,
@@ -1763,3 +1766,455 @@ def test_quadratic_results_report_net_votes_support_oppose_and_exclude_conflicte
 
     assert result["options"][0]["option_id"] == str(option_a.id)
     assert "leads with a net" in result["uncertainty_narrative"]
+
+
+def _open_liquid_democracy_exercise(*, owner, decision, **overrides):
+    exercise = create_exercise(
+        actor=owner,
+        decision=decision,
+        owner_id=owner.id,
+        title=overrides.pop("title", "Community delegation"),
+        purpose=overrides.pop("purpose", "Vote directly or delegate to someone you trust."),
+        method="liquid_democracy",
+        quorum_count=overrides.pop("quorum_count", 1),
+        **overrides,
+    )
+    return update_exercise(
+        actor=owner, exercise=exercise, fields={"status": EvaluationExercise.Status.OPEN}
+    )
+
+
+def _add_eligible_participant(*, organisation, decision, owner, user):
+    Membership.objects.create(
+        organisation=organisation,
+        user=user,
+        role=Membership.Role.CONTRIBUTOR,
+        status=Membership.Status.ACTIVE,
+    )
+    Participant.objects.create(
+        organisation=organisation,
+        decision=decision,
+        user=user,
+        role=Participant.Role.CONTRIBUTOR,
+        added_by=owner,
+    )
+
+
+@pytest.mark.django_db
+def test_cast_liquid_vote_direct_vote_happy_path(
+    organisation_factory, decision_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    option = create_option(actor=owner, decision=decision, title="Option A", description="d")
+    exercise = _open_liquid_democracy_exercise(owner=owner, decision=decision)
+
+    vote = cast_liquid_vote(actor=owner, exercise=exercise, option_id=option.id)
+    assert vote.option_id == option.id
+    assert vote.delegate_to_id is None
+
+
+@pytest.mark.django_db
+def test_cast_liquid_vote_delegation_happy_path(
+    organisation_factory, decision_factory, user_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    contributor = user_factory(email="delegate@example.com")
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    _add_eligible_participant(organisation=organisation, decision=decision, owner=owner, user=contributor)
+    exercise = _open_liquid_democracy_exercise(owner=owner, decision=decision)
+
+    vote = cast_liquid_vote(actor=owner, exercise=exercise, delegate_to_id=contributor.id)
+    assert vote.delegate_to_id == contributor.id
+    assert vote.option_id is None
+
+
+@pytest.mark.django_db
+def test_cast_liquid_vote_direct_vote_overrides_prior_delegation(
+    organisation_factory, decision_factory, user_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    contributor = user_factory(email="delegate@example.com")
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    _add_eligible_participant(organisation=organisation, decision=decision, owner=owner, user=contributor)
+    option = create_option(actor=owner, decision=decision, title="Option A", description="d")
+    exercise = _open_liquid_democracy_exercise(owner=owner, decision=decision)
+
+    cast_liquid_vote(actor=owner, exercise=exercise, delegate_to_id=contributor.id)
+    vote = cast_liquid_vote(actor=owner, exercise=exercise, option_id=option.id)
+
+    assert vote.option_id == option.id
+    assert vote.delegate_to_id is None
+    assert LiquidVote.objects.filter(exercise=exercise, voter=owner).count() == 1
+
+
+@pytest.mark.django_db
+def test_cast_liquid_vote_rejects_neither_or_both_choices(
+    organisation_factory, decision_factory, user_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    contributor = user_factory(email="delegate@example.com")
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    _add_eligible_participant(organisation=organisation, decision=decision, owner=owner, user=contributor)
+    option = create_option(actor=owner, decision=decision, title="Option A", description="d")
+    exercise = _open_liquid_democracy_exercise(owner=owner, decision=decision)
+
+    with pytest.raises(EvaluationServiceError):
+        cast_liquid_vote(actor=owner, exercise=exercise)
+    with pytest.raises(EvaluationServiceError):
+        cast_liquid_vote(
+            actor=owner, exercise=exercise, option_id=option.id, delegate_to_id=contributor.id
+        )
+
+
+@pytest.mark.django_db
+def test_cast_liquid_vote_rejects_self_delegation(
+    organisation_factory, decision_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    exercise = _open_liquid_democracy_exercise(owner=owner, decision=decision)
+
+    with pytest.raises(EvaluationServiceError):
+        cast_liquid_vote(actor=owner, exercise=exercise, delegate_to_id=owner.id)
+
+
+@pytest.mark.django_db
+def test_cast_liquid_vote_rejects_delegation_to_ineligible_participant(
+    organisation_factory, decision_factory, user_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    observer = user_factory(email="observer@example.com")
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    Membership.objects.create(
+        organisation=organisation,
+        user=observer,
+        role=Membership.Role.VIEWER,
+        status=Membership.Status.ACTIVE,
+    )
+    Participant.objects.create(
+        organisation=organisation,
+        decision=decision,
+        user=observer,
+        role=Participant.Role.OBSERVER,
+        added_by=owner,
+    )
+    exercise = _open_liquid_democracy_exercise(owner=owner, decision=decision)
+
+    with pytest.raises(EvaluationServiceError):
+        cast_liquid_vote(actor=owner, exercise=exercise, delegate_to_id=observer.id)
+
+
+@pytest.mark.django_db
+def test_cast_liquid_vote_rejects_delegation_that_would_create_a_cycle(
+    organisation_factory, decision_factory, user_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    contributor = user_factory(email="contributor@example.com")
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    _add_eligible_participant(organisation=organisation, decision=decision, owner=owner, user=contributor)
+    exercise = _open_liquid_democracy_exercise(owner=owner, decision=decision)
+
+    cast_liquid_vote(actor=owner, exercise=exercise, delegate_to_id=contributor.id)
+    with pytest.raises(EvaluationServiceError):
+        cast_liquid_vote(actor=contributor, exercise=exercise, delegate_to_id=owner.id)
+
+
+@pytest.mark.django_db
+def test_cast_liquid_vote_rejects_when_exercise_not_open(
+    organisation_factory, decision_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    option = create_option(actor=owner, decision=decision, title="Option A", description="d")
+    exercise = create_exercise(
+        actor=owner,
+        decision=decision,
+        owner_id=owner.id,
+        title="Liquid democracy",
+        purpose="p",
+        method="liquid_democracy",
+        quorum_count=1,
+    )
+    with pytest.raises(EvaluationServiceError):
+        cast_liquid_vote(actor=owner, exercise=exercise, option_id=option.id)
+
+
+@pytest.mark.django_db
+def test_cast_liquid_vote_permission_denied_for_non_participant(
+    organisation_factory, decision_factory, user_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    outsider = user_factory(email="outsider@example.com")
+    Membership.objects.create(
+        organisation=organisation,
+        user=outsider,
+        role=Membership.Role.CONTRIBUTOR,
+        status=Membership.Status.ACTIVE,
+    )
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    option = create_option(actor=owner, decision=decision, title="Option A", description="d")
+    exercise = _open_liquid_democracy_exercise(owner=owner, decision=decision)
+
+    with pytest.raises(PermissionDenied):
+        cast_liquid_vote(actor=outsider, exercise=exercise, option_id=option.id)
+
+
+@pytest.mark.django_db
+def test_liquid_democracy_tally_empty_when_no_votes(
+    organisation_factory, decision_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    exercise = _open_liquid_democracy_exercise(owner=owner, decision=decision)
+
+    tally = liquid_democracy_tally(exercise=exercise)
+    assert tally["options"] == []
+    assert tally["direct_voters"] == []
+    assert tally["abstained_count"] == 0
+    assert tally["total_vote_count"] == 0
+
+
+@pytest.mark.django_db
+def test_liquid_democracy_tally_resolves_chains_and_counts_delegated_votes_per_direct_voter(
+    organisation_factory, decision_factory, user_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    option_a = create_option(actor=owner, decision=decision, title="Option A", description="d")
+    option_b = create_option(actor=owner, decision=decision, title="Option B", description="d")
+
+    direct_a = user_factory(email="direct-a@example.com")
+    direct_b = user_factory(email="direct-b@example.com")
+    delegator_1 = user_factory(email="delegator-1@example.com")  # -> owner -> direct_a
+    delegator_2 = user_factory(email="delegator-2@example.com")  # -> direct_a directly
+    delegator_3 = user_factory(email="delegator-3@example.com")  # -> direct_b
+    for user in (direct_a, direct_b, delegator_1, delegator_2, delegator_3):
+        _add_eligible_participant(organisation=organisation, decision=decision, owner=owner, user=user)
+
+    exercise = _open_liquid_democracy_exercise(owner=owner, decision=decision)
+
+    cast_liquid_vote(actor=direct_a, exercise=exercise, option_id=option_a.id)
+    cast_liquid_vote(actor=direct_b, exercise=exercise, option_id=option_b.id)
+    cast_liquid_vote(actor=owner, exercise=exercise, delegate_to_id=direct_a.id)
+    cast_liquid_vote(actor=delegator_1, exercise=exercise, delegate_to_id=owner.id)  # 2-hop chain
+    cast_liquid_vote(actor=delegator_2, exercise=exercise, delegate_to_id=direct_a.id)  # 1-hop
+    cast_liquid_vote(actor=delegator_3, exercise=exercise, delegate_to_id=direct_b.id)  # 1-hop
+
+    tally = liquid_democracy_tally(exercise=exercise)
+
+    assert tally["total_vote_count"] == 6
+    assert tally["abstained_count"] == 0
+
+    rows = {row["option_id"]: row for row in tally["options"]}
+    row_a = rows[str(option_a.id)]
+    assert row_a["direct_vote_count"] == 1
+    assert row_a["delegated_vote_count"] == 3  # owner, delegator_1 (via owner), delegator_2
+    assert row_a["total_vote_count"] == 4
+
+    row_b = rows[str(option_b.id)]
+    assert row_b["direct_vote_count"] == 1
+    assert row_b["delegated_vote_count"] == 1
+    assert row_b["total_vote_count"] == 2
+
+    assert tally["options"][0]["option_id"] == str(option_a.id)  # sorted by total votes desc
+
+    direct_voters = {row["voter_id"]: row for row in tally["direct_voters"]}
+    assert direct_voters[str(direct_a.id)]["delegated_vote_count"] == 3
+    assert direct_voters[str(direct_b.id)]["delegated_vote_count"] == 1
+
+
+@pytest.mark.django_db
+def test_liquid_democracy_tally_treats_a_stored_cycle_as_abstention_without_hanging(
+    organisation_factory, decision_factory, user_factory
+):  # type: ignore[no-untyped-def]
+    """A cycle can't be cast through the service (it's rejected up front), but the
+    tally must still resolve one safely - e.g. if one arose from a race, or the
+    guard has a gap we haven't found yet. This constructs one directly via the
+    ORM, bypassing cast_liquid_vote entirely, to prove the tally never crashes
+    or loops on it."""
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    user_b = user_factory(email="user-b@example.com")
+    user_c = user_factory(email="user-c@example.com")
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    for user in (user_b, user_c):
+        _add_eligible_participant(organisation=organisation, decision=decision, owner=owner, user=user)
+    exercise = _open_liquid_democracy_exercise(owner=owner, decision=decision)
+
+    LiquidVote.objects.create(
+        organisation=exercise.organisation, exercise=exercise, voter=owner, delegate_to=user_b
+    )
+    LiquidVote.objects.create(
+        organisation=exercise.organisation, exercise=exercise, voter=user_b, delegate_to=user_c
+    )
+    LiquidVote.objects.create(
+        organisation=exercise.organisation, exercise=exercise, voter=user_c, delegate_to=owner
+    )
+
+    tally = liquid_democracy_tally(exercise=exercise)
+
+    assert tally["options"] == []
+    assert tally["direct_voters"] == []
+    assert tally["abstained_count"] == 3
+    assert tally["total_vote_count"] == 3
+
+
+@pytest.mark.django_db
+def test_liquid_democracy_tally_treats_dead_end_chain_as_abstention(
+    organisation_factory, decision_factory, user_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    never_voted = user_factory(email="never-voted@example.com")
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    _add_eligible_participant(
+        organisation=organisation, decision=decision, owner=owner, user=never_voted
+    )
+    exercise = _open_liquid_democracy_exercise(owner=owner, decision=decision)
+
+    cast_liquid_vote(actor=owner, exercise=exercise, delegate_to_id=never_voted.id)
+
+    tally = liquid_democracy_tally(exercise=exercise)
+    assert tally["options"] == []
+    assert tally["abstained_count"] == 1
+    assert tally["total_vote_count"] == 1
+
+
+@pytest.mark.django_db
+def test_liquid_democracy_tally_resolves_a_chain_exactly_at_the_depth_cap(
+    organisation_factory, decision_factory, user_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    option = create_option(actor=owner, decision=decision, title="Option A", description="d")
+    direct_voter = user_factory(email="direct@example.com")
+    delegators = [owner] + [user_factory(email=f"chain{i}@example.com") for i in range(9)]
+    for user in delegators[1:] + [direct_voter]:
+        _add_eligible_participant(organisation=organisation, decision=decision, owner=owner, user=user)
+    exercise = _open_liquid_democracy_exercise(owner=owner, decision=decision)
+
+    # 10 delegators (delegators[0..9]) each pointing to the next, the last pointing
+    # to direct_voter, who casts a direct vote - exactly 10 delegation hops.
+    assert len(delegators) == 10
+    for voter, target in zip(delegators, delegators[1:] + [direct_voter], strict=True):
+        cast_liquid_vote(actor=voter, exercise=exercise, delegate_to_id=target.id)
+    cast_liquid_vote(actor=direct_voter, exercise=exercise, option_id=option.id)
+
+    tally = liquid_democracy_tally(exercise=exercise)
+    assert tally["abstained_count"] == 0
+    row = tally["options"][0]
+    assert row["direct_vote_count"] == 1
+    assert row["delegated_vote_count"] == 10
+    direct_row = tally["direct_voters"][0]
+    assert direct_row["delegated_vote_count"] == 10
+
+
+@pytest.mark.django_db
+def test_liquid_democracy_tally_abstains_a_chain_one_hop_beyond_the_depth_cap(
+    organisation_factory, decision_factory, user_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    option = create_option(actor=owner, decision=decision, title="Option A", description="d")
+    direct_voter = user_factory(email="direct@example.com")
+    delegators = [owner] + [user_factory(email=f"chain{i}@example.com") for i in range(10)]
+    for user in delegators[1:] + [direct_voter]:
+        _add_eligible_participant(organisation=organisation, decision=decision, owner=owner, user=user)
+    exercise = _open_liquid_democracy_exercise(owner=owner, decision=decision)
+
+    # 11 delegators before the direct voter. Only delegators[0] is 11 hops away
+    # from the direct voter - one beyond the cap - so only it abstains; everyone
+    # else in the chain is closer and still resolves. The cap is a per-voter
+    # distance limit, not an all-or-nothing property of the whole chain.
+    assert len(delegators) == 11
+    for voter, target in zip(delegators, delegators[1:] + [direct_voter], strict=True):
+        cast_liquid_vote(actor=voter, exercise=exercise, delegate_to_id=target.id)
+    cast_liquid_vote(actor=direct_voter, exercise=exercise, option_id=option.id)
+
+    tally = liquid_democracy_tally(exercise=exercise)
+    assert tally["abstained_count"] == 1
+    row = tally["options"][0]
+    assert row["direct_vote_count"] == 1
+    assert row["delegated_vote_count"] == 10
+
+
+@pytest.mark.django_db
+def test_cast_liquid_vote_rejects_wrong_method(
+    organisation_factory, decision_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    option = create_option(actor=owner, decision=decision, title="Option A", description="d")
+    exercise = create_exercise(
+        actor=owner,
+        decision=decision,
+        owner_id=owner.id,
+        title="Scorecard",
+        purpose="p",
+        method="scorecard",
+        quorum_count=1,
+    )
+    with pytest.raises(EvaluationServiceError):
+        cast_liquid_vote(actor=owner, exercise=exercise, option_id=option.id)
+
+
+@pytest.mark.django_db
+def test_cast_liquid_vote_rejects_unknown_option_or_delegate(
+    organisation_factory, decision_factory
+):  # type: ignore[no-untyped-def]
+    import uuid
+
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    exercise = _open_liquid_democracy_exercise(owner=owner, decision=decision)
+
+    with pytest.raises(EvaluationServiceError):
+        cast_liquid_vote(actor=owner, exercise=exercise, option_id=uuid.uuid4())
+    with pytest.raises(EvaluationServiceError):
+        cast_liquid_vote(actor=owner, exercise=exercise, delegate_to_id=uuid.uuid4())
+
+
+@pytest.mark.django_db
+def test_cast_liquid_vote_allows_delegation_into_a_chain_with_an_unrelated_existing_cycle(
+    organisation_factory, decision_factory, user_factory
+):  # type: ignore[no-untyped-def]
+    """B and C already delegate to each other in a 2-cycle that has nothing to do
+    with A. A delegating to B should still be allowed - it isn't A's cycle, and
+    the tally already knows how to abstain the B/C pair safely regardless."""
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    user_b = user_factory(email="user-b@example.com")
+    user_c = user_factory(email="user-c@example.com")
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    for user in (user_b, user_c):
+        _add_eligible_participant(organisation=organisation, decision=decision, owner=owner, user=user)
+    exercise = _open_liquid_democracy_exercise(owner=owner, decision=decision)
+
+    LiquidVote.objects.create(
+        organisation=exercise.organisation, exercise=exercise, voter=user_b, delegate_to=user_c
+    )
+    LiquidVote.objects.create(
+        organisation=exercise.organisation, exercise=exercise, voter=user_c, delegate_to=user_b
+    )
+
+    vote = cast_liquid_vote(actor=owner, exercise=exercise, delegate_to_id=user_b.id)
+    assert vote.delegate_to_id == user_b.id
+
+    tally = liquid_democracy_tally(exercise=exercise)
+    assert tally["abstained_count"] == 3  # owner, user_b, and user_c all resolve to nothing

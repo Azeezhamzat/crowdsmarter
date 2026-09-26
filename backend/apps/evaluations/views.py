@@ -36,6 +36,8 @@ from .serializers import (
     ForecastQuestionWriteSerializer,
     ForecastSerializer,
     ForecastWriteSerializer,
+    LiquidVoteSerializer,
+    LiquidVoteWriteSerializer,
     MinorityReportSerializer,
     MinorityReportWriteSerializer,
     PortfolioAssessmentSerializer,
@@ -53,6 +55,7 @@ from .serializers import (
 from .services import (
     add_candidate,
     add_portfolio_criterion,
+    cast_liquid_vote,
     create_criterion,
     create_exercise,
     create_forecast_question,
@@ -61,6 +64,7 @@ from .services import (
     create_round,
     evaluation_results,
     forecasting_leaderboard,
+    liquid_democracy_tally,
     resolve_forecast_question,
     save_portfolio_assessment,
     save_submission,
@@ -239,6 +243,25 @@ class ForecastingLeaderboardView(APIView):
             Organisation.objects.for_user(request.user), id=organisation_id
         )
         return Response(forecasting_leaderboard(organisation=organisation))
+
+
+class LiquidVoteCastView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def put(self, request, exercise_id):
+        exercise = exercise_for_user(user=request.user, exercise_id=exercise_id)
+        serializer = LiquidVoteWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        vote = cast_liquid_vote(actor=request.user, exercise=exercise, **serializer.validated_data)
+        return Response(LiquidVoteSerializer(vote, context={"request": request}).data)
+
+
+class LiquidDemocracyTallyView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, exercise_id):
+        exercise = exercise_for_user(user=request.user, exercise_id=exercise_id)
+        return Response(liquid_democracy_tally(exercise=exercise))
 
 
 class PrioritisationPortfolioListCreateView(APIView):

@@ -30,6 +30,7 @@ from .models import (
     EvaluationSubmission,
     Forecast,
     ForecastQuestion,
+    LiquidVote,
     MinorityReport,
     PortfolioAssessment,
     PortfolioCandidate,
@@ -45,6 +46,13 @@ from .policies import (
 )
 
 APPLICATION_LABEL_FORMAT = "Application {index}"
+
+ROUNDLESS_METHODS = {
+    EvaluationExercise.Method.FORECASTING,
+    EvaluationExercise.Method.LIQUID_DEMOCRACY,
+}
+
+MAX_DELEGATION_CHAIN_DEPTH = 10
 
 
 def scoring_options_for_exercise(*, exercise, viewer):
@@ -141,7 +149,7 @@ def update_exercise(*, actor, exercise, fields):
         raise EvaluationServiceError("Archived evaluations cannot be changed.")
     requested_status = fields.get("status")
     if requested_status is not None and requested_status != exercise.status:
-        if exercise.method == EvaluationExercise.Method.FORECASTING:
+        if exercise.method in ROUNDLESS_METHODS:
             allowed = {
                 (EvaluationExercise.Status.DRAFT, EvaluationExercise.Status.OPEN),
                 (EvaluationExercise.Status.OPEN, EvaluationExercise.Status.CLOSED),
@@ -219,8 +227,10 @@ def create_round(*, actor, exercise, title=""):
     )
     if not can_manage_exercise(actor=actor, exercise=exercise):
         raise PermissionDenied("You cannot manage this evaluation.")
-    if exercise.method == EvaluationExercise.Method.FORECASTING:
-        raise EvaluationServiceError("Calibrated-forecasting exercises do not use rounds.")
+    if exercise.method in ROUNDLESS_METHODS:
+        raise EvaluationServiceError(
+            f"{exercise.get_method_display()} exercises do not use rounds."
+        )
     if exercise.status == EvaluationExercise.Status.ARCHIVED:
         raise EvaluationServiceError("Archived evaluations cannot receive new rounds.")
     if exercise.rounds.filter(status=EvaluationRound.Status.OPEN).exists():
@@ -1493,3 +1503,195 @@ def forecasting_leaderboard(*, organisation):
             }
         )
     return rows
+
+
+def _creates_delegation_cycle(*, exercise, voter_id, delegate_to_id):
+    """Would voter_id delegating to delegate_to_id eventually loop back to voter_id?
+
+    Walks the existing chain starting at delegate_to_id (voter_id's own vote
+    isn't written yet, so it can't appear on its own path). Anything else -
+    an unrelated existing cycle, a dead end, or a chain longer than the cap -
+    isn't this voter's problem to reject; the tally resolves it as an
+    abstention for whoever it actually affects.
+    """
+    current_id = delegate_to_id
+    seen = set()
+    for _ in range(MAX_DELEGATION_CHAIN_DEPTH + 1):
+        if current_id == voter_id:
+            return True
+        if current_id in seen:
+            return False
+        seen.add(current_id)
+        try:
+            next_vote = LiquidVote.objects.get(exercise=exercise, voter_id=current_id)
+        except LiquidVote.DoesNotExist:
+            return False
+        if next_vote.delegate_to_id is None:
+            return False
+        current_id = next_vote.delegate_to_id
+    return False
+
+
+@transaction.atomic
+def cast_liquid_vote(*, actor, exercise, option_id=None, delegate_to_id=None):
+    exercise = (
+        EvaluationExercise.objects.select_for_update()
+        .select_related("decision", "organisation", "owner")
+        .get(id=exercise.id)
+    )
+    if exercise.method != EvaluationExercise.Method.LIQUID_DEMOCRACY:
+        raise EvaluationServiceError(
+            "Only a liquid-democracy exercise accepts direct votes or delegations."
+        )
+    if exercise.status != EvaluationExercise.Status.OPEN:
+        raise EvaluationServiceError("This liquid-democracy exercise is not open.")
+    if not can_submit_evaluation(actor=actor, exercise=exercise):
+        raise PermissionDenied("Only active, non-observer decision participants may vote.")
+    if bool(option_id) == bool(delegate_to_id):
+        raise EvaluationServiceError(
+            "Choose exactly one of an active option to vote for, or a participant to delegate to."
+        )
+    option = None
+    delegate_to = None
+    if option_id:
+        try:
+            option = exercise.decision.options.get(
+                id=option_id, status=DecisionOption.Status.ACTIVE
+            )
+        except DecisionOption.DoesNotExist as exc:
+            raise EvaluationServiceError(
+                {"option_id": "Select an active option from this decision."}
+            ) from exc
+    else:
+        if str(delegate_to_id) == str(actor.id):
+            raise EvaluationServiceError({"delegate_to_id": "You cannot delegate to yourself."})
+        try:
+            delegate_to = User.objects.get(id=delegate_to_id)
+        except User.DoesNotExist as exc:
+            raise EvaluationServiceError(
+                {"delegate_to_id": "Select someone to delegate to."}
+            ) from exc
+        if not can_submit_evaluation(actor=delegate_to, exercise=exercise):
+            raise EvaluationServiceError(
+                {
+                    "delegate_to_id": "You can only delegate to another eligible participant in this decision."
+                }
+            )
+        if _creates_delegation_cycle(
+            exercise=exercise, voter_id=actor.id, delegate_to_id=delegate_to.id
+        ):
+            raise EvaluationServiceError(
+                {"delegate_to_id": "This delegation would create a cycle - choose someone else."}
+            )
+    vote, _ = LiquidVote.objects.update_or_create(
+        exercise=exercise,
+        voter=actor,
+        defaults={"organisation": exercise.organisation, "option": option, "delegate_to": delegate_to},
+    )
+    vote.full_clean(validate_unique=False, validate_constraints=False)
+    vote.save()
+    record_event(
+        action="evaluation.liquid_vote_cast",
+        object_type="evaluations.LiquidVote",
+        object_id=str(vote.id),
+        actor=actor,
+        organisation=exercise.organisation,
+        metadata={
+            "exercise_id": str(exercise.id),
+            "option_id": str(option.id) if option else None,
+            "delegate_to_id": str(delegate_to.id) if delegate_to else None,
+        },
+    )
+    return vote
+
+
+def _resolve_direct_voter(*, votes, start_voter_id):
+    """Walk delegate_to pointers from start_voter_id to whoever casts a direct vote.
+
+    Each voter's own distance to resolution is capped independently, so a
+    voter one hop from a direct vote still resolves even if some other,
+    far-upstream delegator's much longer chain would exceed the cap. A cycle
+    or a chain longer than MAX_DELEGATION_CHAIN_DEPTH resolves to None
+    (abstain) rather than looping or raising - the mechanism's own rule, not
+    just a defensive fallback.
+    """
+    current_id = start_voter_id
+    visited: set = set()
+    hops = 0
+    while True:
+        vote = votes.get(current_id)
+        if vote is None:
+            return None
+        if vote.option_id is not None:
+            return current_id
+        if current_id in visited:
+            return None
+        visited.add(current_id)
+        if hops >= MAX_DELEGATION_CHAIN_DEPTH:
+            return None
+        current_id = vote.delegate_to_id
+        hops += 1
+
+
+def liquid_democracy_tally(*, exercise):
+    """Resolve every standing vote/delegation to whoever ultimately casts a direct vote."""
+    votes = {
+        item.voter_id: item
+        for item in LiquidVote.objects.filter(exercise=exercise).select_related(
+            "voter", "option", "delegate_to"
+        )
+    }
+    option_tally: dict[Any, dict[str, Any]] = {}
+    delegated_count_by_direct_voter: Counter = Counter()
+    abstained_count = 0
+    for voter_id in votes:
+        direct_voter_id = _resolve_direct_voter(votes=votes, start_voter_id=voter_id)
+        if direct_voter_id is None:
+            abstained_count += 1
+            continue
+        direct_vote = votes[direct_voter_id]
+        bucket = option_tally.setdefault(
+            direct_vote.option_id, {"option": direct_vote.option, "direct": 0, "delegated": 0}
+        )
+        if voter_id == direct_voter_id:
+            bucket["direct"] += 1
+        else:
+            bucket["delegated"] += 1
+            delegated_count_by_direct_voter[direct_voter_id] += 1
+
+    option_rows = sorted(
+        (
+            {
+                "option_id": str(option_id),
+                "title": bucket["option"].title,
+                "direct_vote_count": bucket["direct"],
+                "delegated_vote_count": bucket["delegated"],
+                "total_vote_count": bucket["direct"] + bucket["delegated"],
+            }
+            for option_id, bucket in option_tally.items()
+        ),
+        key=lambda row: row["total_vote_count"],
+        reverse=True,
+    )
+    direct_voter_rows = sorted(
+        (
+            {
+                "voter_id": str(vote.voter_id),
+                "email": vote.voter.email,
+                "option_id": str(vote.option_id),
+                "option_title": vote.option.title,
+                "delegated_vote_count": delegated_count_by_direct_voter.get(vote.voter_id, 0),
+            }
+            for vote in votes.values()
+            if vote.option_id is not None
+        ),
+        key=lambda row: row["delegated_vote_count"],
+        reverse=True,
+    )
+    return {
+        "exercise_id": str(exercise.id),
+        "options": option_rows,
+        "direct_voters": direct_voter_rows,
+        "abstained_count": abstained_count,
+        "total_vote_count": len(votes),
+    }

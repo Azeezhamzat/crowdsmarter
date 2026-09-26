@@ -21,6 +21,7 @@ class EvaluationExercise(UUIDTimeStampedModel):
         RANKED_CHOICE = "ranked_choice", "Ranked-choice (instant runoff)"
         FORECASTING = "forecasting", "Calibrated forecasting"
         QUADRATIC = "quadratic", "Quadratic voting"
+        LIQUID_DEMOCRACY = "liquid_democracy", "Liquid democracy"
 
     class Status(models.TextChoices):
         DRAFT = "draft", "Draft"
@@ -716,4 +717,83 @@ class Forecast(UUIDTimeStampedModel):
         ):
             raise ValidationError(
                 {"organisation": "The forecast must share the question organisation."}
+            )
+
+
+class LiquidVote(UUIDTimeStampedModel):
+    """A participant's standing choice in a liquid-democracy exercise: a direct vote or a delegation.
+
+    Casting a new direct vote or delegation always replaces whichever of the
+    two this voter previously had - there is exactly one row per (exercise,
+    voter), which is what lets a direct vote silently override a standing
+    delegation, per the mechanism's own rule.
+    """
+
+    organisation = models.ForeignKey(
+        "organisations.Organisation", on_delete=models.CASCADE, related_name="liquid_votes"
+    )
+    exercise = models.ForeignKey(EvaluationExercise, on_delete=models.CASCADE, related_name="liquid_votes")
+    voter = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="liquid_votes"
+    )
+    option = models.ForeignKey(
+        "decision_options.DecisionOption",
+        on_delete=models.CASCADE,
+        related_name="liquid_votes",
+        null=True,
+        blank=True,
+    )
+    delegate_to = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="liquid_delegations_received",
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        ordering = ["-updated_at", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["exercise", "voter"], name="unique_liquid_vote_per_exercise_voter"
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(option__isnull=False, delegate_to__isnull=True)
+                    | models.Q(option__isnull=True, delegate_to__isnull=False)
+                ),
+                name="liquid_vote_exactly_one_choice",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["exercise", "delegate_to"], name="liquid_vote_delegate_idx"),
+        ]
+
+    def clean(self) -> None:
+        super().clean()
+        if (
+            self.exercise_id
+            and self.organisation_id
+            and self.exercise.organisation_id != self.organisation_id
+        ):
+            raise ValidationError(
+                {"organisation": "The vote must share the exercise organisation."}
+            )
+        if self.exercise_id and self.exercise.method != EvaluationExercise.Method.LIQUID_DEMOCRACY:
+            raise ValidationError(
+                {"exercise": "Liquid votes may only be cast in a liquid-democracy exercise."}
+            )
+        if self.option_id and self.delegate_to_id:
+            raise ValidationError("Choose either a direct vote or a delegation, not both.")
+        if not self.option_id and not self.delegate_to_id:
+            raise ValidationError("Choose either a direct vote or a delegation.")
+        if self.delegate_to_id and self.voter_id and self.delegate_to_id == self.voter_id:
+            raise ValidationError({"delegate_to": "You cannot delegate to yourself."})
+        if (
+            self.option_id
+            and self.exercise_id
+            and self.option.decision_id != self.exercise.decision_id
+        ):
+            raise ValidationError(
+                {"option": "Select an active option from the evaluated decision."}
             )

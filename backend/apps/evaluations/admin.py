@@ -8,6 +8,7 @@ from .models import (
     EvaluationSubmission,
     Forecast,
     ForecastQuestion,
+    LiquidVote,
     MinorityReport,
     PortfolioAssessment,
     PortfolioCandidate,
@@ -30,5 +31,6 @@ for model in [
     PortfolioSelection,
     ForecastQuestion,
     Forecast,
+    LiquidVote,
 ]:
     admin.site.register(model)
