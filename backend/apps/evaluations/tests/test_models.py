@@ -4,7 +4,7 @@ import pytest
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 
-from apps.evaluations.models import Forecast, ForecastQuestion
+from apps.evaluations.models import EvaluationExercise, Forecast, ForecastQuestion
 from apps.evaluations.services import create_exercise
 
 
@@ -143,3 +143,24 @@ def test_forecast_requires_matching_question_organisation(
     )
     with pytest.raises(ValidationError):
         forecast.full_clean(validate_unique=False, validate_constraints=False)
+
+
+@pytest.mark.django_db
+def test_evaluation_exercise_voice_credit_budget_must_be_positive(
+    organisation_factory, decision_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    exercise = EvaluationExercise(
+        organisation=organisation,
+        decision=decision,
+        title="Quadratic voting",
+        purpose="p",
+        method=EvaluationExercise.Method.QUADRATIC,
+        owner=owner,
+        created_by=owner,
+        voice_credit_budget=0,
+    )
+    with pytest.raises(ValidationError):
+        exercise.full_clean(validate_unique=False)

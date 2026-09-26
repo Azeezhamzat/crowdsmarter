@@ -84,6 +84,7 @@ class EvaluationResponseSerializer(serializers.ModelSerializer):
             "score",
             "vote",
             "rank",
+            "quadratic_votes",
             "rationale",
             "created_at",
         ]
@@ -293,6 +294,7 @@ class EvaluationExerciseSerializer(serializers.ModelSerializer):
             "quorum_count",
             "approval_threshold",
             "objection_threshold",
+            "voice_credit_budget",
             "owner",
             "created_by",
             "criteria",
@@ -343,6 +345,9 @@ class EvaluationExerciseWriteSerializer(StrictSerializer):
         min_value=0,
         max_value=100,
     )
+    voice_credit_budget = serializers.IntegerField(
+        required=False, default=100, min_value=1, max_value=1000000
+    )
     owner_id = serializers.UUIDField()
 
 
@@ -362,6 +367,7 @@ class EvaluationExercisePatchSerializer(StrictSerializer):
     objection_threshold = serializers.DecimalField(
         required=False, max_digits=5, decimal_places=2, min_value=0, max_value=100
     )
+    voice_credit_budget = serializers.IntegerField(required=False, min_value=1, max_value=1000000)
     owner_id = serializers.UUIDField(required=False)
 
 
@@ -386,6 +392,9 @@ class EvaluationResponseWriteSerializer(StrictSerializer):
         required=False, allow_blank=True, choices=EvaluationResponse.Vote.choices
     )
     rank = serializers.IntegerField(required=False, allow_null=True, min_value=1, max_value=9999)
+    quadratic_votes = serializers.IntegerField(
+        required=False, allow_null=True, min_value=-1000, max_value=1000
+    )
     rationale = serializers.CharField(required=False, allow_blank=True, max_length=8000)
 
 

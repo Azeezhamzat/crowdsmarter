@@ -20,6 +20,7 @@ class EvaluationExercise(UUIDTimeStampedModel):
         DELPHI = "delphi", "Delphi evaluation"
         RANKED_CHOICE = "ranked_choice", "Ranked-choice (instant runoff)"
         FORECASTING = "forecasting", "Calibrated forecasting"
+        QUADRATIC = "quadratic", "Quadratic voting"
 
     class Status(models.TextChoices):
         DRAFT = "draft", "Draft"
@@ -52,6 +53,10 @@ class EvaluationExercise(UUIDTimeStampedModel):
     quorum_count = models.PositiveIntegerField(default=1)
     approval_threshold = models.DecimalField(max_digits=5, decimal_places=2, default=60)
     objection_threshold = models.DecimalField(max_digits=5, decimal_places=2, default=20)
+    voice_credit_budget = models.PositiveIntegerField(
+        default=100,
+        help_text="Quadratic voting only: credits each participant may spend across their ballot.",
+    )
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
@@ -76,6 +81,10 @@ class EvaluationExercise(UUIDTimeStampedModel):
             models.CheckConstraint(
                 condition=models.Q(objection_threshold__gte=0, objection_threshold__lte=100),
                 name="evaluation_objection_threshold_range",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(voice_credit_budget__gte=1),
+                name="evaluation_voice_credit_budget_positive",
             ),
         ]
         indexes = [
@@ -281,6 +290,11 @@ class EvaluationResponse(UUIDTimeStampedModel):
     score = models.DecimalField(max_digits=8, decimal_places=3, null=True, blank=True)
     vote = models.CharField(max_length=20, choices=Vote.choices, blank=True)
     rank = models.PositiveSmallIntegerField(null=True, blank=True)
+    quadratic_votes = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text="Signed vote count for a quadratic-voting ballot; positive supports, negative opposes.",
+    )
     rationale = models.TextField(blank=True)
 
     class Meta:
@@ -311,6 +325,9 @@ class EvaluationResponse(UUIDTimeStampedModel):
         is_ranked_choice = (
             exercise is not None and exercise.method == EvaluationExercise.Method.RANKED_CHOICE
         )
+        is_quadratic = (
+            exercise is not None and exercise.method == EvaluationExercise.Method.QUADRATIC
+        )
         if self.criterion_id:
             if self.score is None:
                 raise ValidationError({"score": "A criterion response requires a score."})
@@ -321,10 +338,21 @@ class EvaluationResponse(UUIDTimeStampedModel):
                 raise ValidationError({"rank": "A ranked-choice response requires a rank."})
             if self.vote:
                 raise ValidationError({"vote": "Ranked-choice responses do not use a vote."})
+        elif is_quadratic:
+            if not self.quadratic_votes:
+                raise ValidationError(
+                    {"quadratic_votes": "A quadratic ballot response requires a non-zero vote count."}
+                )
+            if self.vote:
+                raise ValidationError({"vote": "Quadratic ballot responses do not use a vote."})
         elif not self.vote:
             raise ValidationError({"vote": "A ballot response requires a vote."})
         if not is_ranked_choice and self.rank is not None:
             raise ValidationError({"rank": "Rank is only meaningful for a ranked-choice exercise."})
+        if not is_quadratic and self.quadratic_votes is not None:
+            raise ValidationError(
+                {"quadratic_votes": "Vote counts are only meaningful for a quadratic-voting exercise."}
+            )
 
 
 class MinorityReport(UUIDTimeStampedModel):

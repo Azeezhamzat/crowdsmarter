@@ -339,3 +339,70 @@ def test_forecasting_leaderboard_api(
     assert body[0]["email"] == owner.email
     assert body[0]["rank"] == 1
     assert body[0]["mean_brier_score"] == pytest.approx(0.01)
+
+
+@pytest.mark.django_db
+def test_quadratic_voting_full_flow_and_budget_rejection_via_api(
+    api_client, organisation_factory, decision_factory
+):  # type: ignore[no-untyped-def]
+    from apps.decision_options.services import create_option
+    from apps.evaluations.models import EvaluationRound
+    from apps.evaluations.services import create_exercise, create_round, transition_round
+
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    option_a = create_option(actor=owner, decision=decision, title="Option A", description="d")
+    option_b = create_option(actor=owner, decision=decision, title="Option B", description="d")
+    exercise = create_exercise(
+        actor=owner,
+        decision=decision,
+        owner_id=owner.id,
+        title="Quadratic voting",
+        purpose="p",
+        method="quadratic",
+        blind_results_until_close=False,
+        voice_credit_budget=50,
+        quorum_count=1,
+    )
+    round_item = create_round(actor=owner, exercise=exercise)
+    transition_round(actor=owner, round=round_item, status=EvaluationRound.Status.OPEN)
+
+    api_client.force_authenticate(owner)
+
+    over_budget = api_client.put(
+        reverse("evaluations:evaluation-submission", kwargs={"round_id": round_item.id}),
+        {
+            "confidence": 4,
+            "overall_rationale": "",
+            "responses": [
+                {"option_id": str(option_a.id), "quadratic_votes": 6},  # 36
+                {"option_id": str(option_b.id), "quadratic_votes": 4},  # 16, total 52 > 50
+            ],
+        },
+        format="json",
+    )
+    assert over_budget.status_code == 400
+    assert "responses" in over_budget.json()
+
+    within_budget = api_client.put(
+        reverse("evaluations:evaluation-submission", kwargs={"round_id": round_item.id}),
+        {
+            "confidence": 4,
+            "overall_rationale": "",
+            "responses": [{"option_id": str(option_a.id), "quadratic_votes": -7}],  # 49
+        },
+        format="json",
+    )
+    assert within_budget.status_code == 200
+    assert within_budget.json()["responses"][0]["quadratic_votes"] == -7
+
+    results = api_client.get(
+        reverse("evaluations:evaluation-results", kwargs={"round_id": round_item.id})
+    )
+    assert results.status_code == 200
+    body = results.json()
+    row = next(r for r in body["options"] if r["option_id"] == str(option_a.id))
+    assert row["net_votes"] == -7
+    assert row["oppose_votes"] == 7
+    assert row["credits_spent"] == 49

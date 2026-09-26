@@ -338,9 +338,11 @@ def _validate_responses(*, exercise, responses):
         EvaluationExercise.Method.DELPHI,
     }
     is_ranked_choice = exercise.method == EvaluationExercise.Method.RANKED_CHOICE
+    is_quadratic = exercise.method == EvaluationExercise.Method.QUADRATIC
     cleaned = []
     seen = set()
     ranks_used = set()
+    credits_spent = 0
     for value in responses:
         option = active_options.get(str(value["option_id"]))
         if option is None:
@@ -389,6 +391,17 @@ def _validate_responses(*, exercise, responses):
                 raise EvaluationServiceError(
                     {"responses": "Ranked-choice responses do not use a vote."}
                 )
+        elif is_quadratic:
+            votes = value.get("quadratic_votes")
+            if not votes:
+                raise EvaluationServiceError(
+                    {"responses": "Every quadratic-ballot response must cast a non-zero number of votes."}
+                )
+            if value.get("vote"):
+                raise EvaluationServiceError(
+                    {"responses": "Quadratic ballot responses do not use a vote."}
+                )
+            credits_spent += votes**2
         elif exercise.method == EvaluationExercise.Method.APPROVAL and value.get("vote") not in {
             EvaluationResponse.Vote.APPROVE,
             EvaluationResponse.Vote.ABSTAIN,
@@ -408,6 +421,12 @@ def _validate_responses(*, exercise, responses):
         cleaned.append((option, criterion, value))
     if not cleaned:
         raise EvaluationServiceError({"responses": "Submit at least one response."})
+    if is_quadratic and credits_spent > exercise.voice_credit_budget:
+        raise EvaluationServiceError(
+            {
+                "responses": f"This ballot costs {credits_spent} credits, exceeding the {exercise.voice_credit_budget}-credit voice-credit budget."
+            }
+        )
     return cleaned
 
 
@@ -424,7 +443,7 @@ def save_submission(*, actor, round, confidence, overall_rationale, responses, s
     if not can_submit_evaluation(actor=actor, exercise=item.exercise):
         raise PermissionDenied("Only active, non-observer decision participants may contribute.")
     cleaned = _validate_responses(exercise=item.exercise, responses=responses)
-    if submit:
+    if submit and item.exercise.method != EvaluationExercise.Method.QUADRATIC:
         active_option_count = item.exercise.decision.options.filter(
             status=DecisionOption.Status.ACTIVE
         ).count()
@@ -461,6 +480,7 @@ def save_submission(*, actor, round, confidence, overall_rationale, responses, s
             score=value.get("score"),
             vote=value.get("vote", ""),
             rank=value.get("rank"),
+            quadratic_votes=value.get("quadratic_votes"),
             rationale=value.get("rationale", ""),
         )
         response.full_clean(validate_unique=False, validate_constraints=False)
@@ -673,6 +693,43 @@ def evaluation_results(*, round, viewer):
             base["uncertainty_narrative"] = (
                 f"“{winner['title']}” wins by instant runoff after "
                 f"{len(base.get('ranked_choice_rounds', []))} elimination round(s)."
+            )
+    elif exercise.method == EvaluationExercise.Method.QUADRATIC:
+        grouped = defaultdict(list)
+        option_map = {}
+        for submission in submitted:
+            for response in submission.responses.all():
+                if _is_conflicted(submission.submitted_by_id, response.option_id):
+                    excluded_emails_by_option[response.option_id].add(submission.submitted_by.email)
+                    continue
+                grouped[response.option_id].append(response.quadratic_votes)
+                option_map[response.option_id] = response.option
+        rows = []
+        for option_id, votes in grouped.items():
+            support_votes = sum(v for v in votes if v > 0)
+            oppose_votes = sum(-v for v in votes if v < 0)
+            rows.append(
+                {
+                    "option_id": str(option_id),
+                    "title": option_map[option_id].title,
+                    "net_votes": support_votes - oppose_votes,
+                    "support_votes": support_votes,
+                    "oppose_votes": oppose_votes,
+                    "voter_count": len(votes),
+                    "credits_spent": sum(v * v for v in votes),
+                    "excluded_response_count": len(excluded_emails_by_option.get(option_id, ())),
+                    "conflicted_reviewer_emails": sorted(
+                        excluded_emails_by_option.get(option_id, ())
+                    ),
+                }
+            )
+        rows.sort(key=lambda x: x["net_votes"], reverse=True)
+        base["options"] = rows
+        if rows:
+            leader = rows[0]
+            base["uncertainty_narrative"] = (
+                f"“{leader['title']}” leads with a net {leader['net_votes']} vote(s) "
+                f"across {leader['voter_count']} voter(s)."
             )
     else:
         grouped = defaultdict(list)

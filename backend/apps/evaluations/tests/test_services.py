@@ -5,6 +5,7 @@ from apps.decision_options.services import create_option
 from apps.evaluations.models import (
     EvaluationExercise,
     EvaluationRound,
+    EvaluationSubmission,
     ForecastQuestion,
     PrioritisationPortfolio,
 )
@@ -1573,3 +1574,192 @@ def test_forecasting_leaderboard_empty_when_no_resolved_questions(
 ):  # type: ignore[no-untyped-def]
     organisation = organisation_factory()
     assert forecasting_leaderboard(organisation=organisation) == []
+
+
+def _open_quadratic_exercise(*, owner, decision, **overrides):
+    exercise = create_exercise(
+        actor=owner,
+        decision=decision,
+        owner_id=owner.id,
+        title=overrides.pop("title", "Community priorities"),
+        purpose=overrides.pop("purpose", "Spend your voice credits on what matters most."),
+        method="quadratic",
+        quorum_count=overrides.pop("quorum_count", 1),
+        **overrides,
+    )
+    round_item = create_round(actor=owner, exercise=exercise)
+    transition_round(actor=owner, round=round_item, status=EvaluationRound.Status.OPEN)
+    return exercise, round_item
+
+
+@pytest.mark.django_db
+def test_quadratic_ballot_rejects_ballot_that_would_exceed_budget(
+    organisation_factory, decision_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    option_a = create_option(actor=owner, decision=decision, title="Option A", description="d")
+    option_b = create_option(actor=owner, decision=decision, title="Option B", description="d")
+    exercise, round_item = _open_quadratic_exercise(owner=owner, decision=decision)
+    assert exercise.voice_credit_budget == 100
+
+    with pytest.raises(EvaluationServiceError):
+        save_submission(
+            actor=owner,
+            round=round_item,
+            confidence=4,
+            overall_rationale="",
+            responses=[
+                {"option_id": option_a.id, "quadratic_votes": 10},  # costs 100
+                {"option_id": option_b.id, "quadratic_votes": 1},  # costs 1, total 101
+            ],
+        )
+    assert not EvaluationSubmission.objects.filter(round=round_item, submitted_by=owner).exists()
+
+
+@pytest.mark.django_db
+def test_quadratic_ballot_accepts_ballot_exactly_at_budget(
+    organisation_factory, decision_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    option = create_option(actor=owner, decision=decision, title="Option A", description="d")
+    exercise, round_item = _open_quadratic_exercise(owner=owner, decision=decision)
+
+    submission = save_submission(
+        actor=owner,
+        round=round_item,
+        confidence=4,
+        overall_rationale="",
+        responses=[{"option_id": option.id, "quadratic_votes": 10}],  # costs exactly 100
+    )
+    assert submission.responses.get().quadratic_votes == 10
+
+
+@pytest.mark.django_db
+def test_quadratic_ballot_rejects_zero_vote_response(
+    organisation_factory, decision_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    option = create_option(actor=owner, decision=decision, title="Option A", description="d")
+    exercise, round_item = _open_quadratic_exercise(owner=owner, decision=decision)
+
+    with pytest.raises(EvaluationServiceError):
+        save_submission(
+            actor=owner,
+            round=round_item,
+            confidence=4,
+            overall_rationale="",
+            responses=[{"option_id": option.id, "quadratic_votes": 0}],
+        )
+
+
+@pytest.mark.django_db
+def test_quadratic_ballot_allows_partial_ballot_without_covering_every_option(
+    organisation_factory, decision_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    option_a = create_option(actor=owner, decision=decision, title="Option A", description="d")
+    create_option(actor=owner, decision=decision, title="Option B", description="d")
+    create_option(actor=owner, decision=decision, title="Option C", description="d")
+    exercise, round_item = _open_quadratic_exercise(owner=owner, decision=decision)
+
+    submission = save_submission(
+        actor=owner,
+        round=round_item,
+        confidence=4,
+        overall_rationale="",
+        responses=[{"option_id": option_a.id, "quadratic_votes": 3}],
+        submit=True,
+    )
+    assert submission.status == EvaluationSubmission.Status.SUBMITTED
+    assert submission.responses.count() == 1
+
+
+@pytest.mark.django_db
+def test_quadratic_results_report_net_votes_support_oppose_and_exclude_conflicted_reviewer(
+    organisation_factory, decision_factory, user_factory
+):  # type: ignore[no-untyped-def]
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    contributor = user_factory(email="contributor@example.com")
+    conflicted = user_factory(email="conflicted@example.com")
+    for user in (contributor, conflicted):
+        Membership.objects.create(
+            organisation=organisation,
+            user=user,
+            role=Membership.Role.CONTRIBUTOR,
+            status=Membership.Status.ACTIVE,
+        )
+    decision = decision_factory(workspace=organisation.workspaces.get(is_default=True), owner=owner)
+    for user in (contributor, conflicted):
+        Participant.objects.create(
+            organisation=organisation,
+            decision=decision,
+            user=user,
+            role=Participant.Role.CONTRIBUTOR,
+            added_by=owner,
+        )
+    option_a = create_option(actor=owner, decision=decision, title="Fund the library", description="d")
+    option_b = create_option(actor=owner, decision=decision, title="Fund the park", description="d")
+    exercise, round_item = _open_quadratic_exercise(
+        owner=owner, decision=decision, blind_results_until_close=False
+    )
+
+    conflicted_participant = Participant.objects.get(decision=decision, user=conflicted)
+    declare_conflict(
+        actor=conflicted,
+        participant=conflicted_participant,
+        scope=ConflictOfInterest.Scope.DECISION,
+        reason="I run the library.",
+    )
+
+    save_submission(
+        actor=owner,
+        round=round_item,
+        confidence=4,
+        overall_rationale="",
+        responses=[{"option_id": option_a.id, "quadratic_votes": 5}],  # cost 25
+    )
+    save_submission(
+        actor=contributor,
+        round=round_item,
+        confidence=4,
+        overall_rationale="",
+        responses=[
+            {"option_id": option_a.id, "quadratic_votes": -3},  # cost 9
+            {"option_id": option_b.id, "quadratic_votes": 1},  # cost 1
+        ],
+    )
+    save_submission(
+        actor=conflicted,
+        round=round_item,
+        confidence=4,
+        overall_rationale="",
+        responses=[{"option_id": option_a.id, "quadratic_votes": 10}],  # excluded entirely
+    )
+
+    result = evaluation_results(round=round_item, viewer=owner)
+    rows = {row["option_id"]: row for row in result["options"]}
+
+    row_a = rows[str(option_a.id)]
+    assert row_a["net_votes"] == 2  # 5 - 3, conflicted reviewer's 10 excluded
+    assert row_a["support_votes"] == 5
+    assert row_a["oppose_votes"] == 3
+    assert row_a["voter_count"] == 2
+    assert row_a["credits_spent"] == 34
+    assert row_a["excluded_response_count"] == 1
+    assert row_a["conflicted_reviewer_emails"] == [conflicted.email]
+
+    row_b = rows[str(option_b.id)]
+    assert row_b["net_votes"] == 1
+    assert row_b["credits_spent"] == 1
+
+    assert result["options"][0]["option_id"] == str(option_a.id)
+    assert "leads with a net" in result["uncertainty_narrative"]
