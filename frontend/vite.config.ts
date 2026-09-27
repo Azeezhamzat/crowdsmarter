@@ -16,6 +16,13 @@ export default defineConfig({
         changeOrigin: true,
       },
     },
+    watch: {
+      // Playwright writes its own report/results into this bind-mounted
+      // directory during e2e runs; without this, Vite treats those writes
+      // as source changes and reloads the page mid-navigation, aborting
+      // any in-flight lazy-loaded route import.
+      ignored: ["**/playwright-report/**", "**/test-results/**"],
+    },
   },
   test: {
     environment: "jsdom",
