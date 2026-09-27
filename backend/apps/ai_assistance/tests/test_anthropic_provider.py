@@ -9,7 +9,6 @@ from apps.ai_assistance.providers.rules import RuleBasedAIProvider
 from apps.platform_admin.crypto import encrypt_secret
 from apps.platform_admin.models import PlatformConfiguration
 
-
 SNAPSHOT = {
     "decision": {
         "title": "Pilot decision",
@@ -18,7 +17,15 @@ SNAPSHOT = {
         "context": "Current evidence is limited.",
     },
     "options": [{"id": "option-1", "title": "Run pilot"}],
-    "evidence": [{"id": "evidence-1", "title": "Survey", "summary": "x", "option_id": None, "stance": "supports"}],
+    "evidence": [
+        {
+            "id": "evidence-1",
+            "title": "Survey",
+            "summary": "x",
+            "option_id": None,
+            "stance": "supports",
+        }
+    ],
     "assumptions": [],
     "risks": [],
     "participants": [{"role": "decision_owner"}],
@@ -47,7 +54,11 @@ def test_parses_a_well_formed_tool_response_into_ai_review_output():
     payload = {
         "summary": "The pilot has thin evidence and one open risk.",
         "missing_evidence": [
-            {"severity": "medium", "title": "No challenging evidence", "detail": "Only supportive evidence is recorded."}
+            {
+                "severity": "medium",
+                "title": "No challenging evidence",
+                "detail": "Only supportive evidence is recorded.",
+            }
         ],
         "unsupported_assumptions": [],
         "contradictory_evidence": [],
@@ -100,7 +111,11 @@ def test_strips_hallucinated_related_ids_and_unknown_similar_decisions():
         "risk_highlights": [],
         "review_triggers": [],
         "similar_decisions": [
-            {"decision_id": "decision-that-was-never-in-the-snapshot", "similarity": 0.9, "reason": "made up"}
+            {
+                "decision_id": "decision-that-was-never-in-the-snapshot",
+                "similarity": 0.9,
+                "reason": "made up",
+            }
         ],
         "limitations": [],
     }
@@ -150,9 +165,26 @@ def test_summarise_analytics_parses_a_well_formed_narrative():
     config.save(update_fields=["ai_provider_api_key_encrypted"])
 
     metrics = {
-        "totals": {"decisions": 3, "open_decisions": 2, "finalised_decisions": 1, "archived_decisions": 0, "active_lessons": 1},
-        "flow": {"overdue_target_decisions": 1, "contribution_coverage_percent": 50.0, "median_days_to_finalise": 12.0, "created_last_90_days": 3, "finalised_last_90_days": 1},
-        "learning": {"reviews_due_or_overdue": 0, "outcome_success_percent": 100.0, "outcome_reviews_completed": 1, "active_lessons": 1},
+        "totals": {
+            "decisions": 3,
+            "open_decisions": 2,
+            "finalised_decisions": 1,
+            "archived_decisions": 0,
+            "active_lessons": 1,
+        },
+        "flow": {
+            "overdue_target_decisions": 1,
+            "contribution_coverage_percent": 50.0,
+            "median_days_to_finalise": 12.0,
+            "created_last_90_days": 3,
+            "finalised_last_90_days": 1,
+        },
+        "learning": {
+            "reviews_due_or_overdue": 0,
+            "outcome_success_percent": 100.0,
+            "outcome_reviews_completed": 1,
+            "active_lessons": 1,
+        },
     }
     payload = {
         "headline": "3 decisions tracked; one is overdue.",

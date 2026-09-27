@@ -24,11 +24,15 @@ def _owner(*, decision: Decision, owner_id: Any | None, actor: User) -> User:
     if owner_id is None:
         return actor
     try:
-        return Membership.objects.select_related("user").get(
-            organisation=decision.organisation,
-            user_id=owner_id,
-            status=Membership.Status.ACTIVE,
-        ).user
+        return (
+            Membership.objects.select_related("user")
+            .get(
+                organisation=decision.organisation,
+                user_id=owner_id,
+                status=Membership.Status.ACTIVE,
+            )
+            .user
+        )
     except Membership.DoesNotExist as exc:
         raise CriterionServiceError(
             {"owner_id": "The owner must be an active organisation member."}
@@ -47,9 +51,10 @@ def create_criterion(
         raise PermissionDenied("You cannot add criteria in this decision state.")
     if "order" not in fields:
         last_order = (
-            Criterion.objects.filter(decision=decision).order_by("-order").values_list(
-                "order", flat=True
-            ).first()
+            Criterion.objects.filter(decision=decision)
+            .order_by("-order")
+            .values_list("order", flat=True)
+            .first()
         )
         fields["order"] = (last_order or 0) + 1
     criterion = Criterion(
@@ -62,9 +67,16 @@ def create_criterion(
     criterion.full_clean(validate_unique=False, validate_constraints=False)
     criterion.save()
     record_event(
-        action="criterion.created", object_type="criterion", object_id=str(criterion.id),
-        actor=actor, organisation=decision.organisation,
-        metadata={"decision_id": str(decision.id), "title": criterion.title, "weight": criterion.weight},
+        action="criterion.created",
+        object_type="criterion",
+        object_id=str(criterion.id),
+        actor=actor,
+        organisation=decision.organisation,
+        metadata={
+            "decision_id": str(decision.id),
+            "title": criterion.title,
+            "weight": criterion.weight,
+        },
     )
     return criterion
 
@@ -96,8 +108,11 @@ def update_criterion(*, actor: User, criterion: Criterion, fields: dict[str, Any
     criterion.save()
     after = {field: getattr(criterion, field) for field in before}
     record_event(
-        action="criterion.updated", object_type="criterion", object_id=str(criterion.id),
-        actor=actor, organisation=criterion.organisation,
+        action="criterion.updated",
+        object_type="criterion",
+        object_id=str(criterion.id),
+        actor=actor,
+        organisation=criterion.organisation,
         metadata={"decision_id": str(criterion.decision_id), "before": before, "after": after},
     )
     return criterion

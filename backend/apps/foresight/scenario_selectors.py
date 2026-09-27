@@ -56,9 +56,7 @@ def scenario_set_for_user(*, user, scenario_set_id):  # type: ignore[no-untyped-
 
 def scenario_set_workspace_for_user(*, user, scenario_set_id):  # type: ignore[no-untyped-def]
     return get_object_or_404(
-        ScenarioSet.objects.filter(
-            canvas__organisation__in=user_organisations(user)
-        )
+        ScenarioSet.objects.filter(canvas__organisation__in=user_organisations(user))
         .select_related(
             "canvas__organisation",
             "axis_x_driver",
@@ -74,9 +72,7 @@ def scenario_set_workspace_for_user(*, user, scenario_set_id):  # type: ignore[n
                 queryset=Scenario.objects.select_related("created_by").prefetch_related(
                     Prefetch(
                         "driver_states",
-                        queryset=ScenarioDriverState.objects.select_related(
-                            "driver", "created_by"
-                        ),
+                        queryset=ScenarioDriverState.objects.select_related("driver", "created_by"),
                     ),
                     Prefetch(
                         "reviews",
@@ -96,28 +92,20 @@ def scenario_set_workspace_for_user(*, user, scenario_set_id):  # type: ignore[n
                     ),
                     Prefetch(
                         "signpost_links",
-                        queryset=ScenarioSignpost.objects.select_related(
-                            "signpost", "linked_by"
-                        ),
+                        queryset=ScenarioSignpost.objects.select_related("signpost", "linked_by"),
                     ),
                 ),
             ),
             Prefetch(
                 "signposts",
-                queryset=Signpost.objects.select_related(
-                    "owner", "created_by"
-                ).prefetch_related(
+                queryset=Signpost.objects.select_related("owner", "created_by").prefetch_related(
                     Prefetch(
                         "scenario_links",
-                        queryset=ScenarioSignpost.objects.select_related(
-                            "scenario", "linked_by"
-                        ),
+                        queryset=ScenarioSignpost.objects.select_related("scenario", "linked_by"),
                     ),
                     Prefetch(
                         "observations",
-                        queryset=SignpostObservation.objects.select_related(
-                            "source", "created_by"
-                        ),
+                        queryset=SignpostObservation.objects.select_related("source", "created_by"),
                     ),
                 ),
             ),
@@ -143,8 +131,6 @@ def signpost_for_user(*, user, signpost_id):  # type: ignore[no-untyped-def]
     return get_object_or_404(
         Signpost.objects.filter(
             scenario_set__canvas__organisation__in=user_organisations(user)
-        ).select_related(
-            "scenario_set__canvas__organisation", "owner", "created_by"
-        ),
+        ).select_related("scenario_set__canvas__organisation", "owner", "created_by"),
         id=signpost_id,
     )

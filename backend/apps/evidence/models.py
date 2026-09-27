@@ -62,9 +62,7 @@ class Evidence(UUIDTimeStampedModel):
     source_reference = models.CharField(max_length=500, blank=True)
     source_url = models.URLField(max_length=1000, blank=True)
     stance = models.CharField(max_length=20, choices=Stance.choices)
-    strength = models.CharField(
-        max_length=20, choices=Strength.choices, default=Strength.MODERATE
-    )
+    strength = models.CharField(max_length=20, choices=Strength.choices, default=Strength.MODERATE)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -83,32 +81,30 @@ class Evidence(UUIDTimeStampedModel):
     class Meta:
         ordering = ["-created_at", "title", "id"]
         constraints = [
-            models.CheckConstraint(
-                condition=~models.Q(title=""), name="evidence_title_not_empty"
-            ),
+            models.CheckConstraint(condition=~models.Q(title=""), name="evidence_title_not_empty"),
             models.CheckConstraint(
                 condition=models.Q(
                     source_type__in=[
-                        'research',
-                        'internal_data',
-                        'expert_judgement',
-                        'stakeholder_input',
-                        'policy',
-                        'other',
+                        "research",
+                        "internal_data",
+                        "expert_judgement",
+                        "stakeholder_input",
+                        "policy",
+                        "other",
                     ]
                 ),
                 name="evidence_source_type_valid",
             ),
             models.CheckConstraint(
-                condition=models.Q(stance__in=['supports', 'challenges', 'mixed', 'context']),
+                condition=models.Q(stance__in=["supports", "challenges", "mixed", "context"]),
                 name="evidence_stance_valid",
             ),
             models.CheckConstraint(
-                condition=models.Q(strength__in=['low', 'moderate', 'high']),
+                condition=models.Q(strength__in=["low", "moderate", "high"]),
                 name="evidence_strength_valid",
             ),
             models.CheckConstraint(
-                condition=models.Q(status__in=['active', 'withdrawn']),
+                condition=models.Q(status__in=["active", "withdrawn"]),
                 name="evidence_status_valid",
             ),
         ]
@@ -137,7 +133,9 @@ class Evidence(UUIDTimeStampedModel):
                 raise ValidationError({"option": "The option must share the organisation."})
         if not self.source_id and not self.source_reference and not self.source_url:
             raise ValidationError(
-                {"source_reference": "Provide a structured source, source reference, or source URL."}
+                {
+                    "source_reference": "Provide a structured source, source reference, or source URL."
+                }
             )
         if self.status == self.Status.ACTIVE and (self.withdrawn_at or self.withdrawn_by_id):
             raise ValidationError("Active evidence cannot contain withdrawal metadata.")

@@ -21,11 +21,31 @@ class DecisionIssueSerializer(serializers.ModelSerializer):
     class Meta:
         model = DecisionIssue
         fields = [
-            "id", "decision_id", "option_id", "evidence_id", "assumption_id", "risk_id",
-            "evaluation_exercise_id", "scenario_set_id", "issue_type", "issue_type_label",
-            "title", "description", "severity", "severity_label", "status", "status_label",
-            "owner", "due_date", "resolution", "resolved_at", "resolved_by", "created_by",
-            "can_edit", "created_at", "updated_at",
+            "id",
+            "decision_id",
+            "option_id",
+            "evidence_id",
+            "assumption_id",
+            "risk_id",
+            "evaluation_exercise_id",
+            "scenario_set_id",
+            "issue_type",
+            "issue_type_label",
+            "title",
+            "description",
+            "severity",
+            "severity_label",
+            "status",
+            "status_label",
+            "owner",
+            "due_date",
+            "resolution",
+            "resolved_at",
+            "resolved_by",
+            "created_by",
+            "can_edit",
+            "created_at",
+            "updated_at",
         ]
         read_only_fields = fields
 
@@ -44,7 +64,11 @@ class DecisionIssueWriteSerializer(StrictSerializer):
     issue_type = serializers.ChoiceField(choices=DecisionIssue.IssueType.choices)
     title = serializers.CharField(max_length=240)
     description = serializers.CharField(max_length=12000)
-    severity = serializers.ChoiceField(choices=DecisionIssue.Severity.choices, required=False, default=DecisionIssue.Severity.MODERATE)
+    severity = serializers.ChoiceField(
+        choices=DecisionIssue.Severity.choices,
+        required=False,
+        default=DecisionIssue.Severity.MODERATE,
+    )
     owner_id = serializers.UUIDField()
     due_date = serializers.DateField(required=False, allow_null=True)
 
@@ -67,9 +91,17 @@ class DecisionIssuePatchSerializer(StrictSerializer):
 
 
 QUALITY_KEYS = {
-    "clear_question", "distinct_options", "status_quo_considered", "balanced_evidence",
-    "explicit_assumptions", "stakeholders_represented", "uncertainty_examined",
-    "scenarios_considered", "risks_addressed", "dissent_visible", "implementation_plausible",
+    "clear_question",
+    "distinct_options",
+    "status_quo_considered",
+    "balanced_evidence",
+    "explicit_assumptions",
+    "stakeholders_represented",
+    "uncertainty_examined",
+    "scenarios_considered",
+    "risks_addressed",
+    "dissent_visible",
+    "implementation_plausible",
     "review_timing_defined",
 }
 
@@ -82,41 +114,92 @@ class QualityReviewSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = DecisionQualityReview
-        fields = ["id", "decision_id", "version", "status", "status_label", "judgement", "judgement_label", "answers", "strengths", "blockers", "conditions", "author", "published_at", "can_edit", "created_at", "updated_at"]
+        fields = [
+            "id",
+            "decision_id",
+            "version",
+            "status",
+            "status_label",
+            "judgement",
+            "judgement_label",
+            "answers",
+            "strengths",
+            "blockers",
+            "conditions",
+            "author",
+            "published_at",
+            "can_edit",
+            "created_at",
+            "updated_at",
+        ]
         read_only_fields = fields
 
     def get_can_edit(self, obj):
         request = self.context.get("request")
-        return bool(request and obj.status == DecisionQualityReview.Status.DRAFT and can_manage_analysis(actor=request.user, decision=obj.decision))
+        return bool(
+            request
+            and obj.status == DecisionQualityReview.Status.DRAFT
+            and can_manage_analysis(actor=request.user, decision=obj.decision)
+        )
 
 
 class QualityReviewWriteSerializer(StrictSerializer):
-    judgement = serializers.ChoiceField(choices=DecisionQualityReview.Judgement.choices, required=False, default=DecisionQualityReview.Judgement.NOT_READY)
-    answers = serializers.DictField(child=serializers.ChoiceField(choices=["yes", "partly", "no", "not_applicable"]), required=False, default=dict)
-    strengths = serializers.CharField(max_length=12000, required=False, allow_blank=True, default="")
+    judgement = serializers.ChoiceField(
+        choices=DecisionQualityReview.Judgement.choices,
+        required=False,
+        default=DecisionQualityReview.Judgement.NOT_READY,
+    )
+    answers = serializers.DictField(
+        child=serializers.ChoiceField(choices=["yes", "partly", "no", "not_applicable"]),
+        required=False,
+        default=dict,
+    )
+    strengths = serializers.CharField(
+        max_length=12000, required=False, allow_blank=True, default=""
+    )
     blockers = serializers.CharField(max_length=12000, required=False, allow_blank=True, default="")
-    conditions = serializers.CharField(max_length=12000, required=False, allow_blank=True, default="")
+    conditions = serializers.CharField(
+        max_length=12000, required=False, allow_blank=True, default=""
+    )
 
     def validate_answers(self, value):
         unknown = sorted(set(value) - QUALITY_KEYS)
         if unknown:
-            raise serializers.ValidationError(f"Unknown quality-review questions: {', '.join(unknown)}")
+            raise serializers.ValidationError(
+                f"Unknown quality-review questions: {', '.join(unknown)}"
+            )
         return value
 
 
 class QualityReviewPatchSerializer(QualityReviewWriteSerializer):
-    judgement = serializers.ChoiceField(choices=DecisionQualityReview.Judgement.choices, required=False)
-    answers = serializers.DictField(child=serializers.ChoiceField(choices=["yes", "partly", "no", "not_applicable"]), required=False)
+    judgement = serializers.ChoiceField(
+        choices=DecisionQualityReview.Judgement.choices, required=False
+    )
+    answers = serializers.DictField(
+        child=serializers.ChoiceField(choices=["yes", "partly", "no", "not_applicable"]),
+        required=False,
+    )
     strengths = serializers.CharField(max_length=12000, required=False, allow_blank=True)
     blockers = serializers.CharField(max_length=12000, required=False, allow_blank=True)
     conditions = serializers.CharField(max_length=12000, required=False, allow_blank=True)
-    status = serializers.ChoiceField(choices=[DecisionQualityReview.Status.PUBLISHED], required=False)
+    status = serializers.ChoiceField(
+        choices=[DecisionQualityReview.Status.PUBLISHED], required=False
+    )
 
 
 SUMMARY_FIELDS = [
-    "context_summary", "options_summary", "evidence_summary", "uncertainty_summary",
-    "stakeholder_summary", "scenario_summary", "evaluation_summary", "risk_summary",
-    "unresolved_issues", "proposed_judgement", "conditions", "implementation_implications",
+    "context_summary",
+    "options_summary",
+    "evidence_summary",
+    "uncertainty_summary",
+    "stakeholder_summary",
+    "scenario_summary",
+    "evaluation_summary",
+    "risk_summary",
+    "unresolved_issues",
+    "proposed_judgement",
+    "conditions",
+    "implementation_implications",
 ]
 
 
@@ -128,27 +211,68 @@ class ExecutiveSummarySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ExecutiveDecisionSummary
-        fields = ["id", "decision_id", "version", "status", "status_label", *SUMMARY_FIELDS, "created_by", "approved_by", "approved_at", "can_edit", "created_at", "updated_at"]
+        fields = [
+            "id",
+            "decision_id",
+            "version",
+            "status",
+            "status_label",
+            *SUMMARY_FIELDS,
+            "created_by",
+            "approved_by",
+            "approved_at",
+            "can_edit",
+            "created_at",
+            "updated_at",
+        ]
         read_only_fields = fields
 
     def get_can_edit(self, obj):
         request = self.context.get("request")
-        return bool(request and obj.status == ExecutiveDecisionSummary.Status.DRAFT and can_manage_analysis(actor=request.user, decision=obj.decision))
+        return bool(
+            request
+            and obj.status == ExecutiveDecisionSummary.Status.DRAFT
+            and can_manage_analysis(actor=request.user, decision=obj.decision)
+        )
 
 
 class ExecutiveSummaryWriteSerializer(StrictSerializer):
-    context_summary = serializers.CharField(max_length=16000, required=False, allow_blank=True, default="")
-    options_summary = serializers.CharField(max_length=16000, required=False, allow_blank=True, default="")
-    evidence_summary = serializers.CharField(max_length=16000, required=False, allow_blank=True, default="")
-    uncertainty_summary = serializers.CharField(max_length=16000, required=False, allow_blank=True, default="")
-    stakeholder_summary = serializers.CharField(max_length=16000, required=False, allow_blank=True, default="")
-    scenario_summary = serializers.CharField(max_length=16000, required=False, allow_blank=True, default="")
-    evaluation_summary = serializers.CharField(max_length=16000, required=False, allow_blank=True, default="")
-    risk_summary = serializers.CharField(max_length=16000, required=False, allow_blank=True, default="")
-    unresolved_issues = serializers.CharField(max_length=16000, required=False, allow_blank=True, default="")
-    proposed_judgement = serializers.CharField(max_length=16000, required=False, allow_blank=True, default="")
-    conditions = serializers.CharField(max_length=16000, required=False, allow_blank=True, default="")
-    implementation_implications = serializers.CharField(max_length=16000, required=False, allow_blank=True, default="")
+    context_summary = serializers.CharField(
+        max_length=16000, required=False, allow_blank=True, default=""
+    )
+    options_summary = serializers.CharField(
+        max_length=16000, required=False, allow_blank=True, default=""
+    )
+    evidence_summary = serializers.CharField(
+        max_length=16000, required=False, allow_blank=True, default=""
+    )
+    uncertainty_summary = serializers.CharField(
+        max_length=16000, required=False, allow_blank=True, default=""
+    )
+    stakeholder_summary = serializers.CharField(
+        max_length=16000, required=False, allow_blank=True, default=""
+    )
+    scenario_summary = serializers.CharField(
+        max_length=16000, required=False, allow_blank=True, default=""
+    )
+    evaluation_summary = serializers.CharField(
+        max_length=16000, required=False, allow_blank=True, default=""
+    )
+    risk_summary = serializers.CharField(
+        max_length=16000, required=False, allow_blank=True, default=""
+    )
+    unresolved_issues = serializers.CharField(
+        max_length=16000, required=False, allow_blank=True, default=""
+    )
+    proposed_judgement = serializers.CharField(
+        max_length=16000, required=False, allow_blank=True, default=""
+    )
+    conditions = serializers.CharField(
+        max_length=16000, required=False, allow_blank=True, default=""
+    )
+    implementation_implications = serializers.CharField(
+        max_length=16000, required=False, allow_blank=True, default=""
+    )
 
 
 class ExecutiveSummaryPatchSerializer(StrictSerializer):
@@ -163,7 +287,9 @@ class ExecutiveSummaryPatchSerializer(StrictSerializer):
     unresolved_issues = serializers.CharField(max_length=16000, required=False, allow_blank=True)
     proposed_judgement = serializers.CharField(max_length=16000, required=False, allow_blank=True)
     conditions = serializers.CharField(max_length=16000, required=False, allow_blank=True)
-    implementation_implications = serializers.CharField(max_length=16000, required=False, allow_blank=True)
+    implementation_implications = serializers.CharField(
+        max_length=16000, required=False, allow_blank=True
+    )
     status = serializers.ChoiceField(
         choices=[ExecutiveDecisionSummary.Status.APPROVED],
         required=False,

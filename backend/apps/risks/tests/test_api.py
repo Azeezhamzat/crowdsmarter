@@ -43,6 +43,9 @@ def test_risk_api_is_tenant_isolated(
 ):  # type: ignore[no-untyped-def]
     decision = decision_factory(status=Decision.Status.UNDER_REVIEW)
     api_client.force_authenticate(user_factory())
-    assert api_client.get(
-        reverse("risks:list-create", kwargs={"decision_id": decision.id})
-    ).status_code == 404
+    assert (
+        api_client.get(
+            reverse("risks:list-create", kwargs={"decision_id": decision.id})
+        ).status_code
+        == 404
+    )

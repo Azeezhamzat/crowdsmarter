@@ -1,0 +1,41 @@
+{
+  "annotations": {"list": []},
+  "editable": true,
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Backend scrape health",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"expr": "up{job=\"crowdsmarter-backend\"}"}],
+      "gridPos": {"h": 7, "w": 6, "x": 0, "y": 0}
+    },
+    {
+      "type": "timeseries",
+      "title": "Request rate by status family",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"expr": "sum by (status_family) (rate(crowdsmarter_http_requests_total[5m]))", "legendFormat": "{{status_family}}"}],
+      "gridPos": {"h": 7, "w": 9, "x": 6, "y": 0}
+    },
+    {
+      "type": "timeseries",
+      "title": "Average request latency",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"expr": "sum(rate(crowdsmarter_http_request_duration_seconds_sum[5m])) / clamp_min(sum(rate(crowdsmarter_http_request_duration_seconds_count[5m])), 0.001)", "legendFormat": "seconds"}],
+      "gridPos": {"h": 7, "w": 9, "x": 15, "y": 0}
+    },
+    {
+      "type": "logs",
+      "title": "Application logs",
+      "datasource": {"type": "loki", "uid": "loki"},
+      "targets": [{"expr": "{application=\"crowdsmarter\"}"}],
+      "gridPos": {"h": 12, "w": 24, "x": 0, "y": 7}
+    }
+  ],
+  "schemaVersion": 41,
+  "tags": ["crowdsmarter", "operations"],
+  "templating": {"list": []},
+  "time": {"from": "now-1h", "to": "now"},
+  "title": "CrowdSmarter overview",
+  "uid": "crowdsmarter-overview",
+  "version": 1
+}

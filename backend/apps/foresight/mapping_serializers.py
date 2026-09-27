@@ -1,5 +1,7 @@
 """REST contracts for foresight canvases and systems mapping."""
 
+from typing import Any, cast
+
 from rest_framework import serializers
 
 from apps.core.serializers import StrictSerializer
@@ -30,9 +32,21 @@ class CanvasSerializer(serializers.ModelSerializer):
     class Meta:
         model = ForesightCanvas
         fields = [
-            "id", "organisation_id", "title", "focal_question", "scope", "horizon_year",
-            "owner", "created_by", "status", "status_label", "driver_count",
-            "implication_count", "can_edit", "created_at", "updated_at",
+            "id",
+            "organisation_id",
+            "title",
+            "focal_question",
+            "scope",
+            "horizon_year",
+            "owner",
+            "created_by",
+            "status",
+            "status_label",
+            "driver_count",
+            "implication_count",
+            "can_edit",
+            "created_at",
+            "updated_at",
         ]
         read_only_fields = fields
 
@@ -88,10 +102,26 @@ class DriverSerializer(serializers.ModelSerializer):
     class Meta:
         model = Driver
         fields = [
-            "id", "canvas_id", "title", "description", "driver_type", "driver_type_label",
-            "steep_category", "steep_label", "direction", "direction_label", "impact",
-            "uncertainty", "attention_score", "owner", "created_by", "is_active",
-            "linked_signals", "can_edit", "created_at", "updated_at",
+            "id",
+            "canvas_id",
+            "title",
+            "description",
+            "driver_type",
+            "driver_type_label",
+            "steep_category",
+            "steep_label",
+            "direction",
+            "direction_label",
+            "impact",
+            "uncertainty",
+            "attention_score",
+            "owner",
+            "created_by",
+            "is_active",
+            "linked_signals",
+            "can_edit",
+            "created_at",
+            "updated_at",
         ]
         read_only_fields = fields
 
@@ -123,7 +153,9 @@ class DriverWriteSerializer(StrictSerializer):
     title = serializers.CharField(max_length=240, trim_whitespace=True)
     description = serializers.CharField(max_length=12000, trim_whitespace=True)
     driver_type = serializers.ChoiceField(choices=Driver.DriverType.choices)
-    steep_category = serializers.ChoiceField(choices=Driver._meta.get_field("steep_category").choices)
+    steep_category = serializers.ChoiceField(
+        choices=cast(Any, Driver._meta.get_field("steep_category").choices)
+    )
     direction = serializers.ChoiceField(
         choices=Driver.Direction.choices, required=False, default=Driver.Direction.UNCLEAR
     )
@@ -138,7 +170,7 @@ class DriverPatchSerializer(StrictSerializer):
     description = serializers.CharField(max_length=12000, trim_whitespace=True, required=False)
     driver_type = serializers.ChoiceField(choices=Driver.DriverType.choices, required=False)
     steep_category = serializers.ChoiceField(
-        choices=Driver._meta.get_field("steep_category").choices, required=False
+        choices=cast(Any, Driver._meta.get_field("steep_category").choices), required=False
     )
     direction = serializers.ChoiceField(choices=Driver.Direction.choices, required=False)
     impact = serializers.IntegerField(min_value=1, max_value=5, required=False)
@@ -158,16 +190,29 @@ class DriverSignalWriteSerializer(StrictSerializer):
 
 
 class StakeholderSerializer(serializers.ModelSerializer):
-    stakeholder_type_label = serializers.CharField(source="get_stakeholder_type_display", read_only=True)
+    stakeholder_type_label = serializers.CharField(
+        source="get_stakeholder_type_display", read_only=True
+    )
     stance_label = serializers.CharField(source="get_stance_display", read_only=True)
     created_by = DecisionUserSerializer(read_only=True)
 
     class Meta:
         model = SystemStakeholder
         fields = [
-            "id", "canvas_id", "name", "stakeholder_type", "stakeholder_type_label",
-            "role", "interests", "influence", "exposure", "stance", "stance_label",
-            "created_by", "created_at", "updated_at",
+            "id",
+            "canvas_id",
+            "name",
+            "stakeholder_type",
+            "stakeholder_type_label",
+            "role",
+            "interests",
+            "influence",
+            "exposure",
+            "stance",
+            "stance_label",
+            "created_by",
+            "created_at",
+            "updated_at",
         ]
         read_only_fields = fields
 
@@ -196,9 +241,21 @@ class RelationshipSerializer(serializers.ModelSerializer):
     class Meta:
         model = CausalRelationship
         fields = [
-            "id", "canvas_id", "source_driver_id", "source_title", "target_driver_id",
-            "target_title", "polarity", "polarity_label", "strength", "delay",
-            "delay_label", "rationale", "created_by", "created_at", "updated_at",
+            "id",
+            "canvas_id",
+            "source_driver_id",
+            "source_title",
+            "target_driver_id",
+            "target_title",
+            "polarity",
+            "polarity_label",
+            "strength",
+            "delay",
+            "delay_label",
+            "rationale",
+            "created_by",
+            "created_at",
+            "updated_at",
         ]
         read_only_fields = fields
 
@@ -273,10 +330,22 @@ class ConsequenceSerializer(serializers.ModelSerializer):
     class Meta:
         model = FuturesWheelConsequence
         fields = [
-            "id", "canvas_id", "originating_driver_id", "originating_driver_title",
-            "parent_id", "parent_title", "title", "description", "order",
-            "consequence_type", "consequence_type_label", "likelihood", "impact",
-            "created_by", "created_at", "updated_at",
+            "id",
+            "canvas_id",
+            "originating_driver_id",
+            "originating_driver_title",
+            "parent_id",
+            "parent_title",
+            "title",
+            "description",
+            "order",
+            "consequence_type",
+            "consequence_type_label",
+            "likelihood",
+            "impact",
+            "created_by",
+            "created_at",
+            "updated_at",
         ]
         read_only_fields = fields
 
@@ -302,8 +371,16 @@ class HorizonItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = ThreeHorizonItem
         fields = [
-            "id", "canvas_id", "horizon", "horizon_label", "title", "description",
-            "evidence", "created_by", "created_at", "updated_at",
+            "id",
+            "canvas_id",
+            "horizon",
+            "horizon_label",
+            "title",
+            "description",
+            "evidence",
+            "created_by",
+            "created_at",
+            "updated_at",
         ]
         read_only_fields = fields
 
@@ -318,7 +395,9 @@ class HorizonItemWriteSerializer(StrictSerializer):
 
 
 class ImplicationSerializer(serializers.ModelSerializer):
-    implication_type_label = serializers.CharField(source="get_implication_type_display", read_only=True)
+    implication_type_label = serializers.CharField(
+        source="get_implication_type_display", read_only=True
+    )
     status_label = serializers.CharField(source="get_status_display", read_only=True)
     owner = DecisionUserSerializer(read_only=True)
     created_by = DecisionUserSerializer(read_only=True)
@@ -331,10 +410,23 @@ class ImplicationSerializer(serializers.ModelSerializer):
     class Meta:
         model = StrategicImplication
         fields = [
-            "id", "canvas_id", "title", "description", "implication_type",
-            "implication_type_label", "priority", "owner", "linked_decision_id",
-            "linked_decision_title", "drivers", "status", "status_label", "created_by",
-            "can_edit", "created_at", "updated_at",
+            "id",
+            "canvas_id",
+            "title",
+            "description",
+            "implication_type",
+            "implication_type_label",
+            "priority",
+            "owner",
+            "linked_decision_id",
+            "linked_decision_title",
+            "drivers",
+            "status",
+            "status_label",
+            "created_by",
+            "can_edit",
+            "created_at",
+            "updated_at",
         ]
         read_only_fields = fields
 
@@ -401,8 +493,15 @@ class CanvasWorkspaceSerializer(CanvasSerializer):
 
     class Meta(CanvasSerializer.Meta):
         fields = CanvasSerializer.Meta.fields + [
-            "drivers", "stakeholders", "relationships", "feedback_loops",
-            "consequences", "horizon_items", "implications", "scenario_sets", "summary",
+            "drivers",
+            "stakeholders",
+            "relationships",
+            "feedback_loops",
+            "consequences",
+            "horizon_items",
+            "implications",
+            "scenario_sets",
+            "summary",
         ]
 
     def get_summary(self, obj: ForesightCanvas):

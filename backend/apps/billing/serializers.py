@@ -59,9 +59,11 @@ class OrganisationSubscriptionSerializer(serializers.ModelSerializer):
     def get_active_decision_count(self, obj: OrganisationSubscription) -> int:
         from apps.decisions.models import Decision
 
-        return Decision.objects.filter(organisation=obj.organisation_id).exclude(
-            status=Decision.Status.ARCHIVED
-        ).count()
+        return (
+            Decision.objects.filter(organisation=obj.organisation_id)
+            .exclude(status=Decision.Status.ARCHIVED)
+            .count()
+        )
 
     def get_active_member_count(self, obj: OrganisationSubscription) -> int:
         from apps.organisations.models import Membership

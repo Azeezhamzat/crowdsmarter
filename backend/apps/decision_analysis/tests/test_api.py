@@ -3,9 +3,7 @@ from django.urls import reverse
 
 
 @pytest.mark.django_db
-def test_analysis_api_is_strict_and_tenant_safe(
-    api_client, decision_factory, user_factory
-):  # type: ignore[no-untyped-def]
+def test_analysis_api_is_strict_and_tenant_safe(api_client, decision_factory, user_factory):  # type: ignore[no-untyped-def]
     decision = decision_factory()
     api_client.force_authenticate(decision.owner)
     response = api_client.post(
@@ -31,9 +29,7 @@ def test_analysis_api_is_strict_and_tenant_safe(
 
 
 @pytest.mark.django_db
-def test_workspace_explains_that_analysis_has_no_authority(
-    api_client, decision_factory
-):  # type: ignore[no-untyped-def]
+def test_workspace_explains_that_analysis_has_no_authority(api_client, decision_factory):  # type: ignore[no-untyped-def]
     decision = decision_factory()
     api_client.force_authenticate(decision.owner)
     response = api_client.get(
@@ -41,6 +37,7 @@ def test_workspace_explains_that_analysis_has_no_authority(
     )
     assert response.status_code == 200
     assert "does not select an option" in response.json()["principle"]
+
 
 @pytest.mark.django_db
 def test_non_authority_cannot_read_synthesis_drafts_or_edit_another_owners_issue(

@@ -35,9 +35,7 @@ def user_factory(db) -> Callable[..., User]:  # type: ignore[no-untyped-def]
 
 
 @pytest.fixture
-def organisation_factory(
-    db, user_factory
-) -> Callable[..., Organisation]:  # type: ignore[no-untyped-def]
+def organisation_factory(db, user_factory) -> Callable[..., Organisation]:  # type: ignore[no-untyped-def]
     counter = 0
 
     def create_organisation(**kwargs):  # type: ignore[no-untyped-def]

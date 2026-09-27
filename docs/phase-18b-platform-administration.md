@@ -6,7 +6,7 @@ Phase 18B introduces CrowdSmarter's product-aware administration layer. It separ
 
 An active `PlatformAdministrator` record is required for `/api/v1/platform-admin/*` and `/platform-admin`. Django's `is_staff` and `is_superuser` flags remain technical recovery permissions and do not grant product-level platform authority by themselves.
 
-Platform administrators can see safe service-wide summaries, users, demo requests, service configuration, and audit events. They do not silently become members of customer organisations and do not gain contributor identity in customer decisions.
+Platform administrators can see safe service-wide summaries, users, decision enquiries, service configuration, and audit events. They do not silently become members of customer organisations and do not gain contributor identity in customer decisions.
 
 ## Governed support access
 
@@ -27,7 +27,7 @@ The `/platform-admin` workspace provides:
 - organisation directory;
 - user activation and suspension;
 - explicit platform-administrator capability management;
-- demo-request processing;
+- decision-enquiry processing;
 - official contact and support-access configuration;
 - global audit review;
 - a tenant support workspace with visible scope and expiry.
@@ -50,4 +50,4 @@ Omit `--technical-admin` when Django technical access is unnecessary. Omit `--de
 
 ## Audit actions
 
-Material actions append audit events, including support access, capability grants and suspensions, user state changes, ownership transfer, organisation state changes, invitation actions, demo-request state changes, and platform-configuration updates.
+Material actions append audit events, including support access, capability grants and suspensions, user state changes, ownership transfer, organisation state changes, invitation actions, decision-enquiry state changes, and platform-configuration updates.

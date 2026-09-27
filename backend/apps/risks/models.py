@@ -77,18 +77,18 @@ class Risk(UUIDTimeStampedModel):
             ),
             models.CheckConstraint(
                 condition=models.Q(
-                    response_strategy__in=['accept', 'avoid', 'mitigate', 'transfer', 'monitor']
+                    response_strategy__in=["accept", "avoid", "mitigate", "transfer", "monitor"]
                 ),
                 name="risk_response_strategy_valid",
             ),
             models.CheckConstraint(
                 condition=models.Q(
                     status__in=[
-                        'open',
-                        'monitoring',
-                        'mitigated',
-                        'accepted',
-                        'closed',
+                        "open",
+                        "monitoring",
+                        "mitigated",
+                        "accepted",
+                        "closed",
                     ]
                 ),
                 name="risk_status_valid",
@@ -116,11 +116,15 @@ class Risk(UUIDTimeStampedModel):
                 )
         if self.option_id and self.option.decision_id != self.decision_id:
             raise ValidationError({"option": "The option must belong to this decision."})
-        if self.response_strategy in {
-            self.ResponseStrategy.AVOID,
-            self.ResponseStrategy.MITIGATE,
-            self.ResponseStrategy.TRANSFER,
-        } and not self.mitigation_plan:
+        if (
+            self.response_strategy
+            in {
+                self.ResponseStrategy.AVOID,
+                self.ResponseStrategy.MITIGATE,
+                self.ResponseStrategy.TRANSFER,
+            }
+            and not self.mitigation_plan
+        ):
             raise ValidationError(
                 {"mitigation_plan": "This response strategy requires an action plan."}
             )

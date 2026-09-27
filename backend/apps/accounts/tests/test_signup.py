@@ -140,13 +140,17 @@ def test_signup_generates_unique_slug_on_name_collision():  # type: ignore[no-un
         "password": "a-genuinely-long-passphrase",
         "organisation_name": "Shared Name Commons",
     }
-    first = client.post(reverse("accounts:signup"), payload, format="json", HTTP_X_CSRFTOKEN=csrf_token)
+    first = client.post(
+        reverse("accounts:signup"), payload, format="json", HTTP_X_CSRFTOKEN=csrf_token
+    )
     assert first.status_code == 201
     assert first.json()["organisation"]["slug"] == "shared-name-commons"
 
     client2 = _csrf_client()
     csrf_token2 = client2.get(reverse("accounts:csrf")).cookies["csrftoken"].value
     payload["email"] = "second@example.com"
-    second = client2.post(reverse("accounts:signup"), payload, format="json", HTTP_X_CSRFTOKEN=csrf_token2)
+    second = client2.post(
+        reverse("accounts:signup"), payload, format="json", HTTP_X_CSRFTOKEN=csrf_token2
+    )
     assert second.status_code == 201
     assert second.json()["organisation"]["slug"] == "shared-name-commons-2"

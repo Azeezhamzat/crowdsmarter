@@ -1,7 +1,7 @@
 import { defineCatalog } from "../i18n";
 
 /**
- * French and Portuguese strings are AI-assisted and have not been reviewed
+ * French and Arabic strings are AI-assisted and have not been reviewed
  * by a native speaker - see docs/i18n.md before treating them as final copy.
  */
 export const loginCatalog = defineCatalog({
@@ -15,7 +15,7 @@ export const loginCatalog = defineCatalog({
     forgotPassword: "Forgot password?",
     signInButton: "Sign in securely",
     signingInButton: "Signing in securely…",
-    requestDemo: "Request a tailored demonstration",
+    requestDemo: "Discuss a decision",
   },
   fr: {
     welcomeEyebrow: "Content de vous revoir",
@@ -27,18 +27,18 @@ export const loginCatalog = defineCatalog({
     forgotPassword: "Mot de passe oublié ?",
     signInButton: "Se connecter en toute sécurité",
     signingInButton: "Connexion sécurisée en cours…",
-    requestDemo: "Demander une démonstration personnalisée",
+    requestDemo: "Parler d'une décision",
   },
-  pt: {
-    welcomeEyebrow: "Bem-vindo de volta",
-    heading: "Continue o raciocínio - não apenas o registo.",
-    signInHeading: "Entrar no CrowdSmarter",
-    signInHint: "Utilize o endereço de e-mail associado ao convite da sua organização.",
-    emailLabel: "Endereço de e-mail",
-    passwordLabel: "Palavra-passe",
-    forgotPassword: "Esqueceu-se da palavra-passe?",
-    signInButton: "Entrar com segurança",
-    signingInButton: "A entrar com segurança…",
-    requestDemo: "Solicitar uma demonstração personalizada",
+  ar: {
+    welcomeEyebrow: "مرحباً بعودتك",
+    heading: "واصل التفكير، لا مجرد حفظ السجل.",
+    signInHeading: "تسجيل الدخول إلى CrowdSmarter",
+    signInHint: "استخدم عنوان البريد الإلكتروني المرتبط بدعوة مؤسستك.",
+    emailLabel: "عنوان البريد الإلكتروني",
+    passwordLabel: "كلمة المرور",
+    forgotPassword: "هل نسيت كلمة المرور؟",
+    signInButton: "تسجيل الدخول بأمان",
+    signingInButton: "جارٍ تسجيل الدخول بأمان…",
+    requestDemo: "ناقش قراراً",
   },
 });

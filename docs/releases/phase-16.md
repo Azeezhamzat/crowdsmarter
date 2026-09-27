@@ -30,9 +30,10 @@ Decision owners no longer need to coordinate important evidence, risk, assumptio
 ### Facilitation
 
 - bounded decision workshops with an objective, agenda, guidance, facilitator, schedule, and invited participants;
+- explicit participant and observer roles for each session, without changing decision authority;
 - planned, open, closed, and cancelled states;
 - invited, attended, and absent attendance records;
-- outputs connected to named contribution requests rather than an ungoverned whiteboard.
+- accountable outputs connected to named contribution requests, including after a session closes, rather than left on an ungoverned whiteboard.
 
 ### Personal and organisational operation
 

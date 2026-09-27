@@ -62,7 +62,7 @@ def _notify_demo_request(request: DemoRequest) -> None:
         return
     try:
         EmailMessage(
-            subject=f"CrowdSmarter demo request - {request.organisation_name}",
+            subject=f"CrowdSmarter decision enquiry - {request.organisation_name}",
             body=(
                 f"Reference: {request.id}\n"
                 f"Name: {request.full_name}\n"
@@ -81,7 +81,7 @@ def _notify_demo_request(request: DemoRequest) -> None:
         if getattr(settings, "DEMO_REQUEST_SEND_ACKNOWLEDGEMENT", False):
             reply_to = public_reply_to or recipient
             EmailMessage(
-                subject="We received your CrowdSmarter demonstration request",
+                subject="We received your CrowdSmarter decision enquiry",
                 body=(
                     f"Hello {request.full_name},\n\n"
                     "Thank you for sharing your decision context. "
@@ -89,13 +89,11 @@ def _notify_demo_request(request: DemoRequest) -> None:
                     f"Reference: {request.id}\n"
                     f"Contact: {reply_to}\n\n"
                     "CrowdSmarter\n"
-                    "Foresight-to-decision intelligence"
+                    "Facilitation. Systems. Collective intelligence."
                 ),
                 from_email=notification_sender_email(),
                 to=[request.work_email],
                 reply_to=[reply_to],
             ).send(fail_silently=False)
     except Exception:  # noqa: BLE001 - notification failure must not lose the request
-        logger.exception(
-            "Demo request %s was saved but notification delivery failed.", request.id
-        )
+        logger.exception("Demo request %s was saved but notification delivery failed.", request.id)

@@ -3,7 +3,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 
-from .models import User
+from .models import EmailChangeRequest, User
 
 
 @admin.register(User)
@@ -30,6 +30,7 @@ class UserAdmin(DjangoUserAdmin):
         ),
         ("Important dates", {"fields": ("last_login", "date_joined")}),
     )
+
     def has_delete_permission(self, request, obj=None):  # type: ignore[no-untyped-def]
         """Require explicit account lifecycle workflows rather than hard deletion."""
         return False
@@ -43,3 +44,38 @@ class UserAdmin(DjangoUserAdmin):
             },
         ),
     )
+
+
+@admin.register(EmailChangeRequest)
+class EmailChangeRequestAdmin(admin.ModelAdmin):
+    """Read-only visibility into account email-verification activity."""
+
+    list_display = [
+        "user",
+        "new_email",
+        "created_at",
+        "expires_at",
+        "completed_at",
+        "invalidated_at",
+    ]
+    search_fields = ["user__email", "new_email"]
+    readonly_fields = [
+        "id",
+        "user",
+        "new_email",
+        "token_digest",
+        "created_at",
+        "updated_at",
+        "expires_at",
+        "completed_at",
+        "invalidated_at",
+    ]
+
+    def has_add_permission(self, request):  # type: ignore[no-untyped-def]
+        return False
+
+    def has_change_permission(self, request, obj=None):  # type: ignore[no-untyped-def]
+        return False
+
+    def has_delete_permission(self, request, obj=None):  # type: ignore[no-untyped-def]
+        return False

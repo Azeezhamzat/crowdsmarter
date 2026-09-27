@@ -5,8 +5,8 @@ from __future__ import annotations
 from typing import Any
 
 from django.conf import settings
-from django.db import models
 from django.core.validators import RegexValidator
+from django.db import models
 
 from apps.core.models import UUIDTimeStampedModel
 
@@ -14,7 +14,7 @@ from apps.core.models import UUIDTimeStampedModel
 class OrganisationQuerySet(models.QuerySet["Organisation"]):
     """Tenant-safe organisation queries."""
 
-    def for_user(self, user: Any) -> models.QuerySet["Organisation"]:
+    def for_user(self, user: Any) -> models.QuerySet[Organisation]:
         if user.is_anonymous:
             return self.none()
         return self.filter(
@@ -48,15 +48,19 @@ class Organisation(UUIDTimeStampedModel):
         max_length=30, choices=InvitationPolicy.choices, default=InvitationPolicy.OWNERS_AND_ADMINS
     )
     default_invitation_role = models.CharField(
-        max_length=20, choices=[("admin", "Administrator"), ("contributor", "Contributor"), ("viewer", "Viewer")],
+        max_length=20,
+        choices=[("admin", "Administrator"), ("contributor", "Contributor"), ("viewer", "Viewer")],
         default="contributor",
     )
     retention_days = models.PositiveIntegerField(null=True, blank=True)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE)
     deactivated_at = models.DateTimeField(null=True, blank=True)
     deactivated_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="deactivated_organisations",
-        null=True, blank=True,
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="deactivated_organisations",
+        null=True,
+        blank=True,
     )
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -91,8 +95,14 @@ class Organisation(UUIDTimeStampedModel):
             ),
             models.CheckConstraint(
                 condition=(
-                    models.Q(status="active", deactivated_at__isnull=True, deactivated_by__isnull=True)
-                    | models.Q(status="deactivated", deactivated_at__isnull=False, deactivated_by__isnull=False)
+                    models.Q(
+                        status="active", deactivated_at__isnull=True, deactivated_by__isnull=True
+                    )
+                    | models.Q(
+                        status="deactivated",
+                        deactivated_at__isnull=False,
+                        deactivated_by__isnull=False,
+                    )
                 ),
                 name="organisation_deactivation_state_consistent",
             ),
@@ -187,13 +197,19 @@ class MembershipEvent(UUIDTimeStampedModel):
         OWNERSHIP_TRANSFERRED = "ownership_transferred", "Ownership transferred"
         STATUS_CHANGED = "status_changed", "Status changed"
 
-    organisation = models.ForeignKey(Organisation, on_delete=models.PROTECT, related_name="membership_events")
+    organisation = models.ForeignKey(
+        Organisation, on_delete=models.PROTECT, related_name="membership_events"
+    )
     membership_id_snapshot = models.UUIDField(null=True, blank=True)
     user = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="organisation_membership_events"
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="organisation_membership_events",
     )
     actor = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="performed_membership_events"
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="performed_membership_events",
     )
     kind = models.CharField(max_length=30, choices=Kind.choices)
     previous_role = models.CharField(max_length=20, blank=True)
@@ -206,11 +222,21 @@ class MembershipEvent(UUIDTimeStampedModel):
         ordering = ["-created_at", "id"]
         constraints = [
             models.CheckConstraint(
-                condition=models.Q(kind__in=["created", "role_changed", "removed", "ownership_transferred", "status_changed"]),
+                condition=models.Q(
+                    kind__in=[
+                        "created",
+                        "role_changed",
+                        "removed",
+                        "ownership_transferred",
+                        "status_changed",
+                    ]
+                ),
                 name="membership_event_kind_valid",
             ),
         ]
-        indexes = [models.Index(fields=["organisation", "-created_at"], name="member_event_org_idx")]
+        indexes = [
+            models.Index(fields=["organisation", "-created_at"], name="member_event_org_idx")
+        ]
 
     def save(self, *args: Any, **kwargs: Any) -> None:
         if self.pk and type(self).objects.filter(pk=self.pk).exists():
@@ -226,16 +252,23 @@ class OrganisationDeletionRequest(UUIDTimeStampedModel):
         CANCELLED = "cancelled", "Cancelled"
         COMPLETED = "completed", "Completed"
 
-    organisation = models.ForeignKey(Organisation, on_delete=models.PROTECT, related_name="deletion_requests")
+    organisation = models.ForeignKey(
+        Organisation, on_delete=models.PROTECT, related_name="deletion_requests"
+    )
     requested_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="requested_organisation_deletions"
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="requested_organisation_deletions",
     )
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
     reason = models.TextField()
     earliest_deletion_at = models.DateTimeField()
     cancelled_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="cancelled_organisation_deletions",
-        null=True, blank=True,
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="cancelled_organisation_deletions",
+        null=True,
+        blank=True,
     )
     cancelled_at = models.DateTimeField(null=True, blank=True)
 
@@ -247,7 +280,8 @@ class OrganisationDeletionRequest(UUIDTimeStampedModel):
                 name="organisation_deletion_status_valid",
             ),
             models.UniqueConstraint(
-                fields=["organisation"], condition=models.Q(status="pending"),
+                fields=["organisation"],
+                condition=models.Q(status="pending"),
                 name="one_pending_deletion_request_per_org",
             ),
         ]

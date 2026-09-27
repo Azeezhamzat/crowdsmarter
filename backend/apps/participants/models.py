@@ -74,17 +74,17 @@ class Participant(UUIDTimeStampedModel):
             models.CheckConstraint(
                 condition=models.Q(
                     role__in=[
-                        'decision_owner',
-                        'decision_maker',
-                        'contributor',
-                        'reviewer',
-                        'observer',
+                        "decision_owner",
+                        "decision_maker",
+                        "contributor",
+                        "reviewer",
+                        "observer",
                     ]
                 ),
                 name="participant_role_valid",
             ),
             models.CheckConstraint(
-                condition=models.Q(status__in=['active', 'removed']),
+                condition=models.Q(status__in=["active", "removed"]),
                 name="participant_status_valid",
             ),
         ]

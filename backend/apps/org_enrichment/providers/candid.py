@@ -26,7 +26,9 @@ class CandidLookupProvider:
 
     def lookup(self, *, query: str) -> OrganisationLookupResult:
         if not self.api_key:
-            return OrganisationLookupResult(ok=False, found=False, detail="No Candid API key is configured.")
+            return OrganisationLookupResult(
+                ok=False, found=False, detail="No Candid API key is configured."
+            )
         try:
             response = httpx.get(
                 f"{CANDID_API_BASE}/{query.strip()}",
@@ -34,11 +36,17 @@ class CandidLookupProvider:
                 timeout=10.0,
             )
         except httpx.HTTPError as exc:
-            return OrganisationLookupResult(ok=False, found=False, detail=f"Candid request failed: {exc}")
+            return OrganisationLookupResult(
+                ok=False, found=False, detail=f"Candid request failed: {exc}"
+            )
         if response.status_code == 404:
-            return OrganisationLookupResult(ok=True, found=False, detail="No matching organisation was found.")
+            return OrganisationLookupResult(
+                ok=True, found=False, detail="No matching organisation was found."
+            )
         if response.status_code >= 400:
-            return OrganisationLookupResult(ok=False, found=False, detail="Candid rejected the request.")
+            return OrganisationLookupResult(
+                ok=False, found=False, detail="Candid rejected the request."
+            )
         payload = response.json()
         organisation = payload.get("organization", payload)
         return OrganisationLookupResult(
@@ -63,5 +71,7 @@ class CandidLookupProvider:
         except httpx.HTTPError as exc:
             return ProviderConnectionResult(ok=False, detail=f"Candid request failed: {exc}")
         if response.status_code in (401, 403):
-            return ProviderConnectionResult(ok=False, detail="Candid rejected the configured API key.")
+            return ProviderConnectionResult(
+                ok=False, detail="Candid rejected the configured API key."
+            )
         return ProviderConnectionResult(ok=True, detail="Connected to Candid.")

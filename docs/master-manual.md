@@ -1,6 +1,6 @@
 # CrowdSmarter master manual
 
-*Foresight. Collective intelligence. Decisions.*
+*Facilitation. Systems. Collective intelligence.*
 
 This is the single place to start if you want to understand how to actually use CrowdSmarter — as an organisation member running a decision, or as a platform administrator operating the service. It is written for a human reading start to end, not as an API reference. For implementation detail behind any section, see the linked doc in `docs/`.
 
@@ -8,9 +8,21 @@ This is the single place to start if you want to understand how to actually use 
 
 ## 1. What CrowdSmarter is
 
-CrowdSmarter is a decision-governance platform, not a chat assistant. It gives an organisation a structured, attributable record of how a real decision moved from framing to outcome: the evidence considered, who held what position, how the group evaluated options, who finalised it, what was committed to, and what was learned afterwards. AI is used as an advisory layer throughout (a second opinion that can be dismissed) — it never chooses an option, finalises a decision, or acts as a silent participant.
+CrowdSmarter is a facilitation-led practice for groups making consequential
+decisions. It helps people frame the question, involve the right participants,
+work with evidence and disagreement, exercise accountable judgement, and learn
+from what follows. The platform described in this manual supports that work by
+keeping an attributable record from framing to outcome. It is one part of
+CrowdSmarter, not the whole service.
 
-Everything happens inside an **organisation** (a tenant). Organisations contain **workspaces**, workspaces contain **decisions**, and every decision carries its own participants, evidence, and history.
+AI is an optional advisory layer that can be dismissed. It never chooses an
+option, finalises a decision, or acts as a silent participant.
+
+Inside the supporting platform, records are organised within an
+**organisation** (a tenant). Organisations contain **workspaces**, workspaces
+contain **decisions**, and every decision carries its own participants,
+evidence, and history. Discovery and facilitation may begin outside the
+platform when that better serves the group.
 
 ---
 
@@ -83,6 +95,53 @@ Draft → Framing → Open for Contribution → Under Review → Ready for Decis
 
 Collective evaluation of options, when you use it, runs one of four methods: **scorecard** (multi-criteria weighted scoring, the default), **approval voting**, **consent** (surfacing objections rather than a score), or **Delphi** (anonymous rounds converging toward a shared view). Evaluation results include dispersion/dissent metrics and — for scorecard — a tornado chart of which criteria are driving the outcome, so you can see how contested a result actually was, not just the final number.
 
+### Facilitation around the lifecycle
+
+The lifecycle is a record of the decision, not a substitute for facilitation.
+Start by discovering whether there is a real decision, a named authority, and
+a genuine reason to involve other people. Frame the purpose, scope,
+participation boundary, and use of contributions before scheduling a session.
+
+In **Contribution orchestration**, a decision authority can create a session
+brief with an objective, agenda, participation guidance, facilitator,
+schedule, and invited participants. Session roles distinguish people who are
+participating from people who are observing; they do not change decision
+authority. The readiness prompt highlights missing foundations but never
+approves a process automatically.
+
+Record accessibility arrangements and the consent/attribution boundary before
+convening. These fields should state the practical language, format, timing,
+venue, assistive-technology, confidentiality, quotation, and withdrawal
+conditions that actually apply; they are not a generic compliance assertion.
+
+Build the live **run of show** from ordered activities. Each activity can name
+its purpose, method, timebox, facilitator prompt, and the output that should be
+captured. Open the session, start one queued activity, and use the elapsed-time
+display while facilitating. Only one activity can be live. Complete or skip it
+before moving on; a skipped item can be returned to the queue while the session
+is still open. A session cannot close with a live activity.
+
+Capture agreements, disagreements, actions, evidence gaps, questions, and
+participant statements during the session. When an activity is live, a new
+record links to it by default; the facilitator can select another activity or
+leave the record unlinked. This keeps synthesis traceable to the part of the
+process that produced it without altering attributable participant input.
+
+After closure, complete the **Session quality review**. Score inclusion,
+boundary clarity, facilitator neutrality, meaningful participation, and
+follow-through from one to five, then record what worked, what to improve, and
+any unresolved risks. The score is a visible facilitator reflection, not a
+judgement of participants or an automated approval.
+
+After a session, record each bounded agreement, unresolved disagreement,
+action, evidence gap, or next question as a linked contribution request with a
+named assignee and review boundary. Closed sessions remain available for this
+follow-through. This keeps the platform useful between meetings without
+turning every facilitation activity into software administration.
+
+The working service definition and validation approach are in
+`docs/facilitation-offer.md` and `docs/facilitation-validation-plan.md`.
+
 ---
 
 ## 5. AI assistance
@@ -100,6 +159,11 @@ Both run on whichever provider a platform administrator has configured — the b
 
 Foresight is a separate, upstream layer for thinking about the operating environment *before* it becomes a decision. Its building blocks:
 
+- **Research claims** — neutral propositions from internet or internal
+  research, with explicit evidence state, source relationships, limitations,
+  reversal conditions, accountable owner, review date, and a transparent
+  ten-point evidence score. The build/integrate/defer/avoid/monitor field is a
+  human recommendation, not an automated product decision.
 - **Canvas** — a workspace for one foresight exercise, with a horizon year
 - **Signals** — observed developments, tagged by STEEP category (Social, Technological, Economic, Environmental, Political, Legal, Ethical) and polarity (opportunity / threat / both / unclear)
 - **Drivers** — forces shaping the future: a trend, a general driver of change, a critical uncertainty, a predetermined element, or a wild card — each with a direction (increasing/decreasing/stable/volatile/unclear)
@@ -148,9 +212,9 @@ What you can do from here:
 - **Support access** — open a reasoned, time-bounded grant to inspect a specific tenant's detail (visible, scoped, expiring, and audited — never silent); revoke it early if needed
 - **Transfer organisation ownership** or **deactivate/reactivate an organisation**
 - **Manage pending invitations** — revoke or resend
-- **Platform settings** — the contact channels shown publicly (support, privacy, security, demo-request emails) and the maximum allowed support-access duration
+- **Platform settings** — the contact channels shown publicly (support, privacy, security, decision-enquiry emails) and the maximum allowed support-access duration
 - **AI provider** — choose the active provider (rules / Anthropic / OpenAI / Gemini), set its model identifier, store its API key (encrypted at rest, never re-displayed), and use **Test connection** to make a small live call and confirm the key actually works before relying on it
-- **Demo requests** — triage inbound requests from the public site
+- **Decision enquiries** — triage facilitation enquiries from the public site
 - **Audit** — every one of the above actions is logged here, attributed and searchable, along with the rationale you gave for it
 
 Every change here that could affect a customer requires a short, meaningful rationale (see the answer to "what does Change rationale mean" — it's what makes the audit log actually useful later, not just a record that *something* changed).

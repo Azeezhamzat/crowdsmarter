@@ -102,8 +102,8 @@ def update_workspace(
     description: str,
 ) -> Workspace:
     """Update the human-facing workspace configuration."""
-    workspace = Workspace.objects.select_for_update().select_related("organisation").get(
-        id=workspace.id
+    workspace = (
+        Workspace.objects.select_for_update().select_related("organisation").get(id=workspace.id)
     )
     _require_manager(actor=actor, organisation=workspace.organisation)
     previous = {"name": workspace.name, "description": workspace.description}

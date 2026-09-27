@@ -22,6 +22,8 @@ from rest_framework.views import APIView
 
 from .serializers import (
     CurrentUserSerializer,
+    EmailChangeConfirmSerializer,
+    EmailChangeRequestSerializer,
     LoginSerializer,
     MFACodeSerializer,
     MFADisableSerializer,
@@ -33,9 +35,11 @@ from .serializers import (
 )
 from .services import (
     begin_mfa_enrollment,
+    confirm_email_change,
     confirm_mfa_enrollment,
     disable_mfa,
     mfa_is_enabled,
+    request_email_change,
     request_password_reset,
     set_new_password,
     sign_up,
@@ -95,7 +99,9 @@ class SignupView(APIView):
         return Response(
             {
                 "user": CurrentUserSerializer(user).data,
-                "organisation": OrganisationSerializer(organisation, context={"request": request}).data,
+                "organisation": OrganisationSerializer(
+                    organisation, context={"request": request}
+                ).data,
             },
             status=status.HTTP_201_CREATED,
         )
@@ -180,6 +186,56 @@ class PasswordChangeView(APIView):
         )
         update_session_auth_hash(request, request.user)
         return Response({"detail": "Password changed successfully."})
+
+
+class EmailChangeRequestView(APIView):
+    """Require the current password, then verify a replacement email out of band."""
+
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [AccountSecurityThrottle]
+
+    def post(self, request):  # type: ignore[no-untyped-def]
+        serializer = EmailChangeRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        if not request.user.check_password(serializer.validated_data["current_password"]):
+            return Response(
+                {"current_password": ["The current password is incorrect."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        dispatch = request_email_change(
+            user=request.user,
+            new_email=serializer.validated_data["new_email"],
+        )
+        payload: dict[str, object] = {
+            "detail": "Check the new email address for a verification link."
+        }
+        if dispatch.development_url:
+            payload["development_verification_url"] = dispatch.development_url
+        response = Response(payload, status=status.HTTP_202_ACCEPTED)
+        response["Cache-Control"] = "no-store"
+        return response
+
+
+@method_decorator(csrf_protect, name="dispatch")
+class EmailChangeConfirmView(APIView):
+    """Consume a single-use token only after the recipient explicitly confirms."""
+
+    permission_classes = [AllowAny]
+    authentication_classes: list[type] = []
+    throttle_classes = [PasswordResetConfirmThrottle]
+
+    def post(self, request):  # type: ignore[no-untyped-def]
+        serializer = EmailChangeConfirmSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = confirm_email_change(token=serializer.validated_data["token"])
+        response = Response(
+            {
+                "detail": "Email address changed successfully.",
+                "email": user.email,
+            }
+        )
+        response["Cache-Control"] = "no-store"
+        return response
 
 
 @method_decorator(csrf_protect, name="dispatch")
@@ -275,9 +331,7 @@ class MFAVerifyView(APIView):
             user = User.objects.get(id=pending_user_id, is_active=True)
         except (User.DoesNotExist, ValueError):
             user = None
-        if user is None or not verify_mfa_code(
-            user=user, code=serializer.validated_data["code"]
-        ):
+        if user is None or not verify_mfa_code(user=user, code=serializer.validated_data["code"]):
             return Response(
                 {"detail": "That code is incorrect or has expired."},
                 status=status.HTTP_400_BAD_REQUEST,

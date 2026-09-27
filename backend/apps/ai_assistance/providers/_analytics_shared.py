@@ -61,7 +61,8 @@ def clean_observation(raw: dict[str, Any]) -> AnalyticsObservation | None:
     detail = str(raw.get("detail", "")).strip()
     if not title or not detail:
         return None
-    severity = raw.get("severity") if raw.get("severity") in SEVERITIES else "medium"
+    raw_severity = str(raw.get("severity", ""))
+    severity = raw_severity if raw_severity in SEVERITIES else "medium"
     return AnalyticsObservation(severity=severity, title=title, detail=detail)
 
 
@@ -72,8 +73,12 @@ def build_narrative(*, payload: dict[str, Any], provider_label: str) -> Analytic
         for raw in payload.get("observations", [])
         if (cleaned := clean_observation(raw)) is not None
     ]
-    return AnalyticsNarrative(headline=headline, observations=observations, generated_by=provider_label)
+    return AnalyticsNarrative(
+        headline=headline, observations=observations, generated_by=provider_label
+    )
 
 
 def narrative_user_message(metrics: dict[str, Any]) -> str:
-    return "Summarise these organisation decision-system metrics (JSON):\n\n" + json.dumps(metrics, default=str)
+    return "Summarise these organisation decision-system metrics (JSON):\n\n" + json.dumps(
+        metrics, default=str
+    )

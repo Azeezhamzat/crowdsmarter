@@ -2,17 +2,15 @@
 
 from __future__ import annotations
 
-from collections import Counter
+from collections import defaultdict
+from datetime import timedelta
+from decimal import Decimal
 from typing import Any
 
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import IntegrityError, transaction
-from django.utils import timezone
-
-from datetime import timedelta
-from decimal import Decimal
-
 from django.db.models import Count, Q, Sum
+from django.utils import timezone
 
 from apps.accounts.models import User
 from apps.audit.services import record_event
@@ -34,11 +32,15 @@ class DecisionOptionServiceError(ValidationError):
 
 def _active_member(*, decision: Decision, user_id: Any) -> User:
     try:
-        return Membership.objects.select_related("user").get(
-            organisation=decision.organisation,
-            user_id=user_id,
-            status=Membership.Status.ACTIVE,
-        ).user
+        return (
+            Membership.objects.select_related("user")
+            .get(
+                organisation=decision.organisation,
+                user_id=user_id,
+                status=Membership.Status.ACTIVE,
+            )
+            .user
+        )
     except Membership.DoesNotExist as exc:
         raise DecisionOptionServiceError(
             {"proposed_by_id": "The proposer must be an active organisation member."}
@@ -83,8 +85,10 @@ def create_option(
 ) -> DecisionOption:
     if not can_contribute_reasoning(actor=actor, decision=decision):
         raise PermissionDenied("You cannot add options in this decision state.")
-    proposer = actor if proposed_by_id is None else _active_member(
-        decision=decision, user_id=proposed_by_id
+    proposer = (
+        actor
+        if proposed_by_id is None
+        else _active_member(decision=decision, user_id=proposed_by_id)
     )
     option = DecisionOption(
         organisation=decision.organisation,
@@ -114,7 +118,10 @@ def create_option(
     if depends_on_ids:
         option.depends_on.set(
             _related_options(
-                decision=decision, option_id=option.id, ids=depends_on_ids, field_name="depends_on_ids"
+                decision=decision,
+                option_id=option.id,
+                ids=depends_on_ids,
+                field_name="depends_on_ids",
             )
         )
     if mutually_exclusive_with_ids:
@@ -138,12 +145,12 @@ def create_option(
 
 
 @transaction.atomic
-def update_option(
-    *, actor: User, option: DecisionOption, fields: dict[str, Any]
-) -> DecisionOption:
-    option = DecisionOption.objects.select_for_update().select_related(
-        "decision__organisation"
-    ).get(id=option.id)
+def update_option(*, actor: User, option: DecisionOption, fields: dict[str, Any]) -> DecisionOption:
+    option = (
+        DecisionOption.objects.select_for_update()
+        .select_related("decision__organisation")
+        .get(id=option.id)
+    )
     if not can_edit_reasoning(
         actor=actor,
         decision=option.decision,
@@ -200,9 +207,11 @@ def set_eligibility(
     *, actor: User, option: DecisionOption, eligibility_status: str, eligibility_note: str = ""
 ) -> DecisionOption:
     """Record an eligibility screening decision for an application/option."""
-    option = DecisionOption.objects.select_for_update().select_related(
-        "decision__organisation"
-    ).get(id=option.id)
+    option = (
+        DecisionOption.objects.select_for_update()
+        .select_related("decision__organisation")
+        .get(id=option.id)
+    )
     if not can_manage_option_eligibility(actor=actor, decision=option.decision):
         raise PermissionDenied("You cannot screen eligibility for this option.")
     before = option.eligibility_status
@@ -236,9 +245,11 @@ def set_outcome(
     outcome_note: str = "",
 ) -> DecisionOption:
     """Record a funding outcome for an application/option, decoupled from finalisation."""
-    option = DecisionOption.objects.select_for_update().select_related(
-        "decision__organisation"
-    ).get(id=option.id)
+    option = (
+        DecisionOption.objects.select_for_update()
+        .select_related("decision__organisation")
+        .get(id=option.id)
+    )
     if not can_manage_option_outcome(actor=actor, decision=option.decision):
         raise PermissionDenied("You cannot record a funding outcome for this option.")
     before = option.outcome_status
@@ -270,13 +281,23 @@ def budget_summary(*, decision: Decision) -> dict[str, Any]:
     active = DecisionOption.objects.filter(decision=decision, status=DecisionOption.Status.ACTIVE)
     totals = active.aggregate(
         requested_total=Sum("estimated_cost"),
-        awarded_total=Sum("awarded_amount", filter=Q(outcome_status=DecisionOption.OutcomeStatus.FUNDED)),
+        awarded_total=Sum(
+            "awarded_amount", filter=Q(outcome_status=DecisionOption.OutcomeStatus.FUNDED)
+        ),
         funded_count=Count("id", filter=Q(outcome_status=DecisionOption.OutcomeStatus.FUNDED)),
         declined_count=Count("id", filter=Q(outcome_status=DecisionOption.OutcomeStatus.DECLINED)),
-        pending_outcome_count=Count("id", filter=Q(outcome_status=DecisionOption.OutcomeStatus.PENDING)),
-        eligible_count=Count("id", filter=Q(eligibility_status=DecisionOption.EligibilityStatus.ELIGIBLE)),
-        ineligible_count=Count("id", filter=Q(eligibility_status=DecisionOption.EligibilityStatus.INELIGIBLE)),
-        pending_eligibility_count=Count("id", filter=Q(eligibility_status=DecisionOption.EligibilityStatus.PENDING)),
+        pending_outcome_count=Count(
+            "id", filter=Q(outcome_status=DecisionOption.OutcomeStatus.PENDING)
+        ),
+        eligible_count=Count(
+            "id", filter=Q(eligibility_status=DecisionOption.EligibilityStatus.ELIGIBLE)
+        ),
+        ineligible_count=Count(
+            "id", filter=Q(eligibility_status=DecisionOption.EligibilityStatus.INELIGIBLE)
+        ),
+        pending_eligibility_count=Count(
+            "id", filter=Q(eligibility_status=DecisionOption.EligibilityStatus.PENDING)
+        ),
     )
     return {
         "requested_total": totals["requested_total"] or Decimal("0"),
@@ -298,16 +319,22 @@ def organisation_budget_rollup(*, organisation, months: int = 6) -> dict[str, An
     general BI engine, reusing the same fields as the single-round
     budget_summary() above.
     """
-    decisions = Decision.objects.filter(organisation=organisation, source_template_key="grant_round")
+    decisions = Decision.objects.filter(
+        organisation=organisation, source_template_key="grant_round"
+    )
     active_options = DecisionOption.objects.filter(
         decision__in=decisions, status=DecisionOption.Status.ACTIVE
     )
     totals = active_options.aggregate(
         requested_total=Sum("estimated_cost"),
-        awarded_total=Sum("awarded_amount", filter=Q(outcome_status=DecisionOption.OutcomeStatus.FUNDED)),
+        awarded_total=Sum(
+            "awarded_amount", filter=Q(outcome_status=DecisionOption.OutcomeStatus.FUNDED)
+        ),
         funded_count=Count("id", filter=Q(outcome_status=DecisionOption.OutcomeStatus.FUNDED)),
         declined_count=Count("id", filter=Q(outcome_status=DecisionOption.OutcomeStatus.DECLINED)),
-        pending_outcome_count=Count("id", filter=Q(outcome_status=DecisionOption.OutcomeStatus.PENDING)),
+        pending_outcome_count=Count(
+            "id", filter=Q(outcome_status=DecisionOption.OutcomeStatus.PENDING)
+        ),
     )
 
     today = timezone.now().date()
@@ -321,7 +348,7 @@ def organisation_budget_rollup(*, organisation, months: int = 6) -> dict[str, An
     funded_options = active_options.filter(
         outcome_status=DecisionOption.OutcomeStatus.FUNDED, outcome_decided_at__isnull=False
     ).values("outcome_decided_at", "awarded_amount")
-    awarded_by_month: Counter = Counter()
+    awarded_by_month: dict[Any, Decimal] = defaultdict(Decimal)
     for row in funded_options:
         month_key = row["outcome_decided_at"].date().replace(day=1)
         awarded_by_month[month_key] += row["awarded_amount"] or Decimal("0")

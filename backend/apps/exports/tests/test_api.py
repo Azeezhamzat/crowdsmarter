@@ -4,6 +4,7 @@ import zipfile
 from datetime import timedelta
 
 import pytest
+from django.test import override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -75,7 +76,8 @@ def test_organisation_export_includes_xlsx_workbook_and_stable_content_hash(
     owner = user_factory(email="owner@example.com")
     organisation = organisation_factory(owner=owner)
     decision_factory(
-        workspace=organisation.workspaces.get(is_default=True), owner=owner,
+        workspace=organisation.workspaces.get(is_default=True),
+        owner=owner,
         title="Repeatable export decision",
     )
     api_client.force_authenticate(owner)
@@ -97,7 +99,10 @@ def test_organisation_export_includes_xlsx_workbook_and_stable_content_hash(
         headers = [cell.value for cell in sheet[1]]
         assert "title" in headers
         title_column = headers.index("title") + 1
-        titles = [row[0].value for row in sheet.iter_rows(min_row=2, min_col=title_column, max_col=title_column)]
+        titles = [
+            row[0].value
+            for row in sheet.iter_rows(min_row=2, min_col=title_column, max_col=title_column)
+        ]
         assert "Repeatable export decision" in titles
 
     with zipfile.ZipFile(io.BytesIO(bytes(second.content))) as archive:
@@ -105,7 +110,8 @@ def test_organisation_export_includes_xlsx_workbook_and_stable_content_hash(
     assert first_hash == second_hash
 
     decision_factory(
-        workspace=organisation.workspaces.get(is_default=True), owner=owner,
+        workspace=organisation.workspaces.get(is_default=True),
+        owner=owner,
         title="A newly added decision",
     )
     third = api_client.get(url)
@@ -134,12 +140,36 @@ def test_contributor_cannot_download_complete_organisation_export(
 
 
 @pytest.mark.django_db
-def test_visible_member_can_download_decision_dossier(
-    api_client, user_factory, decision_factory
-):  # type: ignore[no-untyped-def]
+def test_visible_member_can_download_decision_dossier(api_client, user_factory, decision_factory):  # type: ignore[no-untyped-def]
     decision = decision_factory(
         decision_question="Which option should we select?",
         purpose="Preserve the complete reasoning record.",
+    )
+    from apps.foresight.models import Source
+    from apps.foresight.services import (
+        create_research_claim,
+        create_source,
+        link_source_to_research_claim,
+    )
+
+    research_source = create_source(
+        actor=decision.owner,
+        organisation=decision.organisation,
+        title="Decision research",
+        source_type=Source.SourceType.RESEARCH,
+        reference="Research-1",
+    )
+    claim = create_research_claim(
+        actor=decision.owner,
+        organisation=decision.organisation,
+        statement="This decision requires a reversible implementation path.",
+        linked_decision_id=decision.id,
+    )
+    link_source_to_research_claim(
+        actor=decision.owner,
+        claim=claim,
+        source_id=research_source.id,
+        relationship="supports",
     )
     viewer = user_factory()
     Membership.objects.create(
@@ -157,6 +187,9 @@ def test_visible_member_can_download_decision_dossier(
         assert "json/decision.json" in archive.namelist()
         assert decision.title in archive.read("summary.txt").decode()
         assert "xlsx/export.xlsx" in archive.namelist()
+        assert "json/foresight_research_claims.json" in archive.namelist()
+        assert "json/foresight_research_claim_sources.json" in archive.namelist()
+        assert claim.statement in archive.read("json/foresight_research_claims.json").decode()
         manifest = json.loads(archive.read("manifest.json"))
         assert len(manifest["content_sha256"]) == 64
 
@@ -194,13 +227,19 @@ def test_outsider_cannot_discover_decision_through_export(
     )
     assert response.status_code == 404
 
+
 @pytest.mark.django_db
 def test_organisation_export_contains_foresight_metadata_and_private_file(
     api_client, organisation_factory
 ):  # type: ignore[no-untyped-def]
     from django.core.files.uploadedfile import SimpleUploadedFile
 
-    from apps.foresight.services import attach_source_file, create_source
+    from apps.foresight.services import (
+        attach_source_file,
+        create_research_claim,
+        create_source,
+        link_source_to_research_claim,
+    )
 
     organisation = organisation_factory()
     owner = organisation.created_by
@@ -222,6 +261,23 @@ def test_organisation_export_contains_foresight_metadata_and_private_file(
             content_type="application/pdf",
         ),
     )
+    claim = create_research_claim(
+        actor=owner,
+        organisation=organisation,
+        statement="The regulation changes the decision environment.",
+        state="supported",
+        authority_score=3,
+        directness_score=3,
+        recency_score=2,
+        triangulation_score=1,
+    )
+    link_source_to_research_claim(
+        actor=owner,
+        claim=claim,
+        source_id=source.id,
+        relationship="supports",
+        note="The responsible regulator issued the source.",
+    )
     api_client.force_authenticate(owner)
 
     response = api_client.get(
@@ -233,10 +289,57 @@ def test_organisation_export_contains_foresight_metadata_and_private_file(
         names = set(archive.namelist())
         assert "json/foresight_sources.json" in names
         assert "json/foresight_source_attachments.json" in names
+        assert "json/foresight_research_claims.json" in names
+        assert "csv/foresight_research_claims.csv" in names
+        assert "json/foresight_research_claim_sources.json" in names
         assert any(
-            name.startswith(f"attachments/foresight/{source.id}/{attachment.id}.")
-            for name in names
+            name.startswith(f"attachments/foresight/{source.id}/{attachment.id}.") for name in names
         )
+
+
+@pytest.mark.django_db
+@override_settings(SOURCE_ATTACHMENT_ENFORCE_CLEAN_DOWNLOADS=True)
+def test_organisation_export_omits_attachment_without_clean_scan(api_client, organisation_factory):  # type: ignore[no-untyped-def]
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    from apps.foresight.models import SourceAttachment
+    from apps.foresight.services import attach_source_file, create_source
+
+    organisation = organisation_factory()
+    owner = organisation.created_by
+    source = create_source(
+        actor=owner,
+        organisation=organisation,
+        title="Quarantined report",
+        source_type="internal",
+        reference="QUARANTINE-1",
+    )
+    attachment = attach_source_file(
+        actor=owner,
+        source=source,
+        upload=SimpleUploadedFile("report.txt", b"Initially clean", content_type="text/plain"),
+    )
+    SourceAttachment.objects.filter(id=attachment.id).update(
+        malware_scan_status=SourceAttachment.ScanStatus.INFECTED
+    )
+    api_client.force_authenticate(owner)
+
+    response = api_client.get(
+        reverse("exports:organisation-complete", kwargs={"organisation_id": organisation.id})
+    )
+
+    assert response.status_code == 200
+    with zipfile.ZipFile(io.BytesIO(bytes(response.content))) as archive:
+        attachment_entries = [
+            name
+            for name in archive.namelist()
+            if name.startswith(f"attachments/foresight/{source.id}/{attachment.id}.")
+        ]
+        assert attachment_entries == [
+            f"attachments/foresight/{source.id}/{attachment.id}.unavailable.txt"
+        ]
+        assert b"not been verified as malware-free" in archive.read(attachment_entries[0])
+
 
 @pytest.mark.django_db
 def test_organisation_export_preserves_systems_mapping_and_feedback_loop_order(
@@ -303,9 +406,7 @@ def test_organisation_export_preserves_systems_mapping_and_feedback_loop_order(
         assert "json/foresight_drivers.json" in names
         assert "json/foresight_feedback_loops.json" in names
         assert "json/foresight_feedback_loop_drivers.json" in names
-        links = json.loads(
-            archive.read("json/foresight_feedback_loop_drivers.json").decode()
-        )
+        links = json.loads(archive.read("json/foresight_feedback_loop_drivers.json").decode())
         ordered = sorted(
             (item for item in links if item["feedback_loop"] == str(loop.id)),
             key=lambda item: item["position"],
@@ -326,14 +427,22 @@ def test_organisation_export_includes_open_session_ideation_data_without_token_d
     organisation = organisation_factory()
     owner = organisation.created_by
     session = ideation_services.create_session(
-        actor=owner, organisation=organisation, title="Ideathon", prompt="What should we try?",
+        actor=owner,
+        organisation=organisation,
+        title="Ideathon",
+        prompt="What should we try?",
     )
     session = ideation_services.open_session(actor=owner, session=session)
     participant, _token = ideation_services.identify_participant(
-        session=session, name="External participant", email="participant@example.com",
+        session=session,
+        name="External participant",
+        email="participant@example.com",
     )
     idea = ideation_services.submit_idea(
-        session=session, participant=participant, title="A promising idea", description="Details.",
+        session=session,
+        participant=participant,
+        title="A promising idea",
+        description="Details.",
     )
     ideation_services.cast_vote(idea=idea, participant=participant)
 
@@ -366,12 +475,17 @@ def test_decision_export_scopes_open_sessions_to_that_decision(
     decision = decision_factory()
     owner = decision.organisation.created_by
     linked_session = ideation_services.create_session(
-        actor=owner, organisation=decision.organisation, decision=decision,
-        title="Community input", prompt="What matters here?",
+        actor=owner,
+        organisation=decision.organisation,
+        decision=decision,
+        title="Community input",
+        prompt="What matters here?",
     )
     ideation_services.create_session(
-        actor=owner, organisation=decision.organisation,
-        title="Unrelated ideathon", prompt="Something else entirely",
+        actor=owner,
+        organisation=decision.organisation,
+        title="Unrelated ideathon",
+        prompt="Something else entirely",
     )
 
     archive = build_decision_export(decision=decision)
@@ -392,27 +506,45 @@ def test_grant_round_export_includes_budget_summary_and_award_letters(
     decision = decision_factory(source_template_key="grant_round", title="2026 community round")
     owner = decision.owner
     session = ideation_services.create_session(
-        actor=owner, organisation=decision.organisation, decision=decision,
-        title="Round intake", prompt="Applications?",
+        actor=owner,
+        organisation=decision.organisation,
+        decision=decision,
+        title="Round intake",
+        prompt="Applications?",
     )
     session = ideation_services.open_session(actor=owner, session=session)
     participant, _token = ideation_services.identify_participant(
-        session=session, name="Ada Lovelace", email="ada@example.com",
+        session=session,
+        name="Ada Lovelace",
+        email="ada@example.com",
     )
     idea = ideation_services.submit_idea(
-        session=session, participant=participant, title="Community garden expansion",
-        description="Expand shared plots.", requested_amount="1000.00",
+        session=session,
+        participant=participant,
+        title="Community garden expansion",
+        description="Expand shared plots.",
+        requested_amount="1000.00",
     )
-    funded_option = ideation_services.promote_idea_to_decision(actor=owner, idea=idea, decision=decision)
+    funded_option = ideation_services.promote_idea_to_decision(
+        actor=owner, idea=idea, decision=decision
+    )
     set_outcome(
-        actor=owner, option=funded_option, outcome_status=DecisionOption.OutcomeStatus.FUNDED,
-        awarded_amount="800.00", outcome_note="Congratulations.",
+        actor=owner,
+        option=funded_option,
+        outcome_status=DecisionOption.OutcomeStatus.FUNDED,
+        awarded_amount="800.00",
+        outcome_note="Congratulations.",
     )
     declined_option = create_option(
-        actor=owner, decision=decision, title="Directly created application", description="Desc.",
+        actor=owner,
+        decision=decision,
+        title="Directly created application",
+        description="Desc.",
         estimated_cost="500.00",
     )
-    set_outcome(actor=owner, option=declined_option, outcome_status=DecisionOption.OutcomeStatus.DECLINED)
+    set_outcome(
+        actor=owner, option=declined_option, outcome_status=DecisionOption.OutcomeStatus.DECLINED
+    )
 
     archive = build_decision_export(decision=decision)
     with zipfile.ZipFile(io.BytesIO(archive.content)) as zf:
@@ -424,7 +556,9 @@ def test_grant_round_export_includes_budget_summary_and_award_letters(
         letter_names = [n for n in names if n.startswith("letters/")]
         assert len(letter_names) == 2
 
-        funded_letter = zf.read(f"letters/{funded_option.title.lower().replace(' ', '-')}.txt").decode()
+        funded_letter = zf.read(
+            f"letters/{funded_option.title.lower().replace(' ', '-')}.txt"
+        ).decode()
         assert "Ada Lovelace" in funded_letter
         assert "800.00" in funded_letter
         assert "ada@example.com" in funded_letter
@@ -433,3 +567,63 @@ def test_grant_round_export_includes_budget_summary_and_award_letters(
             f"letters/{declined_option.title.lower().replace(' ', '-')}.txt"
         ).decode()
         assert "was not funded" in declined_letter
+
+
+@pytest.mark.django_db
+def test_decision_dossier_includes_printable_report_without_confidential_identity(
+    decision_factory,
+):  # type: ignore[no-untyped-def]
+    from apps.contributions.services import (
+        create_facilitation_record,
+        create_session,
+        update_agenda_item_status,
+        update_session_status,
+    )
+    from apps.exports.services import build_decision_export
+
+    decision = decision_factory(status="open_for_contribution", title="Access decision")
+    session = create_session(
+        actor=decision.owner,
+        decision=decision,
+        title="Access workshop",
+        objective="Understand access barriers.",
+        participation_channels=["phone"],
+        agenda_items=[
+            {
+                "title": "Surface access barriers",
+                "method": "Confidential telephone input",
+                "planned_minutes": 20,
+            }
+        ],
+    )
+    session = update_session_status(actor=decision.owner, session=session, status="open")
+    agenda_item = update_agenda_item_status(
+        actor=decision.owner, item=session.agenda_items.get(), action="start"
+    )
+    create_facilitation_record(
+        actor=decision.owner,
+        session=session,
+        kind="participant_statement",
+        body="Evening access creates a safety concern.",
+        channel="phone",
+        origin="participant_input",
+        attribution="confidential",
+        speaker_label="Protected participant identity",
+        agenda_item_id=agenda_item.id,
+    )
+
+    export = build_decision_export(decision=decision)
+    with zipfile.ZipFile(io.BytesIO(export.content)) as archive:
+        records = json.loads(archive.read("json/facilitation_records.json"))
+        agenda_items = json.loads(archive.read("json/facilitation_agenda_items.json"))
+        assert agenda_items[0]["title"] == "Surface access barriers"
+        assert records[0]["speaker_label"] == ""
+        assert records[0]["source_participant"] is None
+        report_name = next(
+            name for name in archive.namelist() if name.startswith("reports/facilitation-")
+        )
+        report = archive.read(report_name).decode("utf-8")
+        assert "Evening access creates a safety concern." in report
+        assert "Confidential participant input" in report
+        assert "Surface access barriers" in report
+        assert "Protected participant identity" not in report

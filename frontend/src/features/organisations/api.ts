@@ -1,5 +1,11 @@
 import { apiRequest } from "../../lib/api";
-import type { Membership, Organisation, OrganisationRole } from "../../lib/types";
+import type {
+  Membership,
+  MembershipEvent,
+  Organisation,
+  OrganisationDeletionRequest,
+  OrganisationRole,
+} from "../../lib/types";
 
 export function listOrganisations(): Promise<Organisation[]> {
   return apiRequest<Organisation[]>("/organisations/");
@@ -51,7 +57,7 @@ export function updateOrganisationAdministration(
 }
 
 export function listMembershipHistory(organisationId: string) {
-  return apiRequest<import("../../lib/types").MembershipEvent[]>(`/organisations/${organisationId}/membership-history/`);
+  return apiRequest<MembershipEvent[]>(`/organisations/${organisationId}/membership-history/`);
 }
 
 export function transferOrganisationOwnership(
@@ -82,14 +88,14 @@ export function reactivateOrganisation(organisationId: string, rationale: string
 }
 
 export function listOrganisationDeletionRequests(organisationId: string) {
-  return apiRequest<import("../../lib/types").OrganisationDeletionRequest[]>(`/organisations/${organisationId}/deletion-requests/`);
+  return apiRequest<OrganisationDeletionRequest[]>(`/organisations/${organisationId}/deletion-requests/`);
 }
 
 export function requestOrganisationDeletion(
   organisationId: string,
   input: { confirmation: string; reason: string },
 ) {
-  return apiRequest<import("../../lib/types").OrganisationDeletionRequest>(`/organisations/${organisationId}/deletion-requests/`, {
+  return apiRequest<OrganisationDeletionRequest>(`/organisations/${organisationId}/deletion-requests/`, {
     method: "POST",
     body: JSON.stringify(input),
   });

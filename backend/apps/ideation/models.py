@@ -67,8 +67,12 @@ class OpenSession(UUIDTimeStampedModel):
     class Meta:
         ordering = ["-created_at", "id"]
         constraints = [
-            models.CheckConstraint(condition=~models.Q(title=""), name="open_session_title_not_empty"),
-            models.CheckConstraint(condition=~models.Q(public_slug=""), name="open_session_slug_not_empty"),
+            models.CheckConstraint(
+                condition=~models.Q(title=""), name="open_session_title_not_empty"
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(public_slug=""), name="open_session_slug_not_empty"
+            ),
             models.CheckConstraint(
                 condition=models.Q(status__in=["draft", "open", "closed", "archived"]),
                 name="open_session_status_valid",
@@ -126,8 +130,12 @@ class SessionParticipant(UUIDTimeStampedModel):
     class Meta:
         ordering = ["created_at", "id"]
         constraints = [
-            models.CheckConstraint(condition=~models.Q(name=""), name="session_participant_name_not_empty"),
-            models.CheckConstraint(condition=~models.Q(email=""), name="session_participant_email_not_empty"),
+            models.CheckConstraint(
+                condition=~models.Q(name=""), name="session_participant_name_not_empty"
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(email=""), name="session_participant_email_not_empty"
+            ),
             models.UniqueConstraint(
                 fields=["session", "email"],
                 name="unique_participant_per_session_email",
@@ -203,7 +211,9 @@ class Idea(UUIDTimeStampedModel):
             models.CheckConstraint(
                 condition=(
                     models.Q(submitted_by_participant__isnull=False, submitted_by_user__isnull=True)
-                    | models.Q(submitted_by_participant__isnull=True, submitted_by_user__isnull=False)
+                    | models.Q(
+                        submitted_by_participant__isnull=True, submitted_by_user__isnull=False
+                    )
                 ),
                 name="idea_submitter_exactly_one_identity",
             ),
@@ -250,7 +260,9 @@ class IdeaTeamMember(UUIDTimeStampedModel):
     class Meta:
         ordering = ["created_at", "id"]
         constraints = [
-            models.CheckConstraint(condition=~models.Q(name=""), name="idea_team_member_name_not_empty"),
+            models.CheckConstraint(
+                condition=~models.Q(name=""), name="idea_team_member_name_not_empty"
+            ),
         ]
 
     def clean(self) -> None:
@@ -285,7 +297,9 @@ class IdeaComment(UUIDTimeStampedModel):
     class Meta:
         ordering = ["created_at", "id"]
         constraints = [
-            models.CheckConstraint(condition=~models.Q(body=""), name="idea_comment_body_not_empty"),
+            models.CheckConstraint(
+                condition=~models.Q(body=""), name="idea_comment_body_not_empty"
+            ),
             models.CheckConstraint(
                 condition=(
                     models.Q(participant__isnull=False, user__isnull=True)

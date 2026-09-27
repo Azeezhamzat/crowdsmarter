@@ -26,15 +26,15 @@ def _can_curate(*, actor: User, decision: Decision) -> bool:
 
 @transaction.atomic
 def create_lesson(*, actor: User, decision: Decision, **fields: Any) -> Lesson:
-    current = Decision.objects.select_for_update().select_related(
-        "organisation", "owner"
-    ).get(id=decision.id)
+    current = (
+        Decision.objects.select_for_update()
+        .select_related("organisation", "owner")
+        .get(id=decision.id)
+    )
     if not _can_curate(actor=actor, decision=current):
         raise PermissionDenied("You cannot curate lessons for this decision.")
     if current.status != Decision.Status.LESSONS_LEARNED:
-        raise LessonServiceError(
-            "Lessons can be added only after the outcome review is complete."
-        )
+        raise LessonServiceError("Lessons can be added only after the outcome review is complete.")
     lesson = Lesson(
         organisation=current.organisation,
         decision=current,
@@ -60,9 +60,11 @@ def create_lesson(*, actor: User, decision: Decision, **fields: Any) -> Lesson:
 
 @transaction.atomic
 def update_lesson(*, actor: User, lesson: Lesson, fields: dict[str, Any]) -> Lesson:
-    current = Lesson.objects.select_for_update().select_related(
-        "decision", "organisation", "decision__owner"
-    ).get(id=lesson.id)
+    current = (
+        Lesson.objects.select_for_update()
+        .select_related("decision", "organisation", "decision__owner")
+        .get(id=lesson.id)
+    )
     if not _can_curate(actor=actor, decision=current.decision):
         raise PermissionDenied("You cannot edit this lesson.")
     if current.decision.status != Decision.Status.LESSONS_LEARNED:
@@ -91,9 +93,11 @@ def update_lesson(*, actor: User, lesson: Lesson, fields: dict[str, Any]) -> Les
 
 @transaction.atomic
 def retire_lesson(*, actor: User, lesson: Lesson) -> Lesson:
-    current = Lesson.objects.select_for_update().select_related(
-        "decision", "organisation", "decision__owner"
-    ).get(id=lesson.id)
+    current = (
+        Lesson.objects.select_for_update()
+        .select_related("decision", "organisation", "decision__owner")
+        .get(id=lesson.id)
+    )
     if not _can_curate(actor=actor, decision=current.decision):
         raise PermissionDenied("You cannot retire this lesson.")
     if current.decision.status != Decision.Status.LESSONS_LEARNED:
@@ -117,9 +121,11 @@ def retire_lesson(*, actor: User, lesson: Lesson) -> Lesson:
 def archive_decision(
     *, actor: User, decision: Decision, expected_status: str, rationale: str
 ) -> None:
-    current = Decision.objects.select_for_update().select_related(
-        "organisation", "owner"
-    ).get(id=decision.id)
+    current = (
+        Decision.objects.select_for_update()
+        .select_related("organisation", "owner")
+        .get(id=decision.id)
+    )
     if not _can_curate(actor=actor, decision=current):
         raise PermissionDenied("You do not hold lifecycle authority for this decision.")
     if current.status != expected_status:

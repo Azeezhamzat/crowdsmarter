@@ -1,12 +1,11 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useState } from "react";
-import { useFieldArray, useForm } from "react-hook-form";
+import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import { Link, useParams } from "react-router";
 import { z } from "zod";
 
 import { FieldError } from "../../components/FieldError";
-import { LanguageSwitcher } from "../../components/LanguageSwitcher";
 import { LogoMark } from "../../components/Logo";
 import { StatusMessage } from "../../components/StatusMessage";
 import { ApiError } from "../../lib/api";
@@ -91,21 +90,6 @@ function commenterLabel(comment: Idea["comments"][number]): string {
     return name || comment.submitted_by_user.email;
   }
   return "Someone";
-}
-
-function ApplicationStatusBlock({ status }: { status: NonNullable<Idea["application_status"]> }) {
-  return (
-    <div className="idea-card__status">
-      <span className={`status-badge status-badge--${status.eligibility_status}`}>
-        {status.eligibility_status_label}
-      </span>
-      <span className={`status-badge status-badge--${status.outcome_status}`}>
-        {status.outcome_status_label}
-        {status.outcome_status === "funded" && status.awarded_amount ? ` · ${status.awarded_amount}` : ""}
-      </span>
-      {status.outcome_note ? <p className="muted">{status.outcome_note}</p> : null}
-    </div>
-  );
 }
 
 function CommentThread({
@@ -199,7 +183,6 @@ function IdeaCard({
         <small className="muted">
           {submitterLabel(idea)} · {idea.status_label}
         </small>
-        {idea.application_status ? <ApplicationStatusBlock status={idea.application_status} /> : null}
         <CommentThread idea={idea} canComment={canComment} onComment={onComment} isPending={commentPending} />
       </div>
       {canVote ? (
@@ -251,7 +234,7 @@ export function OpenSessionPublicPage() {
       guardian_consent_given: false,
     },
   });
-  const declaredAgeBracket = joinForm.watch("age_bracket");
+  const declaredAgeBracket = useWatch({ control: joinForm.control, name: "age_bracket" });
   const isDeclaredMinor = MINOR_AGE_BRACKETS.has(declaredAgeBracket);
   const join = useMutation({
     mutationFn: (values: JoinForm) => joinSession(publicSlug, values),
@@ -300,9 +283,8 @@ export function OpenSessionPublicPage() {
       <header className="demo-request-header">
         <Link className="public-brand" to="/" aria-label="CrowdSmarter home">
           <LogoMark size={38} />
-          <span><strong>CrowdSmarter</strong><small>Foresight. Collective intelligence. Decisions.</small></span>
+          <span><strong>CrowdSmarter</strong><small>Facilitation. Systems. Collective intelligence.</small></span>
         </Link>
-        <LanguageSwitcher />
       </header>
 
       {session.isPending ? <p>Loading this session…</p> : null}
@@ -473,12 +455,12 @@ export function OpenSessionPublicPage() {
                   <IdeaCard
                     key={idea.id}
                     idea={idea}
-                    canVote={hasToken && session.data!.status === "open" && session.data!.voting_enabled}
+                    canVote={hasToken && session.data.status === "open" && session.data.voting_enabled}
                     isPending={vote.isPending || unvote.isPending}
                     onVote={() => vote.mutate(idea.id)}
                     onUnvote={() => unvote.mutate(idea.id)}
                     amountFieldLabel={terms.amountFieldLabel}
-                    canComment={hasToken && session.data!.status === "open"}
+                    canComment={hasToken && session.data.status === "open"}
                     onComment={(body) => comment.mutate({ ideaId: idea.id, body })}
                     commentPending={comment.isPending}
                   />

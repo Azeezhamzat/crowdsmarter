@@ -40,13 +40,19 @@ class DecisionMethod(UUIDTimeStampedModel):
     class Meta:
         ordering = ["name", "id"]
         constraints = [
-            models.UniqueConstraint(fields=["organisation", "key"], name="unique_method_key_per_org"),
+            models.UniqueConstraint(
+                fields=["organisation", "key"], name="unique_method_key_per_org"
+            ),
             models.CheckConstraint(
                 condition=models.Q(status__in=["draft", "approved", "retired"]),
                 name="decision_method_status_valid",
             ),
-            models.CheckConstraint(condition=~models.Q(name=""), name="decision_method_name_not_empty"),
-            models.CheckConstraint(condition=~models.Q(summary=""), name="decision_method_summary_not_empty"),
+            models.CheckConstraint(
+                condition=~models.Q(name=""), name="decision_method_name_not_empty"
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(summary=""), name="decision_method_summary_not_empty"
+            ),
         ]
         indexes = [
             models.Index(fields=["organisation", "status", "name"], name="method_org_status_idx"),
@@ -60,16 +66,27 @@ class DecisionMethod(UUIDTimeStampedModel):
         self.best_for = self.best_for.strip()
         if self.current_version_id:
             if self.current_version.method_id != self.id:
-                raise ValidationError({"current_version": "The current version must belong to this method."})
-            allowed_current_statuses = (
-                {DecisionMethodVersion.Status.APPROVED}
+                raise ValidationError(
+                    {"current_version": "The current version must belong to this method."}
+                )
+            allowed_current_statuses: set[str] = (
+                {str(DecisionMethodVersion.Status.APPROVED)}
                 if self.status == self.Status.APPROVED
-                else {DecisionMethodVersion.Status.APPROVED, DecisionMethodVersion.Status.RETIRED}
+                else {
+                    str(DecisionMethodVersion.Status.APPROVED),
+                    str(DecisionMethodVersion.Status.RETIRED),
+                }
             )
             if self.current_version.status not in allowed_current_statuses:
-                raise ValidationError({"current_version": "The current version must be an approved or retired governed version."})
+                raise ValidationError(
+                    {
+                        "current_version": "The current version must be an approved or retired governed version."
+                    }
+                )
         if self.status == self.Status.APPROVED and not self.current_version_id:
-            raise ValidationError({"current_version": "Approved methods require a current version."})
+            raise ValidationError(
+                {"current_version": "Approved methods require a current version."}
+            )
 
     def __str__(self) -> str:
         return self.name
@@ -85,7 +102,9 @@ class DecisionMethodVersion(UUIDTimeStampedModel):
 
     method = models.ForeignKey(DecisionMethod, on_delete=models.CASCADE, related_name="versions")
     organisation = models.ForeignKey(
-        "organisations.Organisation", on_delete=models.CASCADE, related_name="decision_method_versions"
+        "organisations.Organisation",
+        on_delete=models.CASCADE,
+        related_name="decision_method_versions",
     )
     version = models.PositiveSmallIntegerField()
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT)
@@ -108,7 +127,9 @@ class DecisionMethodVersion(UUIDTimeStampedModel):
     lifecycle_expectations = models.JSONField(default=list, blank=True)
     cloned_from_builtin_key = models.CharField(max_length=80, blank=True)
     created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_decision_method_versions"
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="created_decision_method_versions",
     )
     approved_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -133,34 +154,68 @@ class DecisionMethodVersion(UUIDTimeStampedModel):
             ),
         ]
         indexes = [
-            models.Index(fields=["organisation", "status", "-version"], name="method_ver_org_status_idx"),
+            models.Index(
+                fields=["organisation", "status", "-version"], name="method_ver_org_status_idx"
+            ),
         ]
 
     def clean(self) -> None:
         super().clean()
         for field in (
-            "question_prompt", "purpose_prompt", "context_prompt", "scope_prompt", "contribution_prompt"
+            "question_prompt",
+            "purpose_prompt",
+            "context_prompt",
+            "scope_prompt",
+            "contribution_prompt",
         ):
             value = getattr(self, field).strip()
             setattr(self, field, value)
             if not value:
                 raise ValidationError({field: "This prompt cannot be empty."})
-        if self.method_id and self.organisation_id and self.method.organisation_id != self.organisation_id:
-            raise ValidationError({"organisation": "The version must share the method organisation."})
-        allowed_fields = {"decision_question", "purpose", "context", "scope", "contribution_guidance"}
-        if not isinstance(self.required_fields, list) or not set(self.required_fields).issubset(allowed_fields):
+        if (
+            self.method_id
+            and self.organisation_id
+            and self.method.organisation_id != self.organisation_id
+        ):
+            raise ValidationError(
+                {"organisation": "The version must share the method organisation."}
+            )
+        allowed_fields = {
+            "decision_question",
+            "purpose",
+            "context",
+            "scope",
+            "contribution_guidance",
+        }
+        if not isinstance(self.required_fields, list) or not set(self.required_fields).issubset(
+            allowed_fields
+        ):
             raise ValidationError({"required_fields": "Choose only supported framing fields."})
         for field in (
-            "checklist", "evidence_prompts", "assumption_prompts", "risk_prompts",
-            "stakeholder_prompts", "lifecycle_expectations",
+            "checklist",
+            "evidence_prompts",
+            "assumption_prompts",
+            "risk_prompts",
+            "stakeholder_prompts",
+            "lifecycle_expectations",
         ):
             value = getattr(self, field)
-            if not isinstance(value, list) or any(not isinstance(item, str) or not item.strip() for item in value):
+            if not isinstance(value, list) or any(
+                not isinstance(item, str) or not item.strip() for item in value
+            ):
                 raise ValidationError({field: "Provide a list of non-empty text prompts."})
-        if self.status in {self.Status.APPROVED, self.Status.RETIRED} and (not self.approved_by_id or not self.approved_at):
-            raise ValidationError({"approved_by": "Approved and retired versions require preserved human approval attribution."})
+        if self.status in {self.Status.APPROVED, self.Status.RETIRED} and (
+            not self.approved_by_id or not self.approved_at
+        ):
+            raise ValidationError(
+                {
+                    "approved_by": "Approved and retired versions require preserved human approval attribution."
+                }
+            )
         if self.status == self.Status.DRAFT and (self.approved_by_id or self.approved_at):
-            raise ValidationError({"approved_by": "Draft versions cannot contain approval attribution."})
+            raise ValidationError(
+                {"approved_by": "Draft versions cannot contain approval attribution."}
+            )
 
     def __str__(self) -> str:
         return f"{self.method.name} v{self.version}"
@@ -170,7 +225,9 @@ class DecisionMethodUsage(UUIDTimeStampedModel):
     """Immutable record that a decision began from one approved method version."""
 
     organisation = models.ForeignKey(
-        "organisations.Organisation", on_delete=models.PROTECT, related_name="decision_method_usages"
+        "organisations.Organisation",
+        on_delete=models.PROTECT,
+        related_name="decision_method_usages",
     )
     method_version = models.ForeignKey(
         DecisionMethodVersion, on_delete=models.PROTECT, related_name="usages"
@@ -184,14 +241,24 @@ class DecisionMethodUsage(UUIDTimeStampedModel):
 
     class Meta:
         ordering = ["-created_at", "id"]
-        indexes = [models.Index(fields=["organisation", "-created_at"], name="method_usage_org_idx")]
+        indexes = [
+            models.Index(fields=["organisation", "-created_at"], name="method_usage_org_idx")
+        ]
 
     def clean(self) -> None:
         super().clean()
         if self.method_version_id and self.organisation_id:
             if self.method_version.organisation_id != self.organisation_id:
-                raise ValidationError({"organisation": "The usage must share the method organisation."})
+                raise ValidationError(
+                    {"organisation": "The usage must share the method organisation."}
+                )
             if self.method_version.status != DecisionMethodVersion.Status.APPROVED:
-                raise ValidationError({"method_version": "Only approved method versions can be applied."})
-        if self.decision_id and self.organisation_id and self.decision.organisation_id != self.organisation_id:
+                raise ValidationError(
+                    {"method_version": "Only approved method versions can be applied."}
+                )
+        if (
+            self.decision_id
+            and self.organisation_id
+            and self.decision.organisation_id != self.organisation_id
+        ):
             raise ValidationError({"decision": "The decision must share the method organisation."})

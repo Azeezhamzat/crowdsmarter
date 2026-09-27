@@ -335,10 +335,14 @@ Returns a tenant-scoped read model containing lifecycle progress, next action, f
 |---|---|---|
 | PATCH | `/auth/me/` | Update the authenticated user's first and last name |
 | POST | `/auth/password/change/` | Change the password after checking the current password |
+| POST | `/auth/email/change/` | Send a verification link to a replacement email after checking the current password |
+| POST | `/auth/email/change/confirm/` | Consume a short-lived, single-use email verification token |
 | POST | `/auth/password/reset/` | Request a generic, non-enumerating recovery response |
 | POST | `/auth/password/reset/confirm/` | Validate a time-limited token and set a new password |
 
 The reset-request response is deliberately identical for registered and unregistered email addresses. In local debug mode it may include `development_reset_url` so console-email installations remain usable without external infrastructure.
+
+Email changes do not take effect at request time. The proposed address receives a URL-fragment token, the old address receives a security notice, and the recipient must explicitly press the confirmation button so automated link scanners cannot consume the token. A newer request invalidates every earlier pending link. Local debug responses may include `development_verification_url`.
 
 ## Phase 10 customer exports
 
@@ -357,7 +361,9 @@ All endpoints require an authenticated Django session and active organisation me
 
 - `GET /api/v1/organisations/{organisation_id}/foresight/overview/`
 
-Returns active signal, source, watchlist, high-attention, STEEP, and horizon counts plus the caller's contribution capability.
+Returns active signal, source, research-claim, watchlist, high-attention,
+evidence-gap, review-due, STEEP, and horizon counts plus the caller's
+contribution capability.
 
 ### RSS and Atom feeds
 
@@ -374,6 +380,27 @@ Synchronisation is manual and throttled. Feed entries create unassessed sources 
 - `GET /api/v1/foresight/attachments/{attachment_id}/download/`
 
 Attachment uploads use multipart form data with a `file` field. Downloads are tenant-authorised, audited, and returned with private no-store headers.
+
+Sources also preserve optional access date, jurisdiction, archived URL,
+verification time, and freshness-review date. A non-unassessed credibility
+assessment records the verification time; updating reference or credibility
+fields refreshes it.
+
+### Research claims
+
+- `GET|POST /api/v1/organisations/{organisation_id}/foresight/research-claims/`
+- `GET|PATCH /api/v1/foresight/research-claims/{claim_id}/`
+- `POST /api/v1/foresight/research-claims/{claim_id}/sources/`
+- `DELETE /api/v1/foresight/research-claims/{claim_id}/sources/{source_id}/`
+
+A claim records one neutral proposition, evidence state, product
+recommendation, relevance, claim-level evidence score, limitations,
+assumptions, reversal condition, expected observable result, owner, review
+date, lifecycle, and optional same-tenant decision. Source links explicitly
+state `supports`, `contradicts`, or `context`; posting the same source again
+updates that relationship. Scores are transparent inputs—authority 0–3,
+directness 0–3, recency 0–2, and triangulation 0–2—and do not assert legal
+compliance, effectiveness, or product-market fit.
 
 ### Signals
 
@@ -486,13 +513,13 @@ Issue creation accepts a bounded issue type, title, description, severity, activ
 
 Quality-review answer keys are limited to the published checklist contract. A draft may only transition to `published`. An executive-summary draft may only transition to `approved`. Published, approved, and superseded records reject mutation.
 
-## Public demo requests
+## Public decision enquiries
 
 | Method | Path | Purpose | Access |
 |---|---|---|---|
-| POST | `/public/demo-requests/` | Store a prospective-customer request for a tailored demonstration | Public, CSRF protected, rate limited |
+| POST | `/public/demo-requests/` | Store a prospective-client decision enquiry for facilitation discovery | Public, CSRF protected, rate limited |
 
-Accepted fields are `full_name`, `work_email`, `organisation_name`, `job_title`, `organisation_size`, `primary_need`, `message`, `consent_to_contact`, and the blank anti-spam field `website`. Unknown fields are rejected. A successful response is `202 Accepted` with a reference identifier. The endpoint does not create an account, organisation, membership, or marketing subscription.
+Accepted fields are `full_name`, `work_email`, `organisation_name`, `job_title`, `organisation_size`, `primary_need`, `message`, `consent_to_contact`, and the blank anti-spam field `website`. The public form asks for a problem area and a short description of the real decision so the first conversation can be prepared; the API retains its compatible field contract. Unknown fields are rejected. A successful response is `202 Accepted` with a reference identifier. The endpoint does not create an account, organisation, membership, or marketing subscription.
 
 ## Phase 16 contribution-orchestration API
 
@@ -504,8 +531,12 @@ All routes require the normal session-authenticated, CSRF-protected API boundary
 - `PUT /api/v1/contribution-requests/{request_id}/draft/` — create or replace the assignee's mutable draft.
 - `POST /api/v1/contribution-requests/{request_id}/submit/` — create an immutable submitted revision.
 - `POST /api/v1/contribution-requests/{request_id}/review/` — append an accepted, returned, or comment review.
-- `GET|POST /api/v1/decisions/{decision_id}/facilitation-sessions/` — list or schedule structured sessions.
+- `GET|POST /api/v1/decisions/{decision_id}/facilitation-sessions/` — list or schedule structured sessions. Creation accepts an objective, agenda, participation guidance, facilitator, schedule, `participants: [{"user_id": "...", "role": "participant" | "observer"}]`, and ordered `agenda_items` containing an activity, purpose, method, timebox, facilitator prompt, and expected output. The older `participant_ids` list remains accepted as participant-role invitations for compatible clients.
 - `POST /api/v1/facilitation-sessions/{session_id}/status/` — perform a valid forward session transition.
+- `POST /api/v1/facilitation-sessions/{session_id}/agenda-items/` — append a timed activity to a planned or open run-of-show.
+- `POST /api/v1/facilitation-agenda-items/{item_id}/actions/` — start, complete, skip, or return an item to the queue. Only one agenda item may be live in a session, and a session cannot close while one remains live.
+- `POST /api/v1/facilitation-sessions/{session_id}/records/` — append a provenance-aware agreement, disagreement, action, evidence gap, next question, or participant statement. `agenda_item_id` optionally ties the output to the run-of-show activity that produced it.
+- `PUT /api/v1/facilitation-sessions/{session_id}/quality-review/` — create or update the facilitator's post-session inclusion, boundary-clarity, neutrality, meaningful-participation, and follow-through review. The session must be closed; scores are bounded from one to five and accompanied by qualitative learning.
 - `POST /api/v1/facilitation-participants/{participant_id}/attendance/` — record workshop attendance.
 - `GET /api/v1/contributions/my-work/` — return current assignee and explicit reviewer work across visible organisations.
 - `GET|PATCH /api/v1/organisations/{organisation_id}/contribution-preferences/` — read or update the current user's delivery settings.

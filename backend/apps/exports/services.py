@@ -14,6 +14,7 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
+from django.conf import settings
 from django.db import models
 from django.utils import timezone
 from django.utils.text import slugify
@@ -25,39 +26,88 @@ from apps.assumptions.models import Assumption
 from apps.audit.models import AuditEvent
 from apps.collaboration.models import DiscussionEntry
 from apps.contributions.models import (
-    ContributionPreference, ContributionRequest, ContributionReview,
-    ContributionSubmission, FacilitationSession, SessionParticipant,
+    ContributionPreference,
+    ContributionRequest,
+    ContributionReview,
+    ContributionSubmission,
+    FacilitationAgendaItem,
+    FacilitationAuthorityResponse,
+    FacilitationQualityReview,
+    FacilitationRecord,
+    FacilitationSession,
+    SessionParticipant,
+)
+from apps.contributions.reports import build_facilitation_report_html
+from apps.decision_analysis.models import (
+    DecisionIssue,
+    DecisionQualityReview,
+    ExecutiveDecisionSummary,
 )
 from apps.decision_options.models import DecisionOption
 from apps.decision_options.services import budget_summary
-from apps.decision_analysis.models import DecisionIssue, DecisionQualityReview, ExecutiveDecisionSummary
 from apps.decisions.models import Decision, DecisionFinalisation, DecisionTransition
-from apps.evidence.models import Evidence
 from apps.evaluations.models import (
-    EvaluationCriterion, EvaluationExercise, EvaluationResponse, EvaluationRound,
-    EvaluationSubmission, MinorityReport, PortfolioAssessment, PortfolioCandidate,
-    PortfolioCriterion, PortfolioSelection, PrioritisationPortfolio,
+    EvaluationCriterion,
+    EvaluationExercise,
+    EvaluationResponse,
+    EvaluationRound,
+    EvaluationSubmission,
+    MinorityReport,
+    PortfolioAssessment,
+    PortfolioCandidate,
+    PortfolioCriterion,
+    PortfolioSelection,
+    PrioritisationPortfolio,
 )
-from apps.invitations.models import OrganisationInvitation
+from apps.evidence.models import Evidence
 from apps.foresight.models import (
-    CausalRelationship, Driver, DriverSignal, FeedbackLoop, FeedbackLoopDriver, FeedSubscription, ForesightCanvas,
-    FuturesWheelConsequence, Signal, SignalDecisionLink, Source, SourceAttachment,
-    Scenario, ScenarioDriverState, ScenarioImplicationLink, ScenarioReview, ScenarioSet,
-    ScenarioSignpost, Signpost, SignpostObservation, StrategicImplication, SystemStakeholder,
-    ThreeHorizonItem, Watchlist, WatchlistSignal, WindTunnelAssessment,
+    CausalRelationship,
+    Driver,
+    DriverSignal,
+    FeedbackLoop,
+    FeedbackLoopDriver,
+    FeedSubscription,
+    ForesightCanvas,
+    FuturesWheelConsequence,
+    ResearchClaim,
+    ResearchClaimSource,
+    Scenario,
+    ScenarioDriverState,
+    ScenarioImplicationLink,
+    ScenarioReview,
+    ScenarioSet,
+    ScenarioSignpost,
+    Signal,
+    SignalDecisionLink,
+    Signpost,
+    SignpostObservation,
+    Source,
+    SourceAttachment,
+    StrategicImplication,
+    SystemStakeholder,
+    ThreeHorizonItem,
+    Watchlist,
+    WatchlistSignal,
+    WindTunnelAssessment,
 )
 from apps.ideation.models import Idea, IdeaComment, IdeaVote, OpenSession
 from apps.ideation.models import SessionParticipant as OpenSessionParticipant
+from apps.invitations.models import OrganisationInvitation
 from apps.lessons.models import Lesson
-from apps.organisations.models import Membership, MembershipEvent, Organisation, OrganisationDeletionRequest
 from apps.methodology.models import DecisionMethod, DecisionMethodUsage, DecisionMethodVersion
+from apps.organisations.models import (
+    Membership,
+    MembershipEvent,
+    Organisation,
+    OrganisationDeletionRequest,
+)
 from apps.participants.models import ConflictOfInterest, Participant
 from apps.positions.models import Position
 from apps.reviews.models import DecisionReview
 from apps.risks.models import Risk
 from apps.workspaces.models import Workspace
 
-EXPORT_SCHEMA_VERSION = "1.9"
+EXPORT_SCHEMA_VERSION = "2.0"
 SENSITIVE_FIELD_NAMES = {"password", "token_digest"}
 
 
@@ -95,12 +145,28 @@ def _serialise_instance(instance: models.Model) -> dict[str, Any]:
     for field in instance._meta.many_to_many:
         if field.name in SENSITIVE_FIELD_NAMES:
             continue
-        record[field.name] = [str(value) for value in getattr(instance, field.name).values_list("pk", flat=True)]
+        record[field.name] = [
+            str(value) for value in getattr(instance, field.name).values_list("pk", flat=True)
+        ]
     return record
 
 
 def _records(queryset: Iterable[models.Model]) -> list[dict[str, Any]]:
     return [_serialise_instance(instance) for instance in queryset]
+
+
+def _portable_facilitation_records(
+    queryset: Iterable[FacilitationRecord],
+) -> list[dict[str, Any]]:
+    """Redact confidential identities from a shareable decision dossier."""
+    records = []
+    for instance in queryset:
+        record = _serialise_instance(instance)
+        if instance.attribution == FacilitationRecord.Attribution.CONFIDENTIAL:
+            record["source_participant"] = None
+            record["speaker_label"] = ""
+        records.append(record)
+    return records
 
 
 def _user_records(users: Iterable[User]) -> list[dict[str, Any]]:
@@ -213,10 +279,25 @@ def _write_source_attachment_files(
 ) -> None:
     """Include customer-owned private files when storage can provide them."""
     for attachment in attachments:
-        suffix = attachment.original_name.rsplit(".", 1)[-1] if "." in attachment.original_name else "bin"
+        if attachment.malware_scan_status != SourceAttachment.ScanStatus.CLEAN and getattr(
+            settings, "SOURCE_ATTACHMENT_ENFORCE_CLEAN_DOWNLOADS", True
+        ):
+            archive.writestr(
+                f"attachments/foresight/{attachment.source_id}/{attachment.id}.unavailable.txt",
+                (
+                    b"This file was omitted because it has not been verified as malware-free. "
+                    b"Its metadata and SHA-256 remain in "
+                    b"json/foresight_source_attachments.json.\n"
+                ),
+            )
+            continue
+        suffix = (
+            attachment.original_name.rsplit(".", 1)[-1]
+            if "." in attachment.original_name
+            else "bin"
+        )
         archive_name = (
-            f"attachments/foresight/{attachment.source_id}/"
-            f"{attachment.id}.{suffix.lower()}"
+            f"attachments/foresight/{attachment.source_id}/{attachment.id}.{suffix.lower()}"
         )
         try:
             with attachment.file.open("rb") as source_file:
@@ -228,7 +309,7 @@ def _write_source_attachment_files(
                     f"The stored file {attachment.original_name!r} was unavailable when "
                     "this export was generated. Its metadata and SHA-256 remain in "
                     "json/foresight_source_attachments.json.\n"
-                ).encode("utf-8"),
+                ).encode(),
             )
 
 
@@ -243,10 +324,16 @@ def _organisation_datasets(organisation: Organisation) -> dict[str, list[dict[st
         "users": _user_records(users),
         "memberships": _records(memberships),
         "membership_history": _records(MembershipEvent.objects.filter(organisation=organisation)),
-        "organisation_deletion_requests": _records(OrganisationDeletionRequest.objects.filter(organisation=organisation)),
+        "organisation_deletion_requests": _records(
+            OrganisationDeletionRequest.objects.filter(organisation=organisation)
+        ),
         "decision_methods": _records(DecisionMethod.objects.filter(organisation=organisation)),
-        "decision_method_versions": _records(DecisionMethodVersion.objects.filter(organisation=organisation)),
-        "decision_method_usage": _records(DecisionMethodUsage.objects.filter(organisation=organisation)),
+        "decision_method_versions": _records(
+            DecisionMethodVersion.objects.filter(organisation=organisation)
+        ),
+        "decision_method_usage": _records(
+            DecisionMethodUsage.objects.filter(organisation=organisation)
+        ),
         "workspaces": _records(Workspace.objects.filter(organisation=organisation)),
         "decisions": _records(Decision.objects.filter(organisation=organisation)),
         "decision_transitions": _records(
@@ -268,70 +355,182 @@ def _organisation_datasets(organisation: Organisation) -> dict[str, list[dict[st
                 "mentioned_users"
             )
         ),
-        "contribution_requests": _records(ContributionRequest.objects.filter(organisation=organisation)),
-        "contribution_submissions": _records(ContributionSubmission.objects.filter(organisation=organisation)),
-        "contribution_reviews": _records(ContributionReview.objects.filter(organisation=organisation)),
-        "facilitation_sessions": _records(FacilitationSession.objects.filter(organisation=organisation)),
-        "facilitation_participants": _records(SessionParticipant.objects.filter(organisation=organisation)),
-        "contribution_preferences": _records(ContributionPreference.objects.filter(organisation=organisation)),
-        "ai_reviews": _records(AIReview.objects.filter(organisation=organisation)),
-        "invitations": _records(
-            OrganisationInvitation.objects.filter(organisation=organisation)
+        "contribution_requests": _records(
+            ContributionRequest.objects.filter(organisation=organisation)
         ),
-        "decision_analysis_issues": _records(DecisionIssue.objects.filter(organisation=organisation)),
-        "decision_quality_reviews": _records(DecisionQualityReview.objects.filter(organisation=organisation)),
-        "executive_decision_summaries": _records(ExecutiveDecisionSummary.objects.filter(organisation=organisation)),
-        "evaluation_exercises": _records(EvaluationExercise.objects.filter(organisation=organisation)),
-        "evaluation_criteria": _records(EvaluationCriterion.objects.filter(organisation=organisation)),
+        "contribution_submissions": _records(
+            ContributionSubmission.objects.filter(organisation=organisation)
+        ),
+        "contribution_reviews": _records(
+            ContributionReview.objects.filter(organisation=organisation)
+        ),
+        "facilitation_sessions": _records(
+            FacilitationSession.objects.filter(organisation=organisation)
+        ),
+        "facilitation_agenda_items": _records(
+            FacilitationAgendaItem.objects.filter(session__organisation=organisation)
+        ),
+        "facilitation_participants": _records(
+            SessionParticipant.objects.filter(organisation=organisation)
+        ),
+        "facilitation_records": _records(
+            FacilitationRecord.objects.filter(organisation=organisation)
+        ),
+        "facilitation_authority_responses": _records(
+            FacilitationAuthorityResponse.objects.filter(organisation=organisation)
+        ),
+        "facilitation_quality_reviews": _records(
+            FacilitationQualityReview.objects.filter(session__organisation=organisation)
+        ),
+        "contribution_preferences": _records(
+            ContributionPreference.objects.filter(organisation=organisation)
+        ),
+        "ai_reviews": _records(AIReview.objects.filter(organisation=organisation)),
+        "invitations": _records(OrganisationInvitation.objects.filter(organisation=organisation)),
+        "decision_analysis_issues": _records(
+            DecisionIssue.objects.filter(organisation=organisation)
+        ),
+        "decision_quality_reviews": _records(
+            DecisionQualityReview.objects.filter(organisation=organisation)
+        ),
+        "executive_decision_summaries": _records(
+            ExecutiveDecisionSummary.objects.filter(organisation=organisation)
+        ),
+        "evaluation_exercises": _records(
+            EvaluationExercise.objects.filter(organisation=organisation)
+        ),
+        "evaluation_criteria": _records(
+            EvaluationCriterion.objects.filter(organisation=organisation)
+        ),
         "evaluation_rounds": _records(EvaluationRound.objects.filter(organisation=organisation)),
-        "evaluation_submissions": _records(EvaluationSubmission.objects.filter(organisation=organisation)),
-        "evaluation_responses": _records(EvaluationResponse.objects.filter(organisation=organisation)),
-        "evaluation_minority_reports": _records(MinorityReport.objects.filter(organisation=organisation)),
-        "prioritisation_portfolios": _records(PrioritisationPortfolio.objects.filter(organisation=organisation)),
-        "prioritisation_criteria": _records(PortfolioCriterion.objects.filter(organisation=organisation)),
-        "prioritisation_candidates": _records(PortfolioCandidate.objects.filter(organisation=organisation)),
-        "prioritisation_assessments": _records(PortfolioAssessment.objects.filter(organisation=organisation)),
-        "prioritisation_selections": _records(PortfolioSelection.objects.filter(organisation=organisation)),
+        "evaluation_submissions": _records(
+            EvaluationSubmission.objects.filter(organisation=organisation)
+        ),
+        "evaluation_responses": _records(
+            EvaluationResponse.objects.filter(organisation=organisation)
+        ),
+        "evaluation_minority_reports": _records(
+            MinorityReport.objects.filter(organisation=organisation)
+        ),
+        "prioritisation_portfolios": _records(
+            PrioritisationPortfolio.objects.filter(organisation=organisation)
+        ),
+        "prioritisation_criteria": _records(
+            PortfolioCriterion.objects.filter(organisation=organisation)
+        ),
+        "prioritisation_candidates": _records(
+            PortfolioCandidate.objects.filter(organisation=organisation)
+        ),
+        "prioritisation_assessments": _records(
+            PortfolioAssessment.objects.filter(organisation=organisation)
+        ),
+        "prioritisation_selections": _records(
+            PortfolioSelection.objects.filter(organisation=organisation)
+        ),
         "foresight_feeds": _records(FeedSubscription.objects.filter(organisation=organisation)),
         "foresight_sources": _records(Source.objects.filter(organisation=organisation)),
-        "foresight_source_attachments": _records(SourceAttachment.objects.filter(source__organisation=organisation)),
+        "foresight_source_attachments": _records(
+            SourceAttachment.objects.filter(source__organisation=organisation)
+        ),
+        "foresight_research_claims": _records(
+            ResearchClaim.objects.filter(organisation=organisation)
+        ),
+        "foresight_research_claim_sources": _records(
+            ResearchClaimSource.objects.filter(claim__organisation=organisation)
+        ),
         "foresight_signals": _records(Signal.objects.filter(organisation=organisation)),
-        "foresight_signal_decision_links": _records(SignalDecisionLink.objects.filter(signal__organisation=organisation)),
-        "foresight_watchlists": _records(Watchlist.objects.filter(organisation=organisation).prefetch_related("signals")),
-        "foresight_watchlist_signals": _records(WatchlistSignal.objects.filter(watchlist__organisation=organisation)),
+        "foresight_signal_decision_links": _records(
+            SignalDecisionLink.objects.filter(signal__organisation=organisation)
+        ),
+        "foresight_watchlists": _records(
+            Watchlist.objects.filter(organisation=organisation).prefetch_related("signals")
+        ),
+        "foresight_watchlist_signals": _records(
+            WatchlistSignal.objects.filter(watchlist__organisation=organisation)
+        ),
         "foresight_canvases": _records(ForesightCanvas.objects.filter(organisation=organisation)),
-        "foresight_drivers": _records(Driver.objects.filter(canvas__organisation=organisation).prefetch_related("signals")),
-        "foresight_driver_signals": _records(DriverSignal.objects.filter(driver__canvas__organisation=organisation)),
-        "foresight_system_stakeholders": _records(SystemStakeholder.objects.filter(canvas__organisation=organisation)),
-        "foresight_causal_relationships": _records(CausalRelationship.objects.filter(canvas__organisation=organisation)),
+        "foresight_drivers": _records(
+            Driver.objects.filter(canvas__organisation=organisation).prefetch_related("signals")
+        ),
+        "foresight_driver_signals": _records(
+            DriverSignal.objects.filter(driver__canvas__organisation=organisation)
+        ),
+        "foresight_system_stakeholders": _records(
+            SystemStakeholder.objects.filter(canvas__organisation=organisation)
+        ),
+        "foresight_causal_relationships": _records(
+            CausalRelationship.objects.filter(canvas__organisation=organisation)
+        ),
         "foresight_feedback_loops": _records(
             FeedbackLoop.objects.filter(canvas__organisation=organisation).prefetch_related(
                 "drivers"
             )
         ),
         "foresight_feedback_loop_drivers": _records(
-            FeedbackLoopDriver.objects.filter(
-                feedback_loop__canvas__organisation=organisation
+            FeedbackLoopDriver.objects.filter(feedback_loop__canvas__organisation=organisation)
+        ),
+        "foresight_consequences": _records(
+            FuturesWheelConsequence.objects.filter(canvas__organisation=organisation)
+        ),
+        "foresight_three_horizons": _records(
+            ThreeHorizonItem.objects.filter(canvas__organisation=organisation)
+        ),
+        "foresight_strategic_implications": _records(
+            StrategicImplication.objects.filter(canvas__organisation=organisation).prefetch_related(
+                "drivers"
             )
         ),
-        "foresight_consequences": _records(FuturesWheelConsequence.objects.filter(canvas__organisation=organisation)),
-        "foresight_three_horizons": _records(ThreeHorizonItem.objects.filter(canvas__organisation=organisation)),
-        "foresight_strategic_implications": _records(StrategicImplication.objects.filter(canvas__organisation=organisation).prefetch_related("drivers")),
-        "foresight_scenario_sets": _records(ScenarioSet.objects.filter(canvas__organisation=organisation)),
-        "foresight_scenarios": _records(Scenario.objects.filter(scenario_set__canvas__organisation=organisation)),
-        "foresight_scenario_driver_states": _records(ScenarioDriverState.objects.filter(scenario__scenario_set__canvas__organisation=organisation)),
-        "foresight_scenario_reviews": _records(ScenarioReview.objects.filter(scenario__scenario_set__canvas__organisation=organisation)),
-        "foresight_wind_tunnel_assessments": _records(WindTunnelAssessment.objects.filter(scenario__scenario_set__canvas__organisation=organisation)),
-        "foresight_signposts": _records(Signpost.objects.filter(scenario_set__canvas__organisation=organisation).prefetch_related("scenarios")),
-        "foresight_scenario_signposts": _records(ScenarioSignpost.objects.filter(signpost__scenario_set__canvas__organisation=organisation)),
-        "foresight_signpost_observations": _records(SignpostObservation.objects.filter(signpost__scenario_set__canvas__organisation=organisation)),
-        "foresight_scenario_implications": _records(ScenarioImplicationLink.objects.filter(scenario__scenario_set__canvas__organisation=organisation)),
+        "foresight_scenario_sets": _records(
+            ScenarioSet.objects.filter(canvas__organisation=organisation)
+        ),
+        "foresight_scenarios": _records(
+            Scenario.objects.filter(scenario_set__canvas__organisation=organisation)
+        ),
+        "foresight_scenario_driver_states": _records(
+            ScenarioDriverState.objects.filter(
+                scenario__scenario_set__canvas__organisation=organisation
+            )
+        ),
+        "foresight_scenario_reviews": _records(
+            ScenarioReview.objects.filter(scenario__scenario_set__canvas__organisation=organisation)
+        ),
+        "foresight_wind_tunnel_assessments": _records(
+            WindTunnelAssessment.objects.filter(
+                scenario__scenario_set__canvas__organisation=organisation
+            )
+        ),
+        "foresight_signposts": _records(
+            Signpost.objects.filter(
+                scenario_set__canvas__organisation=organisation
+            ).prefetch_related("scenarios")
+        ),
+        "foresight_scenario_signposts": _records(
+            ScenarioSignpost.objects.filter(
+                signpost__scenario_set__canvas__organisation=organisation
+            )
+        ),
+        "foresight_signpost_observations": _records(
+            SignpostObservation.objects.filter(
+                signpost__scenario_set__canvas__organisation=organisation
+            )
+        ),
+        "foresight_scenario_implications": _records(
+            ScenarioImplicationLink.objects.filter(
+                scenario__scenario_set__canvas__organisation=organisation
+            )
+        ),
         "open_sessions": _records(OpenSession.objects.filter(organisation=organisation)),
-        "open_session_participants": _records(OpenSessionParticipant.objects.filter(session__organisation=organisation)),
+        "open_session_participants": _records(
+            OpenSessionParticipant.objects.filter(session__organisation=organisation)
+        ),
         "ideas": _records(Idea.objects.filter(session__organisation=organisation)),
         "idea_votes": _records(IdeaVote.objects.filter(idea__session__organisation=organisation)),
-        "idea_comments": _records(IdeaComment.objects.filter(idea__session__organisation=organisation)),
-        "conflicts_of_interest": _records(ConflictOfInterest.objects.filter(organisation=organisation)),
+        "idea_comments": _records(
+            IdeaComment.objects.filter(idea__session__organisation=organisation)
+        ),
+        "conflicts_of_interest": _records(
+            ConflictOfInterest.objects.filter(organisation=organisation)
+        ),
         "audit_events": _records(AuditEvent.objects.filter(organisation=organisation)),
     }
 
@@ -344,14 +543,14 @@ def build_organisation_export(*, organisation: Organisation) -> ExportArchive:
     content_hash = _content_hash(datasets)
     files: dict[str, bytes] = {
         "README.txt": (
-            "The CrowdSmarter organisation export\n\n"
-            "This archive belongs to the customer organisation named below. JSON files "
-            "preserve complete structured records; CSV files and a single multi-sheet "
-            "xlsx/export.xlsx workbook provide tabular copies for key registers. "
-            "manifest.json's content_sha256 is a fingerprint of every dataset's JSON "
-            "content, letting you confirm two exports were generated from identical "
-            "underlying records. Passwords and invitation token digests are never exported.\n"
-        ).encode("utf-8"),
+            b"The CrowdSmarter organisation export\n\n"
+            b"This archive belongs to the customer organisation named below. JSON files "
+            b"preserve complete structured records; CSV files and a single multi-sheet "
+            b"xlsx/export.xlsx workbook provide tabular copies for key registers. "
+            b"manifest.json's content_sha256 is a fingerprint of every dataset's JSON "
+            b"content, letting you confirm two exports were generated from identical "
+            b"underlying records. Passwords and invitation token digests are never exported.\n"
+        ),
         "manifest.json": _json_bytes(
             {
                 "schema_version": EXPORT_SCHEMA_VERSION,
@@ -386,7 +585,9 @@ def build_organisation_export(*, organisation: Organisation) -> ExportArchive:
         "contribution_submissions",
         "contribution_reviews",
         "facilitation_sessions",
+        "facilitation_agenda_items",
         "facilitation_participants",
+        "facilitation_quality_reviews",
         "contribution_preferences",
         "decision_method_version",
         "decision_method_usage",
@@ -406,6 +607,8 @@ def build_organisation_export(*, organisation: Organisation) -> ExportArchive:
         "prioritisation_selections",
         "foresight_feeds",
         "foresight_sources",
+        "foresight_research_claims",
+        "foresight_research_claim_sources",
         "foresight_signals",
         "foresight_watchlists",
         "foresight_canvases",
@@ -436,7 +639,9 @@ def build_organisation_export(*, organisation: Organisation) -> ExportArchive:
         archive.writestr("xlsx/export.xlsx", _xlsx_bytes(datasets, sheet_names=sorted(csv_names)))
         _write_source_attachment_files(
             archive,
-            SourceAttachment.objects.filter(source__organisation=organisation).select_related("source"),
+            SourceAttachment.objects.filter(source__organisation=organisation).select_related(
+                "source"
+            ),
         )
     timestamp = generated_at.strftime("%Y%m%dT%H%M%SZ")
     return ExportArchive(
@@ -451,10 +656,20 @@ def _decision_datasets(decision: Decision) -> dict[str, list[dict[str, Any]]]:
         .distinct()
         .order_by("email")
     )
-    linked_signal_ids = SignalDecisionLink.objects.filter(decision=decision).values_list("signal_id", flat=True)
-    evidence_source_ids = Evidence.objects.filter(decision=decision, source_id__isnull=False).values_list("source_id", flat=True)
-    signal_source_ids = Signal.objects.filter(id__in=linked_signal_ids, source_id__isnull=False).values_list("source_id", flat=True)
-    related_source_ids = set(evidence_source_ids) | set(signal_source_ids)
+    linked_signal_ids = SignalDecisionLink.objects.filter(decision=decision).values_list(
+        "signal_id", flat=True
+    )
+    evidence_source_ids = Evidence.objects.filter(
+        decision=decision, source_id__isnull=False
+    ).values_list("source_id", flat=True)
+    signal_source_ids = Signal.objects.filter(
+        id__in=linked_signal_ids, source_id__isnull=False
+    ).values_list("source_id", flat=True)
+    linked_claims = ResearchClaim.objects.filter(linked_decision=decision)
+    claim_source_ids = ResearchClaimSource.objects.filter(claim__in=linked_claims).values_list(
+        "source_id", flat=True
+    )
+    related_source_ids = set(evidence_source_ids) | set(signal_source_ids) | set(claim_source_ids)
     return {
         "users": _user_records(organisation_users),
         "organisation": [_serialise_instance(decision.organisation)],
@@ -474,35 +689,77 @@ def _decision_datasets(decision: Decision) -> dict[str, list[dict[str, Any]]]:
         "review": _records(DecisionReview.objects.filter(decision=decision)),
         "lessons": _records(Lesson.objects.filter(decision=decision)),
         "discussion_entries": _records(
-            DiscussionEntry.objects.filter(decision=decision).prefetch_related(
-                "mentioned_users"
-            )
+            DiscussionEntry.objects.filter(decision=decision).prefetch_related("mentioned_users")
         ),
         "contribution_requests": _records(ContributionRequest.objects.filter(decision=decision)),
-        "contribution_submissions": _records(ContributionSubmission.objects.filter(decision=decision)),
+        "contribution_submissions": _records(
+            ContributionSubmission.objects.filter(decision=decision)
+        ),
         "contribution_reviews": _records(ContributionReview.objects.filter(decision=decision)),
         "facilitation_sessions": _records(FacilitationSession.objects.filter(decision=decision)),
-        "facilitation_participants": _records(SessionParticipant.objects.filter(session__decision=decision)),
+        "facilitation_agenda_items": _records(
+            FacilitationAgendaItem.objects.filter(session__decision=decision)
+        ),
+        "facilitation_participants": _records(
+            SessionParticipant.objects.filter(session__decision=decision)
+        ),
+        "facilitation_records": _portable_facilitation_records(
+            FacilitationRecord.objects.filter(decision=decision)
+        ),
+        "facilitation_authority_responses": _records(
+            FacilitationAuthorityResponse.objects.filter(decision=decision)
+        ),
+        "facilitation_quality_reviews": _records(
+            FacilitationQualityReview.objects.filter(session__decision=decision)
+        ),
         "ai_reviews": _records(AIReview.objects.filter(decision=decision)),
         "decision_analysis_issues": _records(DecisionIssue.objects.filter(decision=decision)),
-        "decision_quality_reviews": _records(DecisionQualityReview.objects.filter(decision=decision)),
-        "executive_decision_summaries": _records(ExecutiveDecisionSummary.objects.filter(decision=decision)),
+        "decision_quality_reviews": _records(
+            DecisionQualityReview.objects.filter(decision=decision)
+        ),
+        "executive_decision_summaries": _records(
+            ExecutiveDecisionSummary.objects.filter(decision=decision)
+        ),
         "evaluation_exercises": _records(EvaluationExercise.objects.filter(decision=decision)),
-        "evaluation_criteria": _records(EvaluationCriterion.objects.filter(exercise__decision=decision)),
+        "evaluation_criteria": _records(
+            EvaluationCriterion.objects.filter(exercise__decision=decision)
+        ),
         "evaluation_rounds": _records(EvaluationRound.objects.filter(exercise__decision=decision)),
-        "evaluation_submissions": _records(EvaluationSubmission.objects.filter(round__exercise__decision=decision)),
-        "evaluation_responses": _records(EvaluationResponse.objects.filter(submission__round__exercise__decision=decision)),
-        "evaluation_minority_reports": _records(MinorityReport.objects.filter(exercise__decision=decision)),
+        "evaluation_submissions": _records(
+            EvaluationSubmission.objects.filter(round__exercise__decision=decision)
+        ),
+        "evaluation_responses": _records(
+            EvaluationResponse.objects.filter(submission__round__exercise__decision=decision)
+        ),
+        "evaluation_minority_reports": _records(
+            MinorityReport.objects.filter(exercise__decision=decision)
+        ),
         "prioritisation_candidates": _records(PortfolioCandidate.objects.filter(decision=decision)),
-        "prioritisation_assessments": _records(PortfolioAssessment.objects.filter(candidate__decision=decision)),
-        "prioritisation_selections": _records(PortfolioSelection.objects.filter(candidate__decision=decision)),
+        "prioritisation_assessments": _records(
+            PortfolioAssessment.objects.filter(candidate__decision=decision)
+        ),
+        "prioritisation_selections": _records(
+            PortfolioSelection.objects.filter(candidate__decision=decision)
+        ),
         "linked_signals": _records(Signal.objects.filter(id__in=linked_signal_ids)),
         "signal_decision_links": _records(SignalDecisionLink.objects.filter(decision=decision)),
+        "foresight_research_claims": _records(linked_claims),
+        "foresight_research_claim_sources": _records(
+            ResearchClaimSource.objects.filter(claim__in=linked_claims)
+        ),
         "foresight_sources": _records(Source.objects.filter(id__in=related_source_ids)),
-        "foresight_source_attachments": _records(SourceAttachment.objects.filter(source_id__in=related_source_ids)),
-        "foresight_strategic_implications": _records(StrategicImplication.objects.filter(linked_decision=decision).prefetch_related("drivers")),
+        "foresight_source_attachments": _records(
+            SourceAttachment.objects.filter(source_id__in=related_source_ids)
+        ),
+        "foresight_strategic_implications": _records(
+            StrategicImplication.objects.filter(linked_decision=decision).prefetch_related(
+                "drivers"
+            )
+        ),
         "foresight_scenario_sets": _records(ScenarioSet.objects.filter(linked_decision=decision)),
-        "foresight_scenarios": _records(Scenario.objects.filter(scenario_set__linked_decision=decision)),
+        "foresight_scenarios": _records(
+            Scenario.objects.filter(scenario_set__linked_decision=decision)
+        ),
         "foresight_scenario_driver_states": _records(
             ScenarioDriverState.objects.filter(scenario__scenario_set__linked_decision=decision)
         ),
@@ -521,21 +778,21 @@ def _decision_datasets(decision: Decision) -> dict[str, list[dict[str, Any]]]:
             ScenarioSignpost.objects.filter(signpost__scenario_set__linked_decision=decision)
         ),
         "foresight_signpost_observations": _records(
-            SignpostObservation.objects.filter(
-                signpost__scenario_set__linked_decision=decision
-            )
+            SignpostObservation.objects.filter(signpost__scenario_set__linked_decision=decision)
         ),
         "foresight_scenario_implications": _records(
-            ScenarioImplicationLink.objects.filter(
-                scenario__scenario_set__linked_decision=decision
-            )
+            ScenarioImplicationLink.objects.filter(scenario__scenario_set__linked_decision=decision)
         ),
         "open_sessions": _records(OpenSession.objects.filter(decision=decision)),
-        "open_session_participants": _records(OpenSessionParticipant.objects.filter(session__decision=decision)),
+        "open_session_participants": _records(
+            OpenSessionParticipant.objects.filter(session__decision=decision)
+        ),
         "ideas": _records(Idea.objects.filter(session__decision=decision)),
         "idea_votes": _records(IdeaVote.objects.filter(idea__session__decision=decision)),
         "idea_comments": _records(IdeaComment.objects.filter(idea__session__decision=decision)),
-        "conflicts_of_interest": _records(ConflictOfInterest.objects.filter(participant__decision=decision)),
+        "conflicts_of_interest": _records(
+            ConflictOfInterest.objects.filter(participant__decision=decision)
+        ),
     }
 
 
@@ -571,18 +828,23 @@ def _decision_summary_text(
     ]
     if decision.source_template_key == "grant_round":
         budget = budget_summary(decision=decision)
-        lines.extend([
-            "Grant round budget",
-            f"Total requested: {budget['requested_total']}",
-            f"Total awarded: {budget['awarded_total']}",
-            f"Funded: {budget['funded_count']} · Declined: {budget['declined_count']} "
-            f"· Pending: {budget['pending_outcome_count']}",
-            f"Eligible: {budget['eligible_count']} · Ineligible: {budget['ineligible_count']} "
-            f"· Pending screening: {budget['pending_eligibility_count']}",
-            "",
-        ])
+        lines.extend(
+            [
+                "Grant round budget",
+                f"Total requested: {Decimal(budget['requested_total']):.2f}",
+                f"Total awarded: {Decimal(budget['awarded_total']):.2f}",
+                f"Funded: {budget['funded_count']} · Declined: {budget['declined_count']} "
+                f"· Pending: {budget['pending_outcome_count']}",
+                f"Eligible: {budget['eligible_count']} · Ineligible: {budget['ineligible_count']} "
+                f"· Pending screening: {budget['pending_eligibility_count']}",
+                "",
+            ]
+        )
     lines.append("Record counts")
-    lines.extend(f"- {name.replace('_', ' ').title()}: {len(records)}" for name, records in sorted(datasets.items()))
+    lines.extend(
+        f"- {name.replace('_', ' ').title()}: {len(records)}"
+        for name, records in sorted(datasets.items())
+    )
     return "\n".join(lines) + "\n"
 
 
@@ -593,9 +855,11 @@ def _award_letter_addressee(option: DecisionOption) -> tuple[str, str]:
     promoted into this option) over the org member who happened to click
     promote, since the applicant is who the outcome actually concerns.
     """
-    idea = Idea.objects.filter(promoted_to_option=option).select_related(
-        "submitted_by_participant", "submitted_by_user"
-    ).first()
+    idea = (
+        Idea.objects.filter(promoted_to_option=option)
+        .select_related("submitted_by_participant", "submitted_by_user")
+        .first()
+    )
     if idea and idea.submitted_by_participant_id:
         return idea.submitted_by_participant.name, idea.submitted_by_participant.email
     if idea and idea.submitted_by_user_id:
@@ -639,31 +903,58 @@ def build_decision_export(*, decision: Decision) -> ExportArchive:
     content_hash = _content_hash(datasets)
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, mode="w", compression=zipfile.ZIP_DEFLATED) as archive:
-        archive.writestr("README.txt", (
-            "The CrowdSmarter decision dossier\n\n"
-            "summary.txt provides a readable overview. JSON preserves complete structured "
-            "records; CSV and a single multi-sheet xlsx/export.xlsx workbook provide "
-            "tabular registers suitable for spreadsheet review. manifest.json's "
-            "content_sha256 is a fingerprint of every dataset's JSON content, letting you "
-            "confirm two exports were generated from identical underlying records.\n"
-        ).encode("utf-8"))
+        archive.writestr(
+            "README.txt",
+            (
+                b"The CrowdSmarter decision dossier\n\n"
+                b"summary.txt provides a readable overview. JSON preserves complete structured "
+                b"records; CSV and a single multi-sheet xlsx/export.xlsx workbook provide "
+                b"tabular registers suitable for spreadsheet review. manifest.json's "
+                b"content_sha256 is a fingerprint of every dataset's JSON content, letting you "
+                b"confirm two exports were generated from identical underlying records. "
+                b"The reports directory contains print-ready facilitation reports that can be "
+                b"saved as PDF from a browser. Confidential participant identities are redacted "
+                b"from portable decision dossiers.\n"
+            ),
+        )
         archive.writestr("summary.txt", _decision_summary_text(decision, datasets).encode("utf-8"))
-        archive.writestr("manifest.json", _json_bytes({
-            "schema_version": EXPORT_SCHEMA_VERSION,
-            "export_type": "decision",
-            "generated_at": generated_at.isoformat(),
-            "content_sha256": content_hash,
-            "decision": {"id": str(decision.id), "title": decision.title, "status": decision.status},
-            "datasets": {name: len(records) for name, records in datasets.items()},
-        }))
+        archive.writestr(
+            "manifest.json",
+            _json_bytes(
+                {
+                    "schema_version": EXPORT_SCHEMA_VERSION,
+                    "export_type": "decision",
+                    "generated_at": generated_at.isoformat(),
+                    "content_sha256": content_hash,
+                    "decision": {
+                        "id": str(decision.id),
+                        "title": decision.title,
+                        "status": decision.status,
+                    },
+                    "datasets": {name: len(records) for name, records in datasets.items()},
+                }
+            ),
+        )
         archive.writestr("json/decision.json", _json_bytes(_serialise_instance(decision)))
         for name, records in sorted(datasets.items()):
             _write_dataset(archive, name, records, csv_copy=True)
         archive.writestr("xlsx/export.xlsx", _xlsx_bytes(datasets, sheet_names=sorted(datasets)))
+        sessions = FacilitationSession.objects.filter(decision=decision).select_related(
+            "decision", "facilitator", "authority_response__published_by"
+        )
+        for session in sessions:
+            session_slug = slugify(session.title)[:60] or str(session.id)
+            archive.writestr(
+                f"reports/facilitation-{session_slug}-{session.id}.html",
+                build_facilitation_report_html(session),
+            )
         if decision.source_template_key == "grant_round":
             decided_options = DecisionOption.objects.filter(
                 decision=decision,
-                outcome_status__in=[DecisionOption.OutcomeStatus.FUNDED, DecisionOption.OutcomeStatus.DECLINED],
+                outcome_status__in=[
+                    DecisionOption.OutcomeStatus.FUNDED,
+                    DecisionOption.OutcomeStatus.DECLINED,
+                ],
             ).select_related("proposed_by")
             for option in decided_options:
                 letter = _award_letter_text(option, decision)
@@ -672,7 +963,9 @@ def build_decision_export(*, decision: Decision) -> ExportArchive:
         related_source_ids = [record["id"] for record in datasets.get("foresight_sources", [])]
         _write_source_attachment_files(
             archive,
-            SourceAttachment.objects.filter(source_id__in=related_source_ids).select_related("source"),
+            SourceAttachment.objects.filter(source_id__in=related_source_ids).select_related(
+                "source"
+            ),
         )
     timestamp = generated_at.strftime("%Y%m%dT%H%M%SZ")
     title_slug = slugify(decision.title)[:60] or "decision"

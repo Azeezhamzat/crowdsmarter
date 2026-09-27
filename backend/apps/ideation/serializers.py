@@ -23,7 +23,9 @@ class IdeaTeamMemberSerializer(serializers.ModelSerializer):
 
 class IdeaTeamMemberInputSerializer(StrictSerializer):
     name = serializers.CharField(max_length=200, trim_whitespace=True)
-    role = serializers.CharField(max_length=60, trim_whitespace=True, allow_blank=True, required=False, default="")
+    role = serializers.CharField(
+        max_length=60, trim_whitespace=True, allow_blank=True, required=False, default=""
+    )
 
 
 class IdeaCommentSerializer(serializers.ModelSerializer):
@@ -42,7 +44,6 @@ class IdeaSerializer(serializers.ModelSerializer):
     status_label = serializers.CharField(source="get_status_display", read_only=True)
     vote_count = serializers.IntegerField(read_only=True)
     voted_by_me = serializers.SerializerMethodField()
-    application_status = serializers.SerializerMethodField()
     comments = IdeaCommentSerializer(many=True, read_only=True)
     team_members = IdeaTeamMemberSerializer(many=True, read_only=True)
 
@@ -62,7 +63,6 @@ class IdeaSerializer(serializers.ModelSerializer):
             "submitted_by_user",
             "vote_count",
             "voted_by_me",
-            "application_status",
             "comments",
             "created_at",
         ]
@@ -70,25 +70,7 @@ class IdeaSerializer(serializers.ModelSerializer):
 
     def get_voted_by_me(self, obj: Idea) -> bool:
         voter_ids = self.context.get("voted_idea_ids")
-        return bool(voter_ids) and obj.id in voter_ids
-
-    def get_application_status(self, obj: Idea) -> dict | None:
-        # A hand-picked allowlist of exactly what an applicant should see about
-        # their promoted application - never the raw DecisionOption (no reviewer
-        # scores, no other applicants' internals), matching the discipline in
-        # get_decision_template_key below.
-        if not obj.promoted_to_option_id:
-            return None
-        option = obj.promoted_to_option
-        return {
-            "eligibility_status": option.eligibility_status,
-            "eligibility_status_label": option.get_eligibility_status_display(),
-            "eligibility_note": option.eligibility_note,
-            "outcome_status": option.outcome_status,
-            "outcome_status_label": option.get_outcome_status_display(),
-            "awarded_amount": option.awarded_amount,
-            "outcome_note": option.outcome_note,
-        }
+        return isinstance(voter_ids, set) and obj.id in voter_ids
 
 
 class IdeaOrganiserSerializer(IdeaSerializer):
@@ -102,15 +84,31 @@ class IdeaOrganiserSerializer(IdeaSerializer):
     submitter_age_bracket = serializers.SerializerMethodField()
     submitter_age_bracket_label = serializers.SerializerMethodField()
     submitter_guardian_consent_given = serializers.SerializerMethodField()
+    application_status = serializers.SerializerMethodField()
 
     class Meta(IdeaSerializer.Meta):
         fields = IdeaSerializer.Meta.fields + [
+            "application_status",
             "submitter_school",
             "submitter_age_bracket",
             "submitter_age_bracket_label",
             "submitter_guardian_consent_given",
         ]
         read_only_fields = fields
+
+    def get_application_status(self, obj: Idea) -> dict | None:
+        if not obj.promoted_to_option_id:
+            return None
+        option = obj.promoted_to_option
+        return {
+            "eligibility_status": option.eligibility_status,
+            "eligibility_status_label": option.get_eligibility_status_display(),
+            "eligibility_note": option.eligibility_note,
+            "outcome_status": option.outcome_status,
+            "outcome_status_label": option.get_outcome_status_display(),
+            "awarded_amount": option.awarded_amount,
+            "outcome_note": option.outcome_note,
+        }
 
     def get_submitter_school(self, obj: Idea) -> str | None:
         participant = obj.submitted_by_participant

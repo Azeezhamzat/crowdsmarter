@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { StrictMode } from "react";
+import { StrictMode, Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import { RouterProvider } from "react-router/dom";
 
@@ -28,7 +28,9 @@ void loadPublicContactChannels().finally(() => {
   createRoot(root).render(
     <StrictMode>
       <QueryClientProvider client={queryClient}>
-        <RouterProvider router={router} />
+        <Suspense fallback={<main id="main-content" className="main-content" tabIndex={-1}><p role="status">Loading page…</p></main>}>
+          <RouterProvider router={router} />
+        </Suspense>
       </QueryClientProvider>
     </StrictMode>,
   );

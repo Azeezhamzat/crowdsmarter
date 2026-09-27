@@ -13,9 +13,7 @@ from apps.workspaces.selectors import workspace_for_user
 from .models import Decision, DecisionTransition
 
 
-def decisions_for_workspace(
-    *, user: User, workspace_id: UUID
-) -> models.QuerySet[Decision]:
+def decisions_for_workspace(*, user: User, workspace_id: UUID) -> models.QuerySet[Decision]:
     """List decisions only after establishing workspace access."""
     workspace = workspace_for_user(user=user, workspace_id=workspace_id)
     return Decision.objects.filter(workspace=workspace).select_related(

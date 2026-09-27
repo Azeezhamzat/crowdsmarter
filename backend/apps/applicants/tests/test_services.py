@@ -7,7 +7,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.utils import timezone
 
 from apps.applicants import services
-from apps.applicants.models import ApplicantAccount, MagicLinkToken
+from apps.applicants.models import MagicLinkToken
 from apps.ideation import services as ideation_services
 
 
@@ -43,7 +43,7 @@ def test_consume_magic_link_rejects_reuse_and_expiry():  # type: ignore[no-untyp
     with pytest.raises(PermissionDenied):
         services.consume_magic_link(raw_token=raw_token)
 
-    token = MagicLinkToken.objects.filter(account=account).exclude(consumed_at__isnull=False).first()
+    (MagicLinkToken.objects.filter(account=account).exclude(consumed_at__isnull=False).first())
     _, raw_token2 = services.request_magic_link(email="amina@example.com")
     stale = MagicLinkToken.objects.get(account=account, consumed_at__isnull=True)
     stale.expires_at = timezone.now() - timezone.timedelta(minutes=1)
@@ -65,10 +65,13 @@ def test_identify_participant_links_verified_applicant_account(organisation_fact
     ideation_services.open_session(actor=owner, session=session)
 
     account, raw_token = services.request_magic_link(email="amina@example.com", name="Amina")
-    services.consume_magic_link(raw_token=raw_token)
+    _, portal_token = services.consume_magic_link(raw_token=raw_token)
 
     participant, _ = ideation_services.identify_participant(
-        session=session, name="Amina", email="amina@example.com"
+        session=session,
+        name="Amina",
+        email="amina@example.com",
+        applicant_token=portal_token,
     )
     assert participant.account_id == account.id
 
@@ -87,13 +90,19 @@ def test_applications_for_account_spans_sessions(organisation_factory):  # type:
     ideation_services.open_session(actor=owner, session=session2)
 
     account, raw_token = services.request_magic_link(email="amina@example.com")
-    services.consume_magic_link(raw_token=raw_token)
+    _, portal_token = services.consume_magic_link(raw_token=raw_token)
 
     participant1, _ = ideation_services.identify_participant(
-        session=session1, name="Amina", email="amina@example.com"
+        session=session1,
+        name="Amina",
+        email="amina@example.com",
+        applicant_token=portal_token,
     )
     participant2, _ = ideation_services.identify_participant(
-        session=session2, name="Amina", email="amina@example.com"
+        session=session2,
+        name="Amina",
+        email="amina@example.com",
+        applicant_token=portal_token,
     )
     ideation_services.submit_idea(session=session1, participant=participant1, title="Idea one")
     ideation_services.submit_idea(session=session2, participant=participant2, title="Idea two")
@@ -105,7 +114,7 @@ def test_applications_for_account_spans_sessions(organisation_factory):  # type:
 @pytest.mark.django_db
 def test_submit_progress_report_requires_funded_ownership(organisation_factory):  # type: ignore[no-untyped-def]
     from apps.decision_options.services import set_outcome
-    from apps.ideation.services import promote_idea_to_decision, shortlist_idea
+    from apps.ideation.services import promote_idea_to_decision
 
     organisation = organisation_factory()
     owner = organisation.created_by
@@ -118,9 +127,12 @@ def test_submit_progress_report_requires_funded_ownership(organisation_factory):
     ideation_services.open_session(actor=owner, session=session)
 
     account, raw_token = services.request_magic_link(email="amina@example.com")
-    services.consume_magic_link(raw_token=raw_token)
+    _, portal_token = services.consume_magic_link(raw_token=raw_token)
     participant, _ = ideation_services.identify_participant(
-        session=session, name="Amina", email="amina@example.com"
+        session=session,
+        name="Amina",
+        email="amina@example.com",
+        applicant_token=portal_token,
     )
     idea = ideation_services.submit_idea(
         session=session, participant=participant, title="Water project", description="Build a well."
@@ -130,7 +142,9 @@ def test_submit_progress_report_requires_funded_ownership(organisation_factory):
     from apps.workspaces.models import Workspace
 
     workspace = Workspace.objects.filter(organisation=organisation, is_default=True).first()
-    decision = create_decision(actor=owner, workspace=workspace, title="Grants", purpose="p", template_key="grant_round")
+    decision = create_decision(
+        actor=owner, workspace=workspace, title="Grants", purpose="p", template_key="grant_round"
+    )
 
     with pytest.raises(ValidationError):
         services.submit_progress_report(account=account, idea=idea, body="Update")
@@ -140,9 +154,13 @@ def test_submit_progress_report_requires_funded_ownership(organisation_factory):
     with pytest.raises(ValidationError):
         services.submit_progress_report(account=account, idea=idea, body="Update")
 
-    set_outcome(actor=owner, option=option, outcome_status="funded", awarded_amount=500, outcome_note="")
+    set_outcome(
+        actor=owner, option=option, outcome_status="funded", awarded_amount=500, outcome_note=""
+    )
     idea.refresh_from_db()
-    report = services.submit_progress_report(account=account, idea=idea, body="We started the well.")
+    report = services.submit_progress_report(
+        account=account, idea=idea, body="We started the well."
+    )
     assert report.idea_id == idea.id
     assert report.account_id == account.id
 
@@ -150,3 +168,19 @@ def test_submit_progress_report_requires_funded_ownership(organisation_factory):
     services.consume_magic_link(raw_token=other_token)
     with pytest.raises(PermissionDenied):
         services.submit_progress_report(account=other_account, idea=idea, body="Not mine")
+
+
+@pytest.mark.django_db
+def test_portal_token_expires_and_can_be_revoked():
+    account, raw_token = services.request_magic_link(email="amina@example.com")
+    account, portal_token = services.consume_magic_link(raw_token=raw_token)
+    account.portal_token_expires_at = timezone.now() - timezone.timedelta(seconds=1)
+    account.save(update_fields=["portal_token_expires_at"])
+    with pytest.raises(PermissionDenied):
+        services.applicant_account_from_portal_token(raw_token=portal_token)
+
+    _, raw_token = services.request_magic_link(email="amina@example.com")
+    account, portal_token = services.consume_magic_link(raw_token=raw_token)
+    services.revoke_portal_session(account=account)
+    with pytest.raises(PermissionDenied):
+        services.applicant_account_from_portal_token(raw_token=portal_token)

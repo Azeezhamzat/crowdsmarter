@@ -16,7 +16,9 @@ class OrganisationLookupConfiguration(UUIDTimeStampedModel):
     organisation = models.OneToOneField(
         "organisations.Organisation", on_delete=models.CASCADE, related_name="lookup_configuration"
     )
-    provider_key = models.CharField(max_length=20, choices=ProviderKey.choices, default=ProviderKey.MANUAL)
+    provider_key = models.CharField(
+        max_length=20, choices=ProviderKey.choices, default=ProviderKey.MANUAL
+    )
     api_key_encrypted = models.TextField(blank=True, default="")
 
     class Meta:

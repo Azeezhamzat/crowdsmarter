@@ -7,7 +7,6 @@ from apps.decisions.models import Decision
 from apps.organisations.models import Membership
 from apps.participants.models import Participant
 
-
 POSITION_STATUSES = {
     Decision.Status.OPEN_FOR_CONTRIBUTION,
     Decision.Status.UNDER_REVIEW,

@@ -56,7 +56,6 @@ def _base_portfolio_queryset(*, user: User) -> models.QuerySet[Decision]:
     )
 
 
-
 def _review_for(decision: Decision) -> DecisionReview | None:
     try:
         return decision.review
@@ -65,10 +64,14 @@ def _review_for(decision: Decision) -> DecisionReview | None:
 
 
 def _due_date_for(decision: Decision) -> date | None:
-    if decision.status in {
-        Decision.Status.OPEN_FOR_CONTRIBUTION,
-        Decision.Status.FRAMING,
-    } and decision.contribution_deadline:
+    if (
+        decision.status
+        in {
+            Decision.Status.OPEN_FOR_CONTRIBUTION,
+            Decision.Status.FRAMING,
+        }
+        and decision.contribution_deadline
+    ):
         return decision.contribution_deadline.date()
     if decision.status in {
         Decision.Status.DRAFT,
@@ -101,10 +104,14 @@ def _next_action_for(*, decision: Decision, user: User, participant_role: str | 
             participant__user=user,
             participant__status=Participant.Status.ACTIVE,
         ).exists()
-        if participant_role in {
-            Participant.Role.DECISION_OWNER,
-            Participant.Role.DECISION_MAKER,
-        } and not has_position:
+        if (
+            participant_role
+            in {
+                Participant.Role.DECISION_OWNER,
+                Participant.Role.DECISION_MAKER,
+            }
+            and not has_position
+        ):
             return "Submit your stakeholder position"
         if decision.owner_id == user.id or participant_role == Participant.Role.DECISION_MAKER:
             return "Review positions and finalise"
@@ -287,9 +294,7 @@ def _risk_heatmap(*, organisation) -> dict:
 
 
 def _benefits_realization(*, organisation) -> dict:
-    counts = {
-        choice: 0 for choice, _ in DecisionReview.OutcomeAssessment.choices
-    }
+    counts = {choice: 0 for choice, _ in DecisionReview.OutcomeAssessment.choices}
     rows = (
         DecisionReview.objects.filter(organisation=organisation)
         .exclude(outcome_assessment="")
@@ -366,17 +371,17 @@ def organisation_portfolio(
         "summary": {
             "total": all_decisions.count(),
             "active": all_decisions.exclude(status=Decision.Status.ARCHIVED).count(),
-            "overdue": sum(
-                1
-                for item in _decorate(
-                    decisions=list(
-                        _base_portfolio_queryset(user=user).filter(
-                            organisation=organisation
-                        )
-                    ),
-                    user=user,
-                )
-                if item.portfolio_is_overdue
+            "overdue": len(
+                [
+                    item
+                    for item in _decorate(
+                        decisions=list(
+                            _base_portfolio_queryset(user=user).filter(organisation=organisation)
+                        ),
+                        user=user,
+                    )
+                    if item.portfolio_is_overdue
+                ]
             ),
             "unresolved_discussion": DiscussionEntry.objects.filter(
                 organisation=organisation,
@@ -396,14 +401,19 @@ def personal_work(*, user: User) -> dict:
         implementation_owner=user,
         reviewed_at__isnull=True,
     ).values("decision_id")
-    queryset = _base_portfolio_queryset(user=user).filter(
-        Q(owner=user)
-        | Q(
-            participants__user=user,
-            participants__status=Participant.Status.ACTIVE,
+    queryset = (
+        _base_portfolio_queryset(user=user)
+        .filter(
+            Q(owner=user)
+            | Q(
+                participants__user=user,
+                participants__status=Participant.Status.ACTIVE,
+            )
+            | Q(id__in=Subquery(implementation_decisions))
         )
-        | Q(id__in=Subquery(implementation_decisions))
-    ).exclude(status=Decision.Status.ARCHIVED).distinct()
+        .exclude(status=Decision.Status.ARCHIVED)
+        .distinct()
+    )
     decisions = _decorate(decisions=list(queryset), user=user)
     urgency_order = {"critical": 0, "high": 1, "normal": 2, "low": 3}
     decisions.sort(
@@ -419,7 +429,7 @@ def personal_work(*, user: User) -> dict:
             recipient=user,
             read_at__isnull=True,
         ).count(),
-        "overdue_count": sum(1 for item in decisions if item.portfolio_is_overdue),
+        "overdue_count": len([item for item in decisions if item.portfolio_is_overdue]),
         "decision_count": len(decisions),
         "decisions": decisions[:50],
     }

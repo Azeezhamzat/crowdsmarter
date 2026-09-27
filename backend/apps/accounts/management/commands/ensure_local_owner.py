@@ -72,7 +72,7 @@ class Command(BaseCommand):
             slug = slug_base
             counter = 2
             while Organisation.objects.filter(slug=slug).exists():
-                slug = f"{slug_base[:70-len(str(counter))-1]}-{counter}"
+                slug = f"{slug_base[: 70 - len(str(counter)) - 1]}-{counter}"
                 counter += 1
             organisation = Organisation.objects.create(
                 name=organisation_name,

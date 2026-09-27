@@ -1,8 +1,12 @@
-import { apiRequest } from "../../lib/api";
+import { apiRequest, downloadApiFile } from "../../lib/api";
 import type {
   ContributionPreference,
   ContributionRequest,
+  FacilitationAgendaItem,
+  FacilitationAuthorityResponse,
+  FacilitationRecord,
   DecisionContributionWorkspace,
+  FacilitationQualityReview,
   FacilitationSession,
   PersonalContributionWork,
 } from "../../lib/types";
@@ -72,6 +76,64 @@ export function updateFacilitationSessionStatus(sessionId: string, status: strin
     method: "POST",
     body: JSON.stringify({ status }),
   });
+}
+
+export function createFacilitationAgendaItem(
+  sessionId: string,
+  input: Record<string, unknown>,
+): Promise<FacilitationAgendaItem> {
+  return apiRequest(`/facilitation-sessions/${sessionId}/agenda-items/`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function facilitationAgendaItemAction(
+  itemId: string,
+  action: "start" | "complete" | "skip" | "reset",
+): Promise<FacilitationAgendaItem> {
+  return apiRequest(`/facilitation-agenda-items/${itemId}/actions/`, {
+    method: "POST",
+    body: JSON.stringify({ action }),
+  });
+}
+
+export function createFacilitationRecord(
+  sessionId: string,
+  input: Record<string, unknown>,
+): Promise<FacilitationRecord> {
+  return apiRequest(`/facilitation-sessions/${sessionId}/records/`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function saveFacilitationAuthorityResponse(
+  sessionId: string,
+  input: Record<string, unknown>,
+): Promise<FacilitationAuthorityResponse> {
+  return apiRequest(`/facilitation-sessions/${sessionId}/authority-response/`, {
+    method: "PUT",
+    body: JSON.stringify(input),
+  });
+}
+
+export function saveFacilitationQualityReview(
+  sessionId: string,
+  input: Record<string, unknown>,
+): Promise<FacilitationQualityReview> {
+  return apiRequest(`/facilitation-sessions/${sessionId}/quality-review/`, {
+    method: "PUT",
+    body: JSON.stringify(input),
+  });
+}
+
+export function downloadFacilitationReport(sessionId: string): Promise<string> {
+  return downloadApiFile(
+    `/facilitation-sessions/${sessionId}/report/`,
+    "text/html",
+    "crowdsmarter-facilitation-report.html",
+  );
 }
 
 export function getPersonalContributions(): Promise<PersonalContributionWork> {

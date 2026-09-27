@@ -1,0 +1,37 @@
+groups:
+  - name: crowdsmarter
+    rules:
+      - alert: CrowdSmarterBackendDown
+        expr: up{job="crowdsmarter-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: CrowdSmarter backend metrics are unreachable
+          description: Prometheus has been unable to scrape the backend for one minute.
+
+      - alert: CrowdSmarterHighServerErrorRate
+        expr: |
+          sum(rate(crowdsmarter_http_requests_total{status_family="5xx"}[5m]))
+          /
+          clamp_min(sum(rate(crowdsmarter_http_requests_total[5m])), 0.001)
+          > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: CrowdSmarter server error rate exceeds 5 percent
+          description: More than 5 percent of requests have returned 5xx responses for five minutes.
+
+      - alert: CrowdSmarterHighAverageLatency
+        expr: |
+          sum(rate(crowdsmarter_http_request_duration_seconds_sum[5m]))
+          /
+          clamp_min(sum(rate(crowdsmarter_http_request_duration_seconds_count[5m])), 0.001)
+          > 2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: CrowdSmarter average request latency exceeds two seconds
+          description: Average backend latency has remained above two seconds for ten minutes.

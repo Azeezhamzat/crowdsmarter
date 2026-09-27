@@ -30,9 +30,7 @@ class DecisionReviewDetailView(APIView):
 
     def get(self, request, decision_id):  # type: ignore[no-untyped-def]
         review = review_for_user(user=request.user, decision_id=decision_id)
-        return Response(
-            {"review": DecisionReviewSerializer(review).data if review else None}
-        )
+        return Response({"review": DecisionReviewSerializer(review).data if review else None})
 
     def patch(self, request, decision_id):  # type: ignore[no-untyped-def]
         decision = decision_for_user(user=request.user, decision_id=decision_id)

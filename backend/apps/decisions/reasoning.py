@@ -29,9 +29,9 @@ def reasoning_summary(decision: Decision) -> dict[str, Any]:
         status=Assumption.Status.ACTIVE,
         verification_status=Assumption.VerificationStatus.INVALIDATED,
     ).count()
-    current_risks = Risk.objects.filter(decision=decision).exclude(
-        status=Risk.Status.CLOSED
-    ).count()
+    current_risks = (
+        Risk.objects.filter(decision=decision).exclude(status=Risk.Status.CLOSED).count()
+    )
     active_criteria = Criterion.objects.filter(
         decision=decision, status=Criterion.Status.ACTIVE
     ).count()

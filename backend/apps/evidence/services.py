@@ -49,7 +49,12 @@ def _source(*, decision: Decision, source_id: Any | None) -> Source | None:
 
 @transaction.atomic
 def create_evidence(
-    *, actor: User, decision: Decision, option_id: Any | None = None, source_id: Any | None = None, **fields: Any
+    *,
+    actor: User,
+    decision: Decision,
+    option_id: Any | None = None,
+    source_id: Any | None = None,
+    **fields: Any,
 ) -> Evidence:
     if not can_contribute_reasoning(actor=actor, decision=decision):
         raise PermissionDenied("You cannot add evidence in this decision state.")

@@ -55,10 +55,7 @@ def test_decision_object_permission_matrix(
     force_authenticate(request, actor)
     request = Request(request)
 
-    assert (
-        CanAccessDecision().has_object_permission(request, object(), decision)
-        is can_patch
-    )
+    assert CanAccessDecision().has_object_permission(request, object(), decision) is can_patch
 
 
 @pytest.mark.django_db

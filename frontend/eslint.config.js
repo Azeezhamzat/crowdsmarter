@@ -23,8 +23,19 @@ export default tseslint.config(
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
+      // Query results and route changes intentionally hydrate local form and
+      // accessibility state. These effects are synchronization boundaries,
+      // not derived render state that can be replaced with useMemo.
+      "react-hooks/set-state-in-effect": "off",
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
-      "@typescript-eslint/consistent-type-imports": "error"
+      "@typescript-eslint/consistent-type-imports": "error",
+      // React and React Hook Form accept event callbacks whose returned
+      // promises React deliberately ignores. Promise safety remains enabled
+      // for every non-attribute call site.
+      "@typescript-eslint/no-misused-promises": [
+        "error",
+        { checksVoidReturn: { attributes: false } },
+      ],
     },
   },
 );

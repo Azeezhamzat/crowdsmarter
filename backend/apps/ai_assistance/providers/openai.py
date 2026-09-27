@@ -45,7 +45,7 @@ class OpenAIProvider:
                 "parameters": shared.REVIEW_PARAMETERS_SCHEMA,
             },
         }
-        response = client.chat.completions.create(
+        response = client.chat.completions.create(  # type: ignore[call-overload]  # Dynamic JSON schema conforms to the provider API.
             model=self.model_identifier,
             messages=[
                 {"role": "system", "content": shared.SYSTEM_PROMPT},
@@ -56,14 +56,20 @@ class OpenAIProvider:
         )
         message = response.choices[0].message
         tool_calls = message.tool_calls or []
-        call = next((item for item in tool_calls if item.function.name == shared.REVIEW_TOOL_NAME), None)
+        call = next(
+            (item for item in tool_calls if item.function.name == shared.REVIEW_TOOL_NAME), None
+        )
         if call is None:
             raise ValueError("The AI provider did not return a structured review.")
         try:
             payload: dict[str, Any] = json.loads(call.function.arguments)
         except (TypeError, ValueError) as error:
-            raise ValueError("The AI provider returned an unparseable structured review.") from error
-        return shared.build_review_output(payload=payload, snapshot=snapshot, provider_label=self.label)
+            raise ValueError(
+                "The AI provider returned an unparseable structured review."
+            ) from error
+        return shared.build_review_output(
+            payload=payload, snapshot=snapshot, provider_label=self.label
+        )
 
     def summarise_analytics(self, *, metrics: dict[str, Any]) -> AnalyticsNarrative:
         client = openai.OpenAI(api_key=self._api_key)
@@ -75,24 +81,36 @@ class OpenAIProvider:
                 "parameters": analytics_shared.NARRATIVE_PARAMETERS_SCHEMA,
             },
         }
-        response = client.chat.completions.create(
+        response = client.chat.completions.create(  # type: ignore[call-overload]  # Dynamic JSON schema conforms to the provider API.
             model=self.model_identifier,
             messages=[
                 {"role": "system", "content": analytics_shared.SYSTEM_PROMPT},
                 {"role": "user", "content": analytics_shared.narrative_user_message(metrics)},
             ],
             tools=[tool],
-            tool_choice={"type": "function", "function": {"name": analytics_shared.NARRATIVE_TOOL_NAME}},
+            tool_choice={
+                "type": "function",
+                "function": {"name": analytics_shared.NARRATIVE_TOOL_NAME},
+            },
         )
         message = response.choices[0].message
         tool_calls = message.tool_calls or []
-        call = next((item for item in tool_calls if item.function.name == analytics_shared.NARRATIVE_TOOL_NAME), None)
+        call = next(
+            (
+                item
+                for item in tool_calls
+                if item.function.name == analytics_shared.NARRATIVE_TOOL_NAME
+            ),
+            None,
+        )
         if call is None:
             raise ValueError("The AI provider did not return a structured narrative.")
         try:
             payload: dict[str, Any] = json.loads(call.function.arguments)
         except (TypeError, ValueError) as error:
-            raise ValueError("The AI provider returned an unparseable structured narrative.") from error
+            raise ValueError(
+                "The AI provider returned an unparseable structured narrative."
+            ) from error
         return analytics_shared.build_narrative(payload=payload, provider_label=self.label)
 
     def test_connection(self) -> ProviderConnectionResult:
@@ -105,4 +123,6 @@ class OpenAIProvider:
             )
         except Exception as error:  # noqa: BLE001 - surface any failure as a diagnosable result
             return ProviderConnectionResult(ok=False, detail=str(error))
-        return ProviderConnectionResult(ok=True, detail=f"Reached the OpenAI API with model {self.model_identifier}.")
+        return ProviderConnectionResult(
+            ok=True, detail=f"Reached the OpenAI API with model {self.model_identifier}."
+        )

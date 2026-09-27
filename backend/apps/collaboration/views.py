@@ -74,9 +74,7 @@ class DiscussionEntryResolveView(APIView):
             entry=entry,
             **serializer.validated_data,
         )
-        return Response(
-            DiscussionEntrySerializer(entry, context={"request": request}).data
-        )
+        return Response(DiscussionEntrySerializer(entry, context={"request": request}).data)
 
 
 class DecisionActivityView(APIView):

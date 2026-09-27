@@ -18,9 +18,7 @@ from apps.participants.services import (
 
 
 @pytest.mark.django_db
-def test_owner_adds_changes_and_removes_participant(
-    user_factory, decision_factory
-):  # type: ignore[no-untyped-def]
+def test_owner_adds_changes_and_removes_participant(user_factory, decision_factory):  # type: ignore[no-untyped-def]
     decision = decision_factory()
     stakeholder = user_factory()
     Membership.objects.create(
@@ -52,9 +50,7 @@ def test_owner_adds_changes_and_removes_participant(
 
 
 @pytest.mark.django_db
-def test_non_member_cannot_be_participant(
-    user_factory, decision_factory
-):  # type: ignore[no-untyped-def]
+def test_non_member_cannot_be_participant(user_factory, decision_factory):  # type: ignore[no-untyped-def]
     decision = decision_factory()
     outsider = user_factory()
 
@@ -82,9 +78,7 @@ def test_decision_owner_participant_cannot_be_removed(
 
 
 @pytest.mark.django_db
-def test_participants_cannot_be_changed_after_under_review(
-    user_factory, decision_factory
-):  # type: ignore[no-untyped-def]
+def test_participants_cannot_be_changed_after_under_review(user_factory, decision_factory):  # type: ignore[no-untyped-def]
     decision = decision_factory(status=Decision.Status.UNDER_REVIEW)
     stakeholder = user_factory()
     Membership.objects.create(
@@ -139,24 +133,34 @@ def test_removed_participant_can_be_restored_without_losing_history(
 def _reviewer_participant(decision, user_factory):  # type: ignore[no-untyped-def]
     reviewer = user_factory()
     Membership.objects.create(
-        organisation=decision.organisation, user=reviewer, role=Membership.Role.CONTRIBUTOR,
+        organisation=decision.organisation,
+        user=reviewer,
+        role=Membership.Role.CONTRIBUTOR,
         status=Membership.Status.ACTIVE,
     )
     return Participant.objects.create(
-        organisation=decision.organisation, decision=decision, user=reviewer,
-        role=Participant.Role.REVIEWER, added_by=decision.owner,
+        organisation=decision.organisation,
+        decision=decision,
+        user=reviewer,
+        role=Participant.Role.REVIEWER,
+        added_by=decision.owner,
     )
 
 
 @pytest.mark.django_db
 def test_reviewer_self_declares_option_conflict(user_factory, decision_factory):  # type: ignore[no-untyped-def]
     decision = decision_factory()
-    option = create_option(actor=decision.owner, decision=decision, title="App", description="Desc.")
+    option = create_option(
+        actor=decision.owner, decision=decision, title="App", description="Desc."
+    )
     participant = _reviewer_participant(decision, user_factory)
 
     conflict = declare_conflict(
-        actor=participant.user, participant=participant,
-        scope=ConflictOfInterest.Scope.OPTION, option=option, reason="I fund this org.",
+        actor=participant.user,
+        participant=participant,
+        scope=ConflictOfInterest.Scope.OPTION,
+        option=option,
+        reason="I fund this org.",
     )
 
     assert conflict.scope == ConflictOfInterest.Scope.OPTION
@@ -171,13 +175,17 @@ def test_other_reviewer_cannot_declare_on_behalf(user_factory, decision_factory)
     participant = _reviewer_participant(decision, user_factory)
     other_reviewer = user_factory()
     Membership.objects.create(
-        organisation=decision.organisation, user=other_reviewer, role=Membership.Role.CONTRIBUTOR,
+        organisation=decision.organisation,
+        user=other_reviewer,
+        role=Membership.Role.CONTRIBUTOR,
         status=Membership.Status.ACTIVE,
     )
 
     with pytest.raises(PermissionDenied):
         declare_conflict(
-            actor=other_reviewer, participant=participant, scope=ConflictOfInterest.Scope.DECISION,
+            actor=other_reviewer,
+            participant=participant,
+            scope=ConflictOfInterest.Scope.DECISION,
         )
 
 
@@ -187,7 +195,9 @@ def test_manager_can_declare_on_behalf_of_reviewer(user_factory, decision_factor
     participant = _reviewer_participant(decision, user_factory)
 
     conflict = declare_conflict(
-        actor=decision.owner, participant=participant, scope=ConflictOfInterest.Scope.DECISION,
+        actor=decision.owner,
+        participant=participant,
+        scope=ConflictOfInterest.Scope.DECISION,
         reason="Family relationship with the round sponsor.",
     )
 
@@ -202,18 +212,24 @@ def test_option_scope_requires_option(user_factory, decision_factory):  # type: 
 
     with pytest.raises(ParticipantServiceError, match="requires an option"):
         declare_conflict(
-            actor=participant.user, participant=participant, scope=ConflictOfInterest.Scope.OPTION,
+            actor=participant.user,
+            participant=participant,
+            scope=ConflictOfInterest.Scope.OPTION,
         )
 
 
 @pytest.mark.django_db
 def test_reviewer_withdraws_own_conflict(user_factory, decision_factory):  # type: ignore[no-untyped-def]
     decision = decision_factory()
-    option = create_option(actor=decision.owner, decision=decision, title="App", description="Desc.")
+    option = create_option(
+        actor=decision.owner, decision=decision, title="App", description="Desc."
+    )
     participant = _reviewer_participant(decision, user_factory)
     conflict = declare_conflict(
-        actor=participant.user, participant=participant,
-        scope=ConflictOfInterest.Scope.OPTION, option=option,
+        actor=participant.user,
+        participant=participant,
+        scope=ConflictOfInterest.Scope.OPTION,
+        option=option,
     )
 
     withdrawn = withdraw_conflict(actor=participant.user, conflict=conflict)
@@ -226,15 +242,21 @@ def test_reviewer_withdraws_own_conflict(user_factory, decision_factory):  # typ
 @pytest.mark.django_db
 def test_duplicate_active_option_conflict_is_rejected(user_factory, decision_factory):  # type: ignore[no-untyped-def]
     decision = decision_factory()
-    option = create_option(actor=decision.owner, decision=decision, title="App", description="Desc.")
+    option = create_option(
+        actor=decision.owner, decision=decision, title="App", description="Desc."
+    )
     participant = _reviewer_participant(decision, user_factory)
     declare_conflict(
-        actor=participant.user, participant=participant,
-        scope=ConflictOfInterest.Scope.OPTION, option=option,
+        actor=participant.user,
+        participant=participant,
+        scope=ConflictOfInterest.Scope.OPTION,
+        option=option,
     )
 
     with pytest.raises(ParticipantServiceError, match="already covers"):
         declare_conflict(
-            actor=participant.user, participant=participant,
-            scope=ConflictOfInterest.Scope.OPTION, option=option,
+            actor=participant.user,
+            participant=participant,
+            scope=ConflictOfInterest.Scope.OPTION,
+            option=option,
         )

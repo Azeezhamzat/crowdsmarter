@@ -7,7 +7,6 @@ import { z } from "zod";
 import { FieldError } from "../../components/FieldError";
 import { StatusMessage } from "../../components/StatusMessage";
 import { ApiError } from "../../lib/api";
-import type { LessonCategory, OutcomeAssessment } from "../../lib/types";
 import { getDecision } from "../decisions/api";
 import { listMemberships } from "../organisations/api";
 import {
@@ -172,11 +171,11 @@ export function DecisionOutcomesPage() {
     onSuccess: refresh,
   });
   const completeReview = useMutation({
-    mutationFn: (input: CompleteReviewForm) => completeOutcomeReview(decisionId, { ...input, expected_status: decision.data?.status ?? "", outcome_assessment: input.outcome_assessment as OutcomeAssessment }),
+    mutationFn: (input: CompleteReviewForm) => completeOutcomeReview(decisionId, { ...input, expected_status: decision.data?.status ?? "", outcome_assessment: input.outcome_assessment }),
     onSuccess: refresh,
   });
   const addLesson = useMutation({
-    mutationFn: (input: LessonForm) => createLesson(decisionId, { ...input, category: input.category as LessonCategory }),
+    mutationFn: (input: LessonForm) => createLesson(decisionId, { ...input, category: input.category }),
     onSuccess: async () => { lessonForm.reset(); await refresh(); },
   });
   const retire = useMutation({ mutationFn: retireLesson, onSuccess: refresh });

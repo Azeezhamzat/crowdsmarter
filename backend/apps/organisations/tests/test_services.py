@@ -43,9 +43,7 @@ def test_create_organisation_makes_actor_owner_and_audits(
 
 
 @pytest.mark.django_db
-def test_last_owner_cannot_be_demoted(
-    user_factory, organisation_factory
-):  # type: ignore[no-untyped-def]
+def test_last_owner_cannot_be_demoted(user_factory, organisation_factory):  # type: ignore[no-untyped-def]
     owner = user_factory()
     organisation = organisation_factory(owner=owner)
     membership = Membership.objects.get(organisation=organisation, user=owner)
@@ -59,9 +57,7 @@ def test_last_owner_cannot_be_demoted(
 
 
 @pytest.mark.django_db
-def test_last_owner_cannot_be_removed(
-    user_factory, organisation_factory
-):  # type: ignore[no-untyped-def]
+def test_last_owner_cannot_be_removed(user_factory, organisation_factory):  # type: ignore[no-untyped-def]
     owner = user_factory()
     organisation = organisation_factory(owner=owner)
     membership = Membership.objects.get(organisation=organisation, user=owner)
@@ -71,9 +67,7 @@ def test_last_owner_cannot_be_removed(
 
 
 @pytest.mark.django_db
-def test_owner_can_transfer_accountability_before_leaving(
-    user_factory, organisation_factory
-):  # type: ignore[no-untyped-def]
+def test_owner_can_transfer_accountability_before_leaving(user_factory, organisation_factory):  # type: ignore[no-untyped-def]
     first_owner = user_factory()
     second_owner = user_factory()
     organisation = organisation_factory(owner=first_owner)
@@ -96,9 +90,7 @@ def test_owner_can_transfer_accountability_before_leaving(
 
 
 @pytest.mark.django_db
-def test_admin_cannot_appoint_or_modify_owner(
-    user_factory, organisation_factory
-):  # type: ignore[no-untyped-def]
+def test_admin_cannot_appoint_or_modify_owner(user_factory, organisation_factory):  # type: ignore[no-untyped-def]
     owner = user_factory()
     admin = user_factory()
     candidate = user_factory()
@@ -142,9 +134,7 @@ def test_create_organisation_normalises_stable_identity(
 
 
 @pytest.mark.django_db
-def test_service_rejects_unknown_membership_role(
-    user_factory, organisation_factory
-):  # type: ignore[no-untyped-def]
+def test_service_rejects_unknown_membership_role(user_factory, organisation_factory):  # type: ignore[no-untyped-def]
     owner = user_factory()
     candidate = user_factory()
     organisation = organisation_factory(owner=owner)
@@ -322,6 +312,7 @@ def test_open_risk_ownership_must_be_transferred_before_offboarding(
 
     assert Membership.objects.filter(id=membership.id).exists()
 
+
 @pytest.mark.django_db
 def test_remove_member_requires_active_implementation_transfer(
     user_factory,
@@ -383,6 +374,7 @@ def test_remove_member_requires_active_implementation_transfer(
     with pytest.raises(OrganisationServiceError, match="implementation ownership"):
         remove_membership(actor=owner, membership=membership)
 
+
 @pytest.mark.django_db
 def test_active_foresight_canvas_ownership_must_be_transferred_before_offboarding(
     user_factory, organisation_factory
@@ -408,9 +400,33 @@ def test_active_foresight_canvas_ownership_must_be_transferred_before_offboardin
         status="active",
     )
 
-    with pytest.raises(
-        OrganisationServiceError, match="active foresight canvas ownership"
-    ):
+    with pytest.raises(OrganisationServiceError, match="active foresight canvas ownership"):
+        remove_membership(actor=owner, membership=membership)
+
+
+@pytest.mark.django_db
+def test_active_research_claim_ownership_must_be_transferred_before_offboarding(
+    user_factory, organisation_factory
+):  # type: ignore[no-untyped-def]
+    from apps.foresight.services import create_research_claim
+
+    owner = user_factory()
+    departing_member = user_factory()
+    organisation = organisation_factory(owner=owner)
+    membership = Membership.objects.create(
+        organisation=organisation,
+        user=departing_member,
+        role=Membership.Role.CONTRIBUTOR,
+    )
+    create_research_claim(
+        actor=owner,
+        organisation=organisation,
+        owner_id=departing_member.id,
+        statement="Structured follow-up improves participant trust.",
+        lifecycle_status="active",
+    )
+
+    with pytest.raises(OrganisationServiceError, match="active research-claim ownership"):
         remove_membership(actor=owner, membership=membership)
 
 
@@ -484,11 +500,8 @@ def test_open_strategic_implication_ownership_must_be_transferred_before_offboar
         priority=4,
     )
 
-    with pytest.raises(
-        OrganisationServiceError, match="open strategic implication ownership"
-    ):
+    with pytest.raises(OrganisationServiceError, match="open strategic implication ownership"):
         remove_membership(actor=owner, membership=membership)
-
 
 
 @pytest.mark.django_db

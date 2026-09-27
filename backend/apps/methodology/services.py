@@ -42,7 +42,7 @@ def _next_key(*, organisation: Organisation, name: str) -> str:
     number = 2
     while DecisionMethod.objects.filter(organisation=organisation, key=key).exists():
         suffix = f"-{number}"
-        key = f"{base[:80-len(suffix)]}{suffix}"
+        key = f"{base[: 80 - len(suffix)]}{suffix}"
         number += 1
     return key
 
@@ -67,7 +67,9 @@ def _version_payload(values: dict) -> dict:
 
 
 @transaction.atomic
-def create_method(*, actor, organisation: Organisation, name: str, summary: str, best_for: str = "", **values):  # type: ignore[no-untyped-def]
+def create_method(
+    *, actor, organisation: Organisation, name: str, summary: str, best_for: str = "", **values
+):  # type: ignore[no-untyped-def]
     _require_manager(actor=actor, organisation=organisation)
     method = DecisionMethod(
         organisation=organisation,
@@ -121,13 +123,23 @@ def clone_builtin_method(*, actor, organisation: Organisation, builtin_key: str,
         suggested_urgency=template.suggested_urgency,
         checklist=list(template.checklist),
         cloned_from_builtin_key=template.key,
-        required_fields=["decision_question", "purpose", "context", "scope", "contribution_guidance"],
+        required_fields=[
+            "decision_question",
+            "purpose",
+            "context",
+            "scope",
+            "contribution_guidance",
+        ],
     )
 
 
 @transaction.atomic
 def update_draft_version(*, actor, version: DecisionMethodVersion, changes: dict):  # type: ignore[no-untyped-def]
-    version = DecisionMethodVersion.objects.select_for_update().select_related("organisation", "method").get(id=version.id)
+    version = (
+        DecisionMethodVersion.objects.select_for_update()
+        .select_related("organisation", "method")
+        .get(id=version.id)
+    )
     _require_manager(actor=actor, organisation=version.organisation)
     if version.status != DecisionMethodVersion.Status.DRAFT:
         raise MethodologyServiceError("Approved or retired versions are immutable.")
@@ -148,7 +160,11 @@ def update_draft_version(*, actor, version: DecisionMethodVersion, changes: dict
 
 @transaction.atomic
 def create_method_version(*, actor, method: DecisionMethod):  # type: ignore[no-untyped-def]
-    method = DecisionMethod.objects.select_for_update().select_related("organisation", "current_version").get(id=method.id)
+    method = (
+        DecisionMethod.objects.select_for_update()
+        .select_related("organisation", "current_version")
+        .get(id=method.id)
+    )
     _require_manager(actor=actor, organisation=method.organisation)
     if method.status == DecisionMethod.Status.RETIRED:
         raise MethodologyServiceError("Retired methods cannot receive new versions.")
@@ -160,9 +176,20 @@ def create_method_version(*, actor, method: DecisionMethod):  # type: ignore[no-
     values = {
         field: getattr(source, field)
         for field in (
-            "question_prompt", "purpose_prompt", "context_prompt", "scope_prompt", "contribution_prompt",
-            "suggested_urgency", "required_fields", "checklist", "evidence_prompts", "assumption_prompts",
-            "risk_prompts", "stakeholder_prompts", "lifecycle_expectations", "cloned_from_builtin_key",
+            "question_prompt",
+            "purpose_prompt",
+            "context_prompt",
+            "scope_prompt",
+            "contribution_prompt",
+            "suggested_urgency",
+            "required_fields",
+            "checklist",
+            "evidence_prompts",
+            "assumption_prompts",
+            "risk_prompts",
+            "stakeholder_prompts",
+            "lifecycle_expectations",
+            "cloned_from_builtin_key",
         )
     }
     version = DecisionMethodVersion(
@@ -187,14 +214,20 @@ def create_method_version(*, actor, method: DecisionMethod):  # type: ignore[no-
 
 @transaction.atomic
 def approve_method_version(*, actor, version: DecisionMethodVersion):  # type: ignore[no-untyped-def]
-    version = DecisionMethodVersion.objects.select_for_update().select_related("organisation", "method").get(id=version.id)
+    version = (
+        DecisionMethodVersion.objects.select_for_update()
+        .select_related("organisation", "method")
+        .get(id=version.id)
+    )
     _require_owner(actor=actor, organisation=version.organisation)
     if version.status != DecisionMethodVersion.Status.DRAFT:
         raise MethodologyServiceError("Only a draft version can be approved.")
     now = timezone.now()
     previous = version.method.current_version
     if previous:
-        DecisionMethodVersion.objects.filter(id=previous.id).update(status=DecisionMethodVersion.Status.RETIRED, updated_at=now)
+        DecisionMethodVersion.objects.filter(id=previous.id).update(
+            status=DecisionMethodVersion.Status.RETIRED, updated_at=now
+        )
     version.status = DecisionMethodVersion.Status.APPROVED
     version.approved_by = actor
     version.approved_at = now
@@ -218,7 +251,9 @@ def approve_method_version(*, actor, version: DecisionMethodVersion):  # type: i
 
 @transaction.atomic
 def retire_method(*, actor, method: DecisionMethod, reason: str):  # type: ignore[no-untyped-def]
-    method = DecisionMethod.objects.select_for_update().select_related("organisation").get(id=method.id)
+    method = (
+        DecisionMethod.objects.select_for_update().select_related("organisation").get(id=method.id)
+    )
     _require_owner(actor=actor, organisation=method.organisation)
     reason = reason.strip()
     if not reason:

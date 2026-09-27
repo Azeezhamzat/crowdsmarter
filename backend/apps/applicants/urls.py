@@ -3,6 +3,7 @@
 from django.urls import path
 
 from .views import (
+    ApplicantSessionLogoutView,
     MagicLinkConsumeView,
     MagicLinkRequestView,
     MyApplicationsView,
@@ -13,7 +14,10 @@ app_name = "applicants"
 
 urlpatterns = [
     path("applicants/magic-link/", MagicLinkRequestView.as_view(), name="magic-link-request"),
-    path("applicants/magic-link/consume/", MagicLinkConsumeView.as_view(), name="magic-link-consume"),
+    path(
+        "applicants/magic-link/consume/", MagicLinkConsumeView.as_view(), name="magic-link-consume"
+    ),
+    path("applicants/session/", ApplicantSessionLogoutView.as_view(), name="session-logout"),
     path("applicants/me/applications/", MyApplicationsView.as_view(), name="my-applications"),
     path(
         "applicants/me/applications/<uuid:idea_id>/progress-reports/",

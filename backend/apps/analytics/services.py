@@ -19,7 +19,6 @@ from apps.reviews.models import DecisionReview
 
 from .models import AnalyticsInsight
 
-
 OPEN_STATUSES = {
     Decision.Status.DRAFT,
     Decision.Status.FRAMING,
@@ -108,9 +107,7 @@ def organisation_analytics(*, organisation: Organisation) -> dict[str, Any]:
         1 for item in open_decisions if active_participant_counts[str(item.id)] >= 2
     )
     contribution_coverage = (
-        round(contribution_ready / len(open_decisions) * 100, 1)
-        if open_decisions
-        else None
+        round(contribution_ready / len(open_decisions) * 100, 1) if open_decisions else None
     )
 
     reviews = list(
@@ -121,19 +118,13 @@ def organisation_analytics(*, organisation: Organisation) -> dict[str, Any]:
         )
     )
     due_reviews = [
-        item
-        for item in reviews
-        if item.reviewed_at is None and item.review_due_date <= today
+        item for item in reviews if item.reviewed_at is None and item.review_due_date <= today
     ]
-    outcome_counts = Counter(
-        item.outcome_assessment for item in reviews if item.outcome_assessment
-    )
+    outcome_counts = Counter(item.outcome_assessment for item in reviews if item.outcome_assessment)
     reviewed_outcomes = sum(outcome_counts.values())
     positive_outcomes = outcome_counts["exceeded"] + outcome_counts["met"]
     outcome_success_rate = (
-        round(positive_outcomes / reviewed_outcomes * 100, 1)
-        if reviewed_outcomes
-        else None
+        round(positive_outcomes / reviewed_outcomes * 100, 1) if reviewed_outcomes else None
     )
 
     active_lessons = Lesson.objects.filter(
@@ -191,8 +182,7 @@ def organisation_analytics(*, organisation: Organisation) -> dict[str, Any]:
                 "Share of open decisions with at least two active participants."
             ),
             "outcome_success_percent": (
-                "Share of completed outcome reviews assessed as met or "
-                "exceeded expectations."
+                "Share of completed outcome reviews assessed as met or exceeded expectations."
             ),
         },
     }
@@ -224,7 +214,9 @@ def generate_analytics_insight(*, organisation: Organisation, actor: User) -> An
     )
 
 
-def list_analytics_insights(*, organisation: Organisation, limit: int = 10) -> list[AnalyticsInsight]:
+def list_analytics_insights(
+    *, organisation: Organisation, limit: int = 10
+) -> list[AnalyticsInsight]:
     return list(
         AnalyticsInsight.objects.filter(organisation=organisation)
         .select_related("requested_by")

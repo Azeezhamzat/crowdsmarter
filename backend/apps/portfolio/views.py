@@ -55,8 +55,4 @@ class OrganisationPortfolioView(APIView):
             my_work=values.get("my_work", False),
             overdue_only=values.get("overdue", False),
         )
-        return Response(
-            OrganisationPortfolioSerializer(
-                result, context={"request": request}
-            ).data
-        )
+        return Response(OrganisationPortfolioSerializer(result, context={"request": request}).data)

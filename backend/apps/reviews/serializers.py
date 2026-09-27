@@ -72,9 +72,7 @@ class OutcomeReviewOpenInputSerializer(StrictSerializer):
 class OutcomeReviewCompleteInputSerializer(StrictSerializer):
     expected_status = serializers.ChoiceField(choices=Decision.Status.choices)
     outcome_summary = serializers.CharField(max_length=16000, trim_whitespace=True)
-    outcome_assessment = serializers.ChoiceField(
-        choices=DecisionReview.OutcomeAssessment.choices
-    )
+    outcome_assessment = serializers.ChoiceField(choices=DecisionReview.OutcomeAssessment.choices)
     review_evidence = serializers.CharField(max_length=16000, trim_whitespace=True)
     unintended_consequences = serializers.CharField(
         max_length=12000,

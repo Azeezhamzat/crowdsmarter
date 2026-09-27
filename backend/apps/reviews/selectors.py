@@ -15,14 +15,18 @@ from .models import DecisionReview
 def review_for_user(*, user: User, decision_id: UUID) -> DecisionReview | None:
     """Return the review only after tenant access has been established."""
     decision = decision_for_user(user=user, decision_id=decision_id)
-    return DecisionReview.objects.select_related(
-        "decision",
-        "organisation",
-        "implementation_owner",
-        "commitment_recorded_by",
-        "implementation_started_by",
-        "reviewed_by",
-    ).filter(decision=decision).first()
+    return (
+        DecisionReview.objects.select_related(
+            "decision",
+            "organisation",
+            "implementation_owner",
+            "commitment_recorded_by",
+            "implementation_started_by",
+            "reviewed_by",
+        )
+        .filter(decision=decision)
+        .first()
+    )
 
 
 def required_review_for_user(*, user: User, decision_id: UUID) -> DecisionReview:

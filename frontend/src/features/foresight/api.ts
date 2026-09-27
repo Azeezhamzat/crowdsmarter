@@ -1,10 +1,29 @@
 import { apiRequest } from "../../lib/api";
 import type {
+  ForesightCanvas,
+  ForesightCanvasWorkspace,
+  ForesightConsequence,
+  ForesightDriver,
   ForesightFeed,
+  ForesightFeedbackLoop,
   ForesightOverview,
+  ResearchClaim,
+  ForesightRelationship,
+  ForesightScenario,
+  ForesightScenarioDriverState,
+  ForesightScenarioImplicationLink,
+  ForesightScenarioReview,
+  ForesightScenarioSet,
+  ForesightScenarioSetWorkspace,
   ForesightSignal,
+  ForesightSignpost,
+  ForesightSignpostObservation,
   ForesightSource,
+  ForesightStakeholder,
   ForesightWatchlist,
+  ForesightWindTunnelAssessment,
+  StrategicImplication,
+  ThreeHorizonItem,
 } from "../../lib/types";
 
 export function getForesightOverview(organisationId: string): Promise<ForesightOverview> {
@@ -32,6 +51,52 @@ export function uploadSourceAttachment(sourceId: string, file: File): Promise<Fo
     method: "POST",
     body,
   });
+}
+
+export function listResearchClaims(organisationId: string): Promise<ResearchClaim[]> {
+  return apiRequest<ResearchClaim[]>(
+    `/organisations/${organisationId}/foresight/research-claims/`,
+  );
+}
+
+export function createResearchClaim(
+  organisationId: string,
+  input: Record<string, unknown>,
+): Promise<ResearchClaim> {
+  return apiRequest<ResearchClaim>(
+    `/organisations/${organisationId}/foresight/research-claims/`,
+    { method: "POST", body: JSON.stringify(input) },
+  );
+}
+
+export function updateResearchClaim(
+  claimId: string,
+  input: Record<string, unknown>,
+): Promise<ResearchClaim> {
+  return apiRequest<ResearchClaim>(`/foresight/research-claims/${claimId}/`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export function linkSourceToResearchClaim(
+  claimId: string,
+  input: { source_id: string; relationship: string; note?: string },
+): Promise<ResearchClaim> {
+  return apiRequest<ResearchClaim>(`/foresight/research-claims/${claimId}/sources/`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function unlinkSourceFromResearchClaim(
+  claimId: string,
+  sourceId: string,
+): Promise<void> {
+  return apiRequest<void>(
+    `/foresight/research-claims/${claimId}/sources/${sourceId}/`,
+    { method: "DELETE" },
+  );
 }
 
 export function listSignals(organisationId: string): Promise<ForesightSignal[]> {
@@ -116,185 +181,185 @@ export function syncFeed(feedId: string): Promise<{
 }
 
 export function listForesightCanvases(organisationId: string) {
-  return apiRequest<import("../../lib/types").ForesightCanvas[]>(
+  return apiRequest<ForesightCanvas[]>(
     `/organisations/${organisationId}/foresight/canvases/`,
   );
 }
 
 export function createForesightCanvas(organisationId: string, input: Record<string, unknown>) {
-  return apiRequest<import("../../lib/types").ForesightCanvas>(
+  return apiRequest<ForesightCanvas>(
     `/organisations/${organisationId}/foresight/canvases/`,
     { method: "POST", body: JSON.stringify(input) },
   );
 }
 
 export function getForesightCanvas(canvasId: string) {
-  return apiRequest<import("../../lib/types").ForesightCanvasWorkspace>(
+  return apiRequest<ForesightCanvasWorkspace>(
     `/foresight/canvases/${canvasId}/`,
   );
 }
 
 export function updateForesightCanvas(canvasId: string, input: Record<string, unknown>) {
-  return apiRequest<import("../../lib/types").ForesightCanvas>(`/foresight/canvases/${canvasId}/`, {
+  return apiRequest<ForesightCanvas>(`/foresight/canvases/${canvasId}/`, {
     method: "PATCH",
     body: JSON.stringify(input),
   });
 }
 
 export function createForesightDriver(canvasId: string, input: Record<string, unknown>) {
-  return apiRequest<import("../../lib/types").ForesightDriver>(`/foresight/canvases/${canvasId}/drivers/`, {
+  return apiRequest<ForesightDriver>(`/foresight/canvases/${canvasId}/drivers/`, {
     method: "POST",
     body: JSON.stringify(input),
   });
 }
 
 export function linkDriverSignal(driverId: string, signalId: string, rationale: string) {
-  return apiRequest<import("../../lib/types").ForesightDriver>(`/foresight/drivers/${driverId}/signals/`, {
+  return apiRequest<ForesightDriver>(`/foresight/drivers/${driverId}/signals/`, {
     method: "POST",
     body: JSON.stringify({ signal_id: signalId, rationale }),
   });
 }
 
 export function createSystemStakeholder(canvasId: string, input: Record<string, unknown>) {
-  return apiRequest<import("../../lib/types").ForesightStakeholder>(
+  return apiRequest<ForesightStakeholder>(
     `/foresight/canvases/${canvasId}/stakeholders/`,
     { method: "POST", body: JSON.stringify(input) },
   );
 }
 
 export function createCausalRelationship(canvasId: string, input: Record<string, unknown>) {
-  return apiRequest<import("../../lib/types").ForesightRelationship>(
+  return apiRequest<ForesightRelationship>(
     `/foresight/canvases/${canvasId}/relationships/`,
     { method: "POST", body: JSON.stringify(input) },
   );
 }
 
 export function createFeedbackLoop(canvasId: string, input: Record<string, unknown>) {
-  return apiRequest<import("../../lib/types").ForesightFeedbackLoop>(
+  return apiRequest<ForesightFeedbackLoop>(
     `/foresight/canvases/${canvasId}/feedback-loops/`,
     { method: "POST", body: JSON.stringify(input) },
   );
 }
 
 export function createFuturesConsequence(canvasId: string, input: Record<string, unknown>) {
-  return apiRequest<import("../../lib/types").ForesightConsequence>(
+  return apiRequest<ForesightConsequence>(
     `/foresight/canvases/${canvasId}/consequences/`,
     { method: "POST", body: JSON.stringify(input) },
   );
 }
 
 export function createThreeHorizonItem(canvasId: string, input: Record<string, unknown>) {
-  return apiRequest<import("../../lib/types").ThreeHorizonItem>(
+  return apiRequest<ThreeHorizonItem>(
     `/foresight/canvases/${canvasId}/horizons/`,
     { method: "POST", body: JSON.stringify(input) },
   );
 }
 
 export function createStrategicImplication(canvasId: string, input: Record<string, unknown>) {
-  return apiRequest<import("../../lib/types").StrategicImplication>(
+  return apiRequest<StrategicImplication>(
     `/foresight/canvases/${canvasId}/implications/`,
     { method: "POST", body: JSON.stringify(input) },
   );
 }
 
 export function updateStrategicImplication(implicationId: string, input: Record<string, unknown>) {
-  return apiRequest<import("../../lib/types").StrategicImplication>(
+  return apiRequest<StrategicImplication>(
     `/foresight/implications/${implicationId}/`,
     { method: "PATCH", body: JSON.stringify(input) },
   );
 }
 
 export function listScenarioSets(canvasId: string) {
-  return apiRequest<import("../../lib/types").ForesightScenarioSet[]>(
+  return apiRequest<ForesightScenarioSet[]>(
     `/foresight/canvases/${canvasId}/scenario-sets/`,
   );
 }
 
 export function createScenarioSet(canvasId: string, input: Record<string, unknown>) {
-  return apiRequest<import("../../lib/types").ForesightScenarioSet>(
+  return apiRequest<ForesightScenarioSet>(
     `/foresight/canvases/${canvasId}/scenario-sets/`,
     { method: "POST", body: JSON.stringify(input) },
   );
 }
 
 export function getScenarioSet(scenarioSetId: string) {
-  return apiRequest<import("../../lib/types").ForesightScenarioSetWorkspace>(
+  return apiRequest<ForesightScenarioSetWorkspace>(
     `/foresight/scenario-sets/${scenarioSetId}/`,
   );
 }
 
 export function updateScenarioSet(scenarioSetId: string, input: Record<string, unknown>) {
-  return apiRequest<import("../../lib/types").ForesightScenarioSet>(
+  return apiRequest<ForesightScenarioSet>(
     `/foresight/scenario-sets/${scenarioSetId}/`,
     { method: "PATCH", body: JSON.stringify(input) },
   );
 }
 
 export function createScenario(scenarioSetId: string, input: Record<string, unknown>) {
-  return apiRequest<import("../../lib/types").ForesightScenario>(
+  return apiRequest<ForesightScenario>(
     `/foresight/scenario-sets/${scenarioSetId}/scenarios/`,
     { method: "POST", body: JSON.stringify(input) },
   );
 }
 
 export function updateScenario(scenarioId: string, input: Record<string, unknown>) {
-  return apiRequest<import("../../lib/types").ForesightScenario>(
+  return apiRequest<ForesightScenario>(
     `/foresight/scenarios/${scenarioId}/`,
     { method: "PATCH", body: JSON.stringify(input) },
   );
 }
 
 export function setScenarioDriverState(scenarioId: string, input: Record<string, unknown>) {
-  return apiRequest<import("../../lib/types").ForesightScenarioDriverState>(
+  return apiRequest<ForesightScenarioDriverState>(
     `/foresight/scenarios/${scenarioId}/driver-states/`,
     { method: "POST", body: JSON.stringify(input) },
   );
 }
 
 export function submitScenarioReview(scenarioId: string, input: Record<string, unknown>) {
-  return apiRequest<import("../../lib/types").ForesightScenarioReview>(
+  return apiRequest<ForesightScenarioReview>(
     `/foresight/scenarios/${scenarioId}/reviews/`,
     { method: "POST", body: JSON.stringify(input) },
   );
 }
 
 export function assessScenarioOption(scenarioId: string, input: Record<string, unknown>) {
-  return apiRequest<import("../../lib/types").ForesightWindTunnelAssessment>(
+  return apiRequest<ForesightWindTunnelAssessment>(
     `/foresight/scenarios/${scenarioId}/wind-tunnel/`,
     { method: "POST", body: JSON.stringify(input) },
   );
 }
 
 export function createScenarioSignpost(scenarioSetId: string, input: Record<string, unknown>) {
-  return apiRequest<import("../../lib/types").ForesightSignpost>(
+  return apiRequest<ForesightSignpost>(
     `/foresight/scenario-sets/${scenarioSetId}/signposts/`,
     { method: "POST", body: JSON.stringify(input) },
   );
 }
 
 export function createSignpostObservation(signpostId: string, input: Record<string, unknown>) {
-  return apiRequest<import("../../lib/types").ForesightSignpostObservation>(
+  return apiRequest<ForesightSignpostObservation>(
     `/foresight/signposts/${signpostId}/observations/`,
     { method: "POST", body: JSON.stringify(input) },
   );
 }
 
 export function linkScenarioImplication(scenarioId: string, input: Record<string, unknown>) {
-  return apiRequest<import("../../lib/types").ForesightScenarioImplicationLink>(
+  return apiRequest<ForesightScenarioImplicationLink>(
     `/foresight/scenarios/${scenarioId}/implications/`,
     { method: "POST", body: JSON.stringify(input) },
   );
 }
 
 export function linkSignpostToAssumption(signpostId: string, input: Record<string, unknown>) {
-  return apiRequest<import("../../lib/types").ForesightSignpost>(
+  return apiRequest<ForesightSignpost>(
     `/foresight/signposts/${signpostId}/assumption-links/`,
     { method: "POST", body: JSON.stringify(input) },
   );
 }
 
 export function linkSignpostToRisk(signpostId: string, input: Record<string, unknown>) {
-  return apiRequest<import("../../lib/types").ForesightSignpost>(
+  return apiRequest<ForesightSignpost>(
     `/foresight/signposts/${signpostId}/risk-links/`,
     { method: "POST", body: JSON.stringify(input) },
   );

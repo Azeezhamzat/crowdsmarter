@@ -15,9 +15,7 @@ from .models import (
     ScenarioSet,
     ScenarioSignpost,
     Signpost,
-    SignpostAssumptionLink,
     SignpostObservation,
-    SignpostRiskLink,
     WindTunnelAssessment,
 )
 from .policies import can_manage_record
@@ -25,13 +23,9 @@ from .policies import can_manage_record
 
 class ScenarioSetSerializer(serializers.ModelSerializer):
     axis_x_driver_id = serializers.UUIDField(read_only=True)
-    axis_x_driver_title = serializers.CharField(
-        source="axis_x_driver.title", read_only=True
-    )
+    axis_x_driver_title = serializers.CharField(source="axis_x_driver.title", read_only=True)
     axis_y_driver_id = serializers.UUIDField(read_only=True)
-    axis_y_driver_title = serializers.CharField(
-        source="axis_y_driver.title", read_only=True
-    )
+    axis_y_driver_title = serializers.CharField(source="axis_y_driver.title", read_only=True)
     linked_decision_id = serializers.UUIDField(read_only=True, allow_null=True)
     linked_decision_title = serializers.CharField(
         source="linked_decision.title", read_only=True, allow_null=True
@@ -114,24 +108,12 @@ class ScenarioSetWriteSerializer(StrictSerializer):
 
 
 class ScenarioSetPatchSerializer(StrictSerializer):
-    title = serializers.CharField(
-        max_length=240, trim_whitespace=True, required=False
-    )
-    purpose = serializers.CharField(
-        max_length=12000, trim_whitespace=True, required=False
-    )
-    axis_x_low_label = serializers.CharField(
-        max_length=160, trim_whitespace=True, required=False
-    )
-    axis_x_high_label = serializers.CharField(
-        max_length=160, trim_whitespace=True, required=False
-    )
-    axis_y_low_label = serializers.CharField(
-        max_length=160, trim_whitespace=True, required=False
-    )
-    axis_y_high_label = serializers.CharField(
-        max_length=160, trim_whitespace=True, required=False
-    )
+    title = serializers.CharField(max_length=240, trim_whitespace=True, required=False)
+    purpose = serializers.CharField(max_length=12000, trim_whitespace=True, required=False)
+    axis_x_low_label = serializers.CharField(max_length=160, trim_whitespace=True, required=False)
+    axis_x_high_label = serializers.CharField(max_length=160, trim_whitespace=True, required=False)
+    axis_y_low_label = serializers.CharField(max_length=160, trim_whitespace=True, required=False)
+    axis_y_high_label = serializers.CharField(max_length=160, trim_whitespace=True, required=False)
     linked_decision_id = serializers.UUIDField(required=False, allow_null=True)
     owner_id = serializers.UUIDField(required=False)
     status = serializers.ChoiceField(choices=ScenarioSet.Status.choices, required=False)
@@ -186,9 +168,7 @@ class WindTunnelAssessmentSerializer(serializers.ModelSerializer):
     option_id = serializers.UUIDField(read_only=True)
     option_title = serializers.CharField(source="option.title", read_only=True)
     decision_id = serializers.UUIDField(source="option.decision_id", read_only=True)
-    decision_title = serializers.CharField(
-        source="option.decision.title", read_only=True
-    )
+    decision_title = serializers.CharField(source="option.decision.title", read_only=True)
     verdict_label = serializers.CharField(source="get_verdict_display", read_only=True)
     assessed_by = DecisionUserSerializer(read_only=True)
     robustness_score = serializers.FloatField(read_only=True)
@@ -221,12 +201,8 @@ class WindTunnelAssessmentSerializer(serializers.ModelSerializer):
 
 class ScenarioImplicationLinkSerializer(serializers.ModelSerializer):
     implication_id = serializers.UUIDField(read_only=True)
-    implication_title = serializers.CharField(
-        source="implication.title", read_only=True
-    )
-    implication_type = serializers.CharField(
-        source="implication.implication_type", read_only=True
-    )
+    implication_title = serializers.CharField(source="implication.title", read_only=True)
+    implication_type = serializers.CharField(source="implication.implication_type", read_only=True)
     effect_label = serializers.CharField(source="get_effect_display", read_only=True)
     linked_by = DecisionUserSerializer(read_only=True)
 
@@ -260,9 +236,7 @@ class ScenarioSerializer(serializers.ModelSerializer):
     driver_states = ScenarioDriverStateSerializer(many=True, read_only=True)
     reviews = ScenarioReviewSerializer(many=True, read_only=True)
     review_summary = serializers.SerializerMethodField()
-    wind_tunnel_assessments = WindTunnelAssessmentSerializer(
-        many=True, read_only=True
-    )
+    wind_tunnel_assessments = WindTunnelAssessmentSerializer(many=True, read_only=True)
     implication_links = ScenarioImplicationLinkSerializer(many=True, read_only=True)
     signpost_links = serializers.SerializerMethodField()
     can_edit = serializers.SerializerMethodField()
@@ -314,12 +288,8 @@ class ScenarioSerializer(serializers.ModelSerializer):
         return {
             "review_count": len(reviews),
             "plausibility": round(mean(item.plausibility for item in reviews), 2),
-            "internal_consistency": round(
-                mean(item.internal_consistency for item in reviews), 2
-            ),
-            "distinctiveness": round(
-                mean(item.distinctiveness for item in reviews), 2
-            ),
+            "internal_consistency": round(mean(item.internal_consistency for item in reviews), 2),
+            "distinctiveness": round(mean(item.distinctiveness for item in reviews), 2),
             "usefulness": round(mean(item.usefulness for item in reviews), 2),
             "confidence": round(mean(confidences), 2),
             "confidence_range": max(confidences) - min(confidences),
@@ -376,19 +346,11 @@ class ScenarioWriteSerializer(StrictSerializer):
 
 
 class ScenarioPatchSerializer(StrictSerializer):
-    title = serializers.CharField(
-        max_length=240, trim_whitespace=True, required=False
-    )
+    title = serializers.CharField(max_length=240, trim_whitespace=True, required=False)
     code = serializers.CharField(max_length=40, trim_whitespace=True, required=False)
-    headline = serializers.CharField(
-        max_length=320, trim_whitespace=True, required=False
-    )
-    narrative = serializers.CharField(
-        max_length=20000, trim_whitespace=True, required=False
-    )
-    key_assumptions = serializers.CharField(
-        max_length=12000, trim_whitespace=True, required=False
-    )
+    headline = serializers.CharField(max_length=320, trim_whitespace=True, required=False)
+    narrative = serializers.CharField(max_length=20000, trim_whitespace=True, required=False)
+    key_assumptions = serializers.CharField(max_length=12000, trim_whitespace=True, required=False)
     opportunities = serializers.CharField(
         max_length=12000, trim_whitespace=True, required=False, allow_blank=True
     )
@@ -456,9 +418,7 @@ class SignpostWriteSerializer(StrictSerializer):
         required=False,
         default=Signpost.Status.ACTIVE,
     )
-    scenario_links = ScenarioSignpostLinkWriteSerializer(
-        many=True, required=False, default=list
-    )
+    scenario_links = ScenarioSignpostLinkWriteSerializer(many=True, required=False, default=list)
 
     def validate_scenario_links(self, value):  # type: ignore[no-untyped-def]
         ids = [str(item["scenario_id"]) for item in value]
@@ -468,13 +428,9 @@ class SignpostWriteSerializer(StrictSerializer):
 
 
 class SignpostObservationSerializer(serializers.ModelSerializer):
-    assessment_label = serializers.CharField(
-        source="get_assessment_display", read_only=True
-    )
+    assessment_label = serializers.CharField(source="get_assessment_display", read_only=True)
     source_id = serializers.UUIDField(read_only=True, allow_null=True)
-    source_title = serializers.CharField(
-        source="source.title", read_only=True, allow_null=True
-    )
+    source_title = serializers.CharField(source="source.title", read_only=True, allow_null=True)
     created_by = DecisionUserSerializer(read_only=True)
 
     class Meta:
@@ -654,13 +610,10 @@ class ScenarioSetWorkspaceSerializer(ScenarioSetSerializer):
             "review_count": sum(len(scenario.reviews.all()) for scenario in scenarios),
             "assessment_count": len(assessments),
             "robust_assessment_count": sum(
-                item.verdict == WindTunnelAssessment.Verdict.ROBUST
-                for item in assessments
+                item.verdict == WindTunnelAssessment.Verdict.ROBUST for item in assessments
             ),
             "active_signpost_count": sum(
                 item.status == Signpost.Status.ACTIVE for item in signposts
             ),
-            "observation_count": sum(
-                len(signpost.observations.all()) for signpost in signposts
-            ),
+            "observation_count": sum(len(signpost.observations.all()) for signpost in signposts),
         }

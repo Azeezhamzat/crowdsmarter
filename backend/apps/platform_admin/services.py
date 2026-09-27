@@ -42,7 +42,9 @@ def _require_platform_administrator(actor: Any) -> PlatformAdministrator:
 def _meaningful(value: str, field: str = "rationale") -> str:
     value = value.strip()
     if len(value) < 12:
-        raise PlatformAdministrationError({field: "Record a specific reason of at least 12 characters."})
+        raise PlatformAdministrationError(
+            {field: "Record a specific reason of at least 12 characters."}
+        )
     return value
 
 
@@ -82,13 +84,13 @@ def require_support_access(
 
 
 @transaction.atomic
-def grant_platform_administrator(
-    *, actor: Any, user: Any, rationale: str
-) -> PlatformAdministrator:
+def grant_platform_administrator(*, actor: Any, user: Any, rationale: str) -> PlatformAdministrator:
     _require_platform_administrator(actor)
     rationale = _meaningful(rationale)
     if not user.is_active:
-        raise PlatformAdministrationError("Reactivate the user before granting platform administration.")
+        raise PlatformAdministrationError(
+            "Reactivate the user before granting platform administration."
+        )
     item, created = PlatformAdministrator.objects.select_for_update().get_or_create(
         user=user,
         defaults={
@@ -127,7 +129,7 @@ def grant_platform_administrator(
             "rationale": rationale,
         },
     )
-    setattr(user, "_crowdsmarter_platform_admin", True)
+    user._crowdsmarter_platform_admin = True
     return item
 
 
@@ -138,25 +140,29 @@ def suspend_platform_administrator(
     _require_platform_administrator(actor)
     rationale = _meaningful(rationale)
     if user.id == actor.id:
-        raise PlatformAdministrationError("You cannot suspend your own platform-administrator capability.")
+        raise PlatformAdministrationError(
+            "You cannot suspend your own platform-administrator capability."
+        )
     item = PlatformAdministrator.objects.select_for_update().get(user=user)
     if item.status == PlatformAdministrator.Status.SUSPENDED:
-        raise PlatformAdministrationError("This platform-administrator capability is already suspended.")
+        raise PlatformAdministrationError(
+            "This platform-administrator capability is already suspended."
+        )
     active_ids = list(
         PlatformAdministrator.objects.select_for_update()
         .filter(status=PlatformAdministrator.Status.ACTIVE, user__is_active=True)
         .values_list("id", flat=True)
     )
     if len(active_ids) <= 1:
-        raise PlatformAdministrationError("CrowdSmarter must retain at least one active platform administrator.")
+        raise PlatformAdministrationError(
+            "CrowdSmarter must retain at least one active platform administrator."
+        )
     item.status = PlatformAdministrator.Status.SUSPENDED
     item.suspended_by = actor
     item.suspended_at = timezone.now()
     item.rationale = rationale
     item.full_clean(validate_unique=False)
-    item.save(
-        update_fields=["status", "suspended_by", "suspended_at", "rationale", "updated_at"]
-    )
+    item.save(update_fields=["status", "suspended_by", "suspended_at", "rationale", "updated_at"])
     SupportAccessGrant.objects.filter(
         administrator=user,
         status=SupportAccessGrant.Status.ACTIVE,
@@ -185,9 +191,12 @@ def set_user_active(*, actor: Any, user: Any, is_active: bool, rationale: str):
     previous = user.is_active
     if previous == is_active:
         return user
-    if not is_active and PlatformAdministrator.objects.filter(
-        user=user, status=PlatformAdministrator.Status.ACTIVE
-    ).exists():
+    if (
+        not is_active
+        and PlatformAdministrator.objects.filter(
+            user=user, status=PlatformAdministrator.Status.ACTIVE
+        ).exists()
+    ):
         raise PlatformAdministrationError(
             "Suspend the platform-administrator capability before suspending this account."
         )
@@ -199,12 +208,16 @@ def set_user_active(*, actor: Any, user: Any, is_active: bool, rationale: str):
             status=Membership.Status.ACTIVE,
         )
         for membership in owned_memberships:
-            has_other_active_owner = Membership.objects.filter(
-                organisation=membership.organisation,
-                role=Membership.Role.OWNER,
-                status=Membership.Status.ACTIVE,
-                user__is_active=True,
-            ).exclude(user=user).exists()
+            has_other_active_owner = (
+                Membership.objects.filter(
+                    organisation=membership.organisation,
+                    role=Membership.Role.OWNER,
+                    status=Membership.Status.ACTIVE,
+                    user__is_active=True,
+                )
+                .exclude(user=user)
+                .exists()
+            )
             if not has_other_active_owner:
                 sole_owner_organisations.append(membership.organisation.name)
         if sole_owner_organisations:
@@ -237,7 +250,9 @@ def create_support_access(
     configuration = PlatformConfiguration.objects.select_for_update().get(singleton_key=1)
     if duration_hours > configuration.support_access_max_hours:
         raise PlatformAdministrationError(
-            {"duration_hours": f"Support access is limited to {configuration.support_access_max_hours} hours."}
+            {
+                "duration_hours": f"Support access is limited to {configuration.support_access_max_hours} hours."
+            }
         )
     now = timezone.now()
     SupportAccessGrant.objects.filter(
@@ -275,10 +290,16 @@ def create_support_access(
 
 
 @transaction.atomic
-def revoke_support_access(*, actor: Any, grant: SupportAccessGrant, rationale: str) -> SupportAccessGrant:
+def revoke_support_access(
+    *, actor: Any, grant: SupportAccessGrant, rationale: str
+) -> SupportAccessGrant:
     _require_platform_administrator(actor)
     rationale = _meaningful(rationale)
-    grant = SupportAccessGrant.objects.select_for_update().select_related("organisation").get(id=grant.id)
+    grant = (
+        SupportAccessGrant.objects.select_for_update()
+        .select_related("organisation")
+        .get(id=grant.id)
+    )
     if grant.status != SupportAccessGrant.Status.ACTIVE:
         raise PlatformAdministrationError("Only active support access can be revoked.")
     grant.status = SupportAccessGrant.Status.REVOKED
@@ -328,10 +349,14 @@ def platform_transfer_ownership(
     if confirmation.strip() != organisation.name:
         raise PlatformAdministrationError({"confirmation": "Enter the organisation name exactly."})
     organisation = Organisation.objects.select_for_update().get(id=organisation.id)
-    target = Membership.objects.select_for_update().select_related("user", "organisation").get(
-        id=target_membership.id,
-        organisation=organisation,
-        status=Membership.Status.ACTIVE,
+    target = (
+        Membership.objects.select_for_update()
+        .select_related("user", "organisation")
+        .get(
+            id=target_membership.id,
+            organisation=organisation,
+            status=Membership.Status.ACTIVE,
+        )
     )
     if not target.user.is_active:
         raise PlatformAdministrationError("The new owner account must be active.")
@@ -415,9 +440,7 @@ def platform_change_organisation_state(
     else:
         raise PlatformAdministrationError("Choose a valid organisation state action.")
     organisation.full_clean(exclude=["created_by"], validate_unique=False)
-    organisation.save(
-        update_fields=["status", "deactivated_at", "deactivated_by", "updated_at"]
-    )
+    organisation.save(update_fields=["status", "deactivated_at", "deactivated_by", "updated_at"])
     record_event(
         action=event_action,
         object_type="organisation",
@@ -436,8 +459,10 @@ def platform_invitation_action(
     organisation = invitation.organisation
     require_support_access(actor=actor, organisation=organisation, operational=True)
     rationale = _meaningful(rationale)
-    invitation = OrganisationInvitation.objects.select_for_update().select_related("organisation").get(
-        id=invitation.id
+    invitation = (
+        OrganisationInvitation.objects.select_for_update()
+        .select_related("organisation")
+        .get(id=invitation.id)
     )
     if invitation.status != OrganisationInvitation.Status.PENDING:
         raise PlatformAdministrationError("Only a pending invitation can be changed.")
@@ -494,7 +519,9 @@ def platform_invitation_action(
 
 
 @transaction.atomic
-def update_platform_configuration(*, actor: Any, values: dict[str, Any], rationale: str) -> PlatformConfiguration:
+def update_platform_configuration(
+    *, actor: Any, values: dict[str, Any], rationale: str
+) -> PlatformConfiguration:
     _require_platform_administrator(actor)
     rationale = _meaningful(rationale)
     item = PlatformConfiguration.objects.select_for_update().get(singleton_key=1)
@@ -548,9 +575,7 @@ def set_ai_provider(
 
 
 @transaction.atomic
-def set_ai_provider_api_key(
-    *, actor: Any, api_key: str, rationale: str
-) -> PlatformConfiguration:
+def set_ai_provider_api_key(*, actor: Any, api_key: str, rationale: str) -> PlatformConfiguration:
     """Store a new provider API key, encrypted at rest.
 
     The raw key is never written to the audit log, only whether one was
@@ -589,9 +614,7 @@ def clear_ai_provider_api_key(*, actor: Any, rationale: str) -> PlatformConfigur
     item.ai_provider_api_key_encrypted = ""
     if item.ai_provider_key != PlatformConfiguration.AIProviderKey.RULES:
         item.ai_provider_key = PlatformConfiguration.AIProviderKey.RULES
-    item.save(
-        update_fields=["ai_provider_api_key_encrypted", "ai_provider_key", "updated_at"]
-    )
+    item.save(update_fields=["ai_provider_api_key_encrypted", "ai_provider_key", "updated_at"])
     record_event(
         action="platform_configuration.ai_provider_api_key_cleared",
         object_type="platform_configuration",

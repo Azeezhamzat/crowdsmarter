@@ -7,7 +7,6 @@ import { z } from "zod";
 
 import { FieldError } from "../../components/FieldError";
 import { Icon } from "../../components/Icon";
-import { LanguageSwitcher } from "../../components/LanguageSwitcher";
 import { LogoMark } from "../../components/Logo";
 import { ApiError } from "../../lib/api";
 import { signupCatalog } from "../../lib/catalogs/signup";
@@ -45,11 +44,10 @@ export function SignupPage() {
       <section className="auth-introduction auth-introduction--executive" aria-labelledby="signup-product-title">
         <Link className="auth-brand" to="/">
           <LogoMark size={38} variant="inverse" />
-          <span><strong>CrowdSmarter</strong><small>Foresight. Collective intelligence. Decisions.</small></span>
+          <span><strong>CrowdSmarter</strong><small>Facilitation. Systems. Collective intelligence.</small></span>
         </Link>
         <div className="auth-introduction__content auth-introduction__content--executive">
           <div className="auth-context-pill"><Icon name="shield" size={16} />{t.eyebrow}</div>
-          <div className="auth-language-row"><LanguageSwitcher /></div>
           <h1 id="signup-product-title">{t.heading}</h1>
           <p>{t.lead}</p>
           <div className="auth-proof-grid">

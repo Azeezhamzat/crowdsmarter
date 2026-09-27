@@ -84,7 +84,9 @@ class CanvasDetailView(APIView):
         item = canvas_for_user(user=request.user, canvas_id=canvas_id)
         serializer = CanvasPatchSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        item = update_canvas(actor=request.user, canvas=item, fields=dict(serializer.validated_data))
+        item = update_canvas(
+            actor=request.user, canvas=item, fields=dict(serializer.validated_data)
+        )
         return Response(CanvasSerializer(item, context={"request": request}).data)
 
 
@@ -109,7 +111,9 @@ class DriverDetailView(APIView):
         item = driver_for_user(user=request.user, driver_id=driver_id)
         serializer = DriverPatchSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        item = update_driver(actor=request.user, driver=item, fields=dict(serializer.validated_data))
+        item = update_driver(
+            actor=request.user, driver=item, fields=dict(serializer.validated_data)
+        )
         return Response(DriverSerializer(item, context={"request": request}).data)
 
 
@@ -154,12 +158,8 @@ class FeedbackLoopListCreateView(APIView):
         canvas = canvas_for_user(user=request.user, canvas_id=canvas_id)
         serializer = FeedbackLoopWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        item = create_feedback_loop(
-            actor=request.user, canvas=canvas, **serializer.validated_data
-        )
-        return Response(
-            FeedbackLoopSerializer(item).data, status=status.HTTP_201_CREATED
-        )
+        item = create_feedback_loop(actor=request.user, canvas=canvas, **serializer.validated_data)
+        return Response(FeedbackLoopSerializer(item).data, status=status.HTTP_201_CREATED)
 
 
 class ConsequenceListCreateView(APIView):

@@ -1,3 +1,5 @@
+import { getLocale } from "./i18n";
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api/v1";
 
 export class ApiError extends Error {
@@ -54,6 +56,9 @@ export async function apiRequest<T>(
   const method = options.method ?? "GET";
   const headers = new Headers(options.headers);
   headers.set("Accept", "application/json");
+  if (!headers.has("Accept-Language")) {
+    headers.set("Accept-Language", getLocale());
+  }
 
   if (options.body && !(options.body instanceof FormData)) {
     headers.set("Content-Type", "application/json");
@@ -94,11 +99,15 @@ export async function ensureCsrfCookie(): Promise<void> {
   await apiRequest<{ detail: string }>("/auth/csrf/");
 }
 
-export async function downloadApiFile(path: string): Promise<string> {
+export async function downloadApiFile(
+  path: string,
+  accept = "application/zip",
+  fallbackFilename = "crowdsmarter-export.zip",
+): Promise<string> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: "GET",
     credentials: "include",
-    headers: { Accept: "application/zip" },
+    headers: { Accept: accept },
   });
   if (!response.ok) {
     const contentType = response.headers.get("content-type") ?? "";
@@ -110,7 +119,7 @@ export async function downloadApiFile(path: string): Promise<string> {
   }
   const disposition = response.headers.get("content-disposition") ?? "";
   const match = /filename="?([^";]+)"?/i.exec(disposition);
-  const filename = match?.[1] ?? "crowdsmarter-export.zip";
+  const filename = match?.[1] ?? fallbackFilename;
   const blob = await response.blob();
   const objectUrl = URL.createObjectURL(blob);
   const link = document.createElement("a");

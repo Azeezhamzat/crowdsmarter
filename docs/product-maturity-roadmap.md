@@ -133,7 +133,7 @@ Delivered in this release:
 Delivered in this release:
 
 - explicit product-level platform-administrator capability separate from Django technical flags;
-- protected platform operations workspace for users, organisations, demo requests, contacts, and audit;
+- protected platform operations workspace for users, organisations, decision enquiries, contacts, and audit;
 - reasoned, expiring read-only or operational tenant support access;
 - ownership, invitation, account-state, and organisation-state safeguards;
 - automatic membership only in clearly marked fictional demo organisations;
@@ -141,33 +141,74 @@ Delivered in this release:
 
 ## Recommended next sequence
 
-### Phase 18C — Security headers and observability
+### Evidence-led delivery rule
 
-- production threat modelling and security verification;
-- Content Security Policy and related browser security headers;
-- request identifiers and structured application logs;
-- secure-cookie, CSRF, rate-limit, dependency, and container checks;
-- operational health and readiness diagnostics.
+The current development basis is structured internet research, documented in
+`docs/research/internet-research-method.md`. The September 2026 baseline keeps
+facilitation ahead of software and directs CrowdSmarter away from a general
+participation portal, whiteboard, meeting tool, survey product, specialist
+grant-management suite, or proprietary global signals library.
 
-### Phase 18D — Upload protection and operational assurance
+Before a new application capability enters the roadmap, it must clear the
+research threshold, have a direct role in the facilitated process, and be a
+better choice than integration, export, or a facilitation template. Adoption,
+effectiveness, and willingness to pay remain unknown without behavioural
+evidence and must not be treated as demonstrated.
 
-- malware scanning or quarantine for private uploads;
-- backup restoration exercises;
-- incident response, retention, deletion, and deployment runbooks;
-- representative browser and assistive-technology verification before any conformance claim.
+### Phase 18C — Security headers and observability (local foundation delivered)
 
-### Phase 19 — Customer pilot readiness
+Delivered: CSP, permissions and cross-origin browser headers; proxy-to-Django
+request identifiers; secure-cookie, CSRF, rate-limit and dependency checks;
+liveness/readiness endpoints; structured JSON request logs; bounded Prometheus
+metrics; and a locally exercised Loki/Alloy/Prometheus/Grafana/Alertmanager
+profile with a dashboard and baseline alerts. Production still needs a tested
+external receiver, infrastructure/error monitoring, multiprocess-aware
+metrics, and an independent review against the deployed origin.
 
-- guided organisation onboarding;
-- a sample foresight-to-decision workspace;
-- contextual help, help centre, product tour, security and privacy documentation;
-- support and feedback workflows;
-- privacy-conscious usage diagnostics;
-- pilot administration, success measures, and structured product-learning loops.
+### Phase 18D — Upload protection and operational assurance (local foundation delivered)
+
+Delivered: fail-closed ClamAV scanning, clean-only download/export, legacy-file
+rescanning, a successful isolated restore drill, a non-destructive retention
+review job, production email checks, operational runbooks, and an internal
+security/privacy review. Remaining: owner/legal policy approval, legal-hold and
+two-person deletion execution, production email/alert evidence, an independent
+review, and representative browser/assistive-technology verification before
+any conformance claim.
+
+### Phase 19 — Hybrid facilitation and research operations
+
+Delivered in this update:
+
+- an internet-research method, reusable claim ledger, and dated baseline;
+- a hybrid session capture pack covering influence, channels, source capture,
+  synthesis, authority response, and process review;
+- structured session briefs that state what participants can influence, what
+  is fixed, which participation channels are used, and which perspectives are
+  still missing;
+- provenance-aware records for in-person, telephone, paper, partner-assisted,
+  and digital input, separating participant input from facilitator synthesis;
+- anonymous, confidential, and attributed capture with quote permission and
+  accountable follow-up ownership;
+- an authority feedback loop recording what was heard, what changed, what did
+  not change and why, and what happens next; published responses are immutable;
+- privacy-redacted, print-ready HTML session reports in the application and
+  decision dossier, suitable for browser Save as PDF.
+
+Remaining:
+
+- a maintained research cadence with dated successor decisions;
+- low-bandwidth and small-screen verification of critical participation and
+  facilitation journeys;
+- offline capture import for sessions that cannot reliably reach the platform;
+- common imports and client-owned exports before bespoke integrations;
+- guided organisation onboarding and a sample facilitation-to-decision
+  workspace;
+- contextual help, security and privacy documentation, support workflows, and
+  privacy-conscious operational diagnostics.
 
 ### Phase 20 — Adaptive strategy and forecasting
 
-After pilot workflows are validated:
+Only after a new evidence review clears the work:
 
 - signpost-triggered contingent actions;
 - review, expiry, reversal, acceleration, and stopping conditions;

@@ -30,13 +30,9 @@ def get_provider() -> AIProvider:
     for attribute in text_attributes:
         value = getattr(provider, attribute, None)
         if not isinstance(value, str) or not value.strip():
-            raise TypeError(
-                f"Configured AI provider requires a non-empty '{attribute}' string."
-            )
+            raise TypeError(f"Configured AI provider requires a non-empty '{attribute}' string.")
     callable_attributes = ["review_decision", "summarise_analytics", "test_connection"]
     for attribute in callable_attributes:
         if not callable(getattr(provider, attribute, None)):
-            raise TypeError(
-                f"Configured AI provider requires a callable '{attribute}' method."
-            )
+            raise TypeError(f"Configured AI provider requires a callable '{attribute}' method.")
     return provider

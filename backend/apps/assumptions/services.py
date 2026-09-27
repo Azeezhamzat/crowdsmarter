@@ -12,9 +12,9 @@ from apps.audit.services import record_event
 from apps.decision_options.models import DecisionOption
 from apps.decisions.models import Decision
 from apps.decisions.reasoning_policies import can_contribute_reasoning, can_edit_reasoning
-from apps.organisations.models import Membership
 from apps.notifications.models import Notification
 from apps.notifications.services import create_notification
+from apps.organisations.models import Membership
 
 from .models import Assumption
 
@@ -38,11 +38,15 @@ def _owner(*, decision: Decision, owner_id: Any | None, actor: User) -> User:
     if owner_id is None:
         return actor
     try:
-        return Membership.objects.select_related("user").get(
-            organisation=decision.organisation,
-            user_id=owner_id,
-            status=Membership.Status.ACTIVE,
-        ).user
+        return (
+            Membership.objects.select_related("user")
+            .get(
+                organisation=decision.organisation,
+                user_id=owner_id,
+                status=Membership.Status.ACTIVE,
+            )
+            .user
+        )
     except Membership.DoesNotExist as exc:
         raise AssumptionServiceError(
             {"owner_id": "The owner must be an active organisation member."}
@@ -96,12 +100,12 @@ def create_assumption(
 
 
 @transaction.atomic
-def update_assumption(
-    *, actor: User, assumption: Assumption, fields: dict[str, Any]
-) -> Assumption:
-    assumption = Assumption.objects.select_for_update().select_related(
-        "decision__organisation"
-    ).get(id=assumption.id)
+def update_assumption(*, actor: User, assumption: Assumption, fields: dict[str, Any]) -> Assumption:
+    assumption = (
+        Assumption.objects.select_for_update()
+        .select_related("decision__organisation")
+        .get(id=assumption.id)
+    )
     if not can_edit_reasoning(
         actor=actor,
         decision=assumption.decision,
@@ -112,9 +116,7 @@ def update_assumption(
     previous_owner_id = assumption.owner_id
     before = {field: getattr(assumption, field) for field in fields}
     if "option_id" in fields:
-        assumption.option = _option(
-            decision=assumption.decision, option_id=fields.pop("option_id")
-        )
+        assumption.option = _option(decision=assumption.decision, option_id=fields.pop("option_id"))
     if "owner_id" in fields:
         assumption.owner = _owner(
             decision=assumption.decision,

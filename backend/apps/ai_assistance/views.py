@@ -71,9 +71,7 @@ class AIReviewDetailView(APIView):
 
     def get(self, request, review_id):  # type: ignore[no-untyped-def]
         review = review_for_user(user=request.user, review_id=review_id)
-        return Response(
-            AIReviewSerializer(review, context={"request": request}).data
-        )
+        return Response(AIReviewSerializer(review, context={"request": request}).data)
 
 
 class AIReviewAcknowledgeView(APIView):
@@ -88,9 +86,7 @@ class AIReviewAcknowledgeView(APIView):
             review=review,
             **serializer.validated_data,
         )
-        return Response(
-            AIReviewSerializer(review, context={"request": request}).data
-        )
+        return Response(AIReviewSerializer(review, context={"request": request}).data)
 
 
 class OrganisationAIReviewQualityView(APIView):
@@ -127,6 +123,4 @@ class AIReviewDismissView(APIView):
             review=review,
             **serializer.validated_data,
         )
-        return Response(
-            AIReviewSerializer(review, context={"request": request}).data
-        )
+        return Response(AIReviewSerializer(review, context={"request": request}).data)

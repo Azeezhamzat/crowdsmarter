@@ -45,5 +45,7 @@ class CriterionDetailView(APIView):
         item = self._get_object(request, criterion_id)
         serializer = CriterionUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        item = update_criterion(actor=request.user, criterion=item, fields=dict(serializer.validated_data))
+        item = update_criterion(
+            actor=request.user, criterion=item, fields=dict(serializer.validated_data)
+        )
         return Response(CriterionSerializer(item, context={"request": request}).data)

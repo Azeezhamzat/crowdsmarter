@@ -66,7 +66,9 @@ def test_change_plan_requires_owner(organisation_factory, user_factory):  # type
 def test_change_plan_rejects_unknown_key(organisation_factory):  # type: ignore[no-untyped-def]
     organisation = organisation_factory()
     with pytest.raises(BillingServiceError):
-        change_plan(actor=organisation.created_by, organisation=organisation, plan_key="does-not-exist")
+        change_plan(
+            actor=organisation.created_by, organisation=organisation, plan_key="does-not-exist"
+        )
 
 
 @pytest.mark.django_db

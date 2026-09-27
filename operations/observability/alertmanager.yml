@@ -1,0 +1,13 @@
+route:
+  receiver: local-dashboard
+  group_by: [alertname, severity]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+
+receivers:
+  - name: local-dashboard
+
+# This local receiver keeps alerts visible in Alertmanager without sending
+# messages externally. Configure a verified email, PagerDuty, Opsgenie, or
+# webhook receiver in the deployment-specific secret configuration.

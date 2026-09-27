@@ -49,4 +49,6 @@ class AnalyticsInsight(UUIDTimeStampedModel):
         ]
 
     def __str__(self) -> str:
-        return f"{self.organisation.name}: {self.provider_label} insight ({self.created_at:%Y-%m-%d})"
+        return (
+            f"{self.organisation.name}: {self.provider_label} insight ({self.created_at:%Y-%m-%d})"
+        )

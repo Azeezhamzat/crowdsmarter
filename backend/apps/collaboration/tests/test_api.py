@@ -8,9 +8,7 @@ from apps.decisions.models import Decision
 
 
 @pytest.mark.django_db
-def test_discussion_api_is_tenant_safe_and_strict(
-    api_client, decision_factory, user_factory
-):  # type: ignore[no-untyped-def]
+def test_discussion_api_is_tenant_safe_and_strict(api_client, decision_factory, user_factory):  # type: ignore[no-untyped-def]
     decision = decision_factory(status=Decision.Status.OPEN_FOR_CONTRIBUTION)
     url = reverse(
         "collaboration:discussion-list-create",
@@ -42,9 +40,7 @@ def test_discussion_api_is_tenant_safe_and_strict(
 
 
 @pytest.mark.django_db
-def test_activity_contains_discussion_and_audit_events(
-    api_client, decision_factory
-):  # type: ignore[no-untyped-def]
+def test_activity_contains_discussion_and_audit_events(api_client, decision_factory):  # type: ignore[no-untyped-def]
     decision = decision_factory(status=Decision.Status.UNDER_REVIEW)
     create_discussion_entry(
         actor=decision.owner,

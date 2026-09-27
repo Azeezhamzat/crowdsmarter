@@ -26,6 +26,19 @@ services:
       timeout: 3s
       retries: 10
 
+  clamav:
+    image: clamav/clamav:1.4.6
+    platform: linux/amd64
+    restart: unless-stopped
+    volumes:
+      - clamav_data:/var/lib/clamav
+    healthcheck:
+      test: ["CMD-SHELL", "clamdscan --ping=1"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
+
   backend:
     build:
       context: ./backend
@@ -37,12 +50,18 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgresql://crowdsmarter:crowdsmarter@db:5432/crowdsmarter}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       CACHE_URL: ${CACHE_URL:-redis://redis:6379/0}
+    command: >-
+      sh -c "python manage.py check --deploy
+      && gunicorn crowdsmarter.wsgi:application --bind 0.0.0.0:8000
+      --workers 2 --threads 4 --timeout 60 --access-logfile -"
     volumes:
       - media_data:/app/media
     depends_on:
       db:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      clamav:
         condition: service_healthy
     healthcheck:
       test:
@@ -135,3 +154,4 @@ volumes:
   media_data:
   certbot_certs:
   certbot_www:
+  clamav_data:

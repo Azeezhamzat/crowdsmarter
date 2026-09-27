@@ -11,9 +11,7 @@ from apps.decisions.selectors import decision_for_user
 from .models import AIReview
 
 
-def reviews_for_decision(
-    *, user: User, decision_id: UUID
-) -> QuerySet[AIReview]:
+def reviews_for_decision(*, user: User, decision_id: UUID) -> QuerySet[AIReview]:
     decision = decision_for_user(user=user, decision_id=decision_id)
     return AIReview.objects.filter(decision=decision).select_related(
         "requested_by", "reviewed_by", "dismissed_by", "decision"

@@ -6,7 +6,6 @@ from apps.organisations.models import Membership
 
 from .models import AIReview
 
-
 _REQUESTABLE_STATUSES = {
     Decision.Status.FRAMING,
     Decision.Status.OPEN_FOR_CONTRIBUTION,
@@ -46,7 +45,4 @@ def can_moderate_ai_review(*, actor: User, review: AIReview) -> bool:
     if actor.id in {review.requested_by_id, review.decision.owner_id}:
         return True
     membership = membership_for(user=actor, decision=review.decision)
-    return bool(
-        membership
-        and membership.role in {Membership.Role.OWNER, Membership.Role.ADMIN}
-    )
+    return bool(membership and membership.role in {Membership.Role.OWNER, Membership.Role.ADMIN})

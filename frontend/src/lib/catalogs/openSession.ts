@@ -1,7 +1,7 @@
 import { defineCatalog } from "../i18n";
 
 /**
- * French and Portuguese strings are AI-assisted and have not been reviewed
+ * French and Arabic strings are AI-assisted and have not been reviewed
  * by a native speaker - see docs/i18n.md before treating them as final copy.
  */
 export const openSessionCatalog = defineCatalog({
@@ -55,29 +55,29 @@ export const openSessionCatalog = defineCatalog({
     addTeamMemberButton: "Ajouter un coéquipier",
     removeTeamMemberButton: "Retirer",
   },
-  pt: {
-    joinHeading: "Junte-se para enviar uma ideia e votar",
-    joinDescription: "Apenas o seu nome e e-mail - sem conta nem palavra-passe necessária.",
-    nameLabel: "Nome",
-    emailLabel: "E-mail",
-    joinButton: "Juntar-se à sessão",
-    joiningButton: "A entrar…",
-    schoolLabel: "Escola ou instituição (opcional)",
-    ageBracketLabel: "Idade",
-    ageBracketPlaceholder: "Selecione a sua faixa etária",
-    ageBracketUnder13: "Menos de 13 anos",
-    ageBracket13to17: "13-17 anos",
-    ageBracket18Plus: "18 anos ou mais",
-    guardianConsentHeading: "Consentimento dos pais ou responsável",
-    guardianConsentDescription: "Esta sessão exige o consentimento de um pai, mãe ou responsável antes de um participante menor de 18 anos poder participar.",
-    guardianNameLabel: "Nome do pai, mãe ou responsável",
-    guardianEmailLabel: "E-mail do pai, mãe ou responsável",
-    guardianConsentCheckboxLabel: "Sou o pai, mãe ou responsável deste participante e consinto na sua participação.",
-    teamNameLabel: "Nome da equipa (opcional)",
-    teamMembersLabel: "Colegas de equipa",
-    teamMemberNamePlaceholder: "Nome do colega de equipa",
-    teamMemberRolePlaceholder: "Função (opcional)",
-    addTeamMemberButton: "Adicionar colega de equipa",
-    removeTeamMemberButton: "Remover",
+  ar: {
+    joinHeading: "انضم لتقديم فكرة والتصويت",
+    joinDescription: "كل ما نحتاجه هو اسمك وبريدك الإلكتروني — لا يلزم حساب أو كلمة مرور.",
+    nameLabel: "الاسم",
+    emailLabel: "البريد الإلكتروني",
+    joinButton: "انضم إلى الجلسة",
+    joiningButton: "جارٍ الانضمام…",
+    schoolLabel: "المدرسة أو المؤسسة (اختياري)",
+    ageBracketLabel: "العمر",
+    ageBracketPlaceholder: "اختر فئتك العمرية",
+    ageBracketUnder13: "أقل من 13 عاماً",
+    ageBracket13to17: "من 13 إلى 17 عاماً",
+    ageBracket18Plus: "18 عاماً أو أكثر",
+    guardianConsentHeading: "موافقة ولي الأمر",
+    guardianConsentDescription: "تتطلب هذه الجلسة موافقة أحد الوالدين أو ولي الأمر قبل أن يتمكن المشارك الذي يقل عمره عن 18 عاماً من الانضمام.",
+    guardianNameLabel: "اسم أحد الوالدين أو ولي الأمر",
+    guardianEmailLabel: "البريد الإلكتروني لأحد الوالدين أو ولي الأمر",
+    guardianConsentCheckboxLabel: "أنا والد أو والدة هذا المشارك أو ولي أمره، وأوافق على مشاركته.",
+    teamNameLabel: "اسم الفريق (اختياري)",
+    teamMembersLabel: "أعضاء الفريق",
+    teamMemberNamePlaceholder: "اسم عضو الفريق",
+    teamMemberRolePlaceholder: "الدور (اختياري)",
+    addTeamMemberButton: "إضافة عضو إلى الفريق",
+    removeTeamMemberButton: "إزالة",
   },
 });

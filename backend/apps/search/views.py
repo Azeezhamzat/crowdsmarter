@@ -21,9 +21,7 @@ class OrganisationSearchView(APIView):
         )
         query = request.query_params.get("q", "").strip()
         if len(query) < 2:
-            raise serializers.ValidationError(
-                {"q": "Enter at least two characters to search."}
-            )
+            raise serializers.ValidationError({"q": "Enter at least two characters to search."})
         results = search_organisation(organisation=organisation, query_text=query)
         return Response(
             {

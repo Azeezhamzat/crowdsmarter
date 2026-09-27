@@ -17,4 +17,6 @@ class ManualLookupProvider:
         )
 
     def test_connection(self) -> ProviderConnectionResult:
-        return ProviderConnectionResult(ok=True, detail="Manual verification requires no external connection.")
+        return ProviderConnectionResult(
+            ok=True, detail="Manual verification requires no external connection."
+        )

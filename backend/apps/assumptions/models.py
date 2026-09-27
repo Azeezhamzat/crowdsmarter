@@ -70,22 +70,22 @@ class Assumption(UUIDTimeStampedModel):
                 condition=~models.Q(statement=""), name="assumption_statement_not_empty"
             ),
             models.CheckConstraint(
-                condition=models.Q(confidence__in=['low', 'medium', 'high']),
+                condition=models.Q(confidence__in=["low", "medium", "high"]),
                 name="assumption_confidence_valid",
             ),
             models.CheckConstraint(
                 condition=models.Q(
                     verification_status__in=[
-                        'unverified',
-                        'partially_verified',
-                        'verified',
-                        'invalidated',
+                        "unverified",
+                        "partially_verified",
+                        "verified",
+                        "invalidated",
                     ]
                 ),
                 name="assumption_verification_status_valid",
             ),
             models.CheckConstraint(
-                condition=models.Q(status__in=['active', 'retired']),
+                condition=models.Q(status__in=["active", "retired"]),
                 name="assumption_status_valid",
             ),
         ]

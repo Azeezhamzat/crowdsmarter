@@ -2,21 +2,20 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
-from typing import Iterable
+from typing import Any
 
 from django.contrib.postgres.search import SearchQuery, SearchRank, SearchVector
+from django.db import connection
 
 from apps.assumptions.models import Assumption
-from apps.decision_options.models import DecisionOption
-from apps.decision_analysis.models import DecisionIssue, ExecutiveDecisionSummary
 from apps.contributions.models import ContributionRequest, FacilitationSession
+from apps.decision_analysis.models import DecisionIssue, ExecutiveDecisionSummary
+from apps.decision_options.models import DecisionOption
 from apps.decisions.models import Decision
-from apps.evidence.models import Evidence
 from apps.evaluations.models import EvaluationExercise, MinorityReport, PrioritisationPortfolio
-from apps.lessons.models import Lesson
-from apps.methodology.models import DecisionMethod
-from apps.organisations.models import Organisation
+from apps.evidence.models import Evidence
 from apps.foresight.models import (
     Driver,
     FeedbackLoop,
@@ -28,6 +27,9 @@ from apps.foresight.models import (
     Source,
     StrategicImplication,
 )
+from apps.lessons.models import Lesson
+from apps.methodology.models import DecisionMethod
+from apps.organisations.models import Organisation
 from apps.reviews.models import DecisionReview
 from apps.risks.models import Risk
 
@@ -59,13 +61,350 @@ def _snippet(values: Iterable[str], query: str, limit: int = 240) -> str:
     return excerpt
 
 
+def _fallback_search_organisation(
+    *, organisation: Organisation, query_text: str
+) -> list[SearchResult]:
+    """Provide deterministic tenant search on non-PostgreSQL development databases.
+
+    Production uses PostgreSQL ranking. The documented fast test path uses
+    SQLite, where PostgreSQL search-vector SQL is invalid; this bounded
+    fallback keeps the same record coverage and result contract without
+    pretending to reproduce PostgreSQL's linguistic ranking.
+    """
+
+    words = [word.casefold() for word in query_text.split() if len(word) > 1]
+    results: list[SearchResult] = []
+
+    def text(value: Any) -> str:
+        if value is None:
+            return ""
+        if isinstance(value, (list, tuple, set)):
+            return " ".join(text(item) for item in value)
+        return str(value)
+
+    def add(
+        *,
+        items: Iterable[Any],
+        kind: str,
+        title: Callable[[Any], str],
+        values: Callable[[Any], Iterable[Any]],
+        url: Callable[[Any], str],
+        decision_id: Callable[[Any], Any] = lambda item: "",
+        limit: int = 15,
+    ) -> None:
+        matches: list[SearchResult] = []
+        for item in items:
+            item_title = text(title(item))
+            item_values = [text(value) for value in values(item)]
+            searchable = " ".join([item_title, *item_values]).casefold()
+            if not words or not all(word in searchable for word in words):
+                continue
+            title_text = item_title.casefold()
+            score = sum(3 for word in words if word in title_text) + sum(
+                searchable.count(word) for word in words
+            )
+            matches.append(
+                SearchResult(
+                    kind=kind,
+                    object_id=str(item.id),
+                    decision_id=str(decision_id(item) or ""),
+                    title=item_title,
+                    snippet=_snippet(item_values, query_text),
+                    url=url(item),
+                    rank=float(score),
+                )
+            )
+        results.extend(sorted(matches, key=lambda result: (-result.rank, result.title))[:limit])
+
+    organisation_url = f"/organisations/{organisation.id}"
+    add(
+        items=DecisionMethod.objects.filter(organisation=organisation).exclude(
+            status=DecisionMethod.Status.RETIRED
+        ),
+        kind="decision method",
+        title=lambda item: item.name,
+        values=lambda item: [item.summary, item.best_for],
+        url=lambda item: f"{organisation_url}/methods",
+        limit=10,
+    )
+    add(
+        items=Source.objects.filter(organisation=organisation),
+        kind="source",
+        title=lambda item: item.title,
+        values=lambda item: [
+            item.author,
+            item.publisher,
+            item.reference,
+            item.notes,
+        ],
+        url=lambda item: f"{organisation_url}/foresight?source={item.id}",
+        limit=10,
+    )
+    add(
+        items=Signal.objects.filter(organisation=organisation),
+        kind="signal",
+        title=lambda item: item.title,
+        values=lambda item: [
+            item.summary,
+            item.future_implication,
+            item.domain,
+            item.geography,
+        ],
+        url=lambda item: f"{organisation_url}/foresight?signal={item.id}",
+    )
+    add(
+        items=ForesightCanvas.objects.filter(organisation=organisation),
+        kind="foresight_canvas",
+        title=lambda item: item.title,
+        values=lambda item: [item.focal_question, item.scope],
+        url=lambda item: f"{organisation_url}/foresight/canvases/{item.id}",
+        limit=10,
+    )
+    add(
+        items=Driver.objects.filter(canvas__organisation=organisation),
+        kind="foresight_driver",
+        title=lambda item: item.title,
+        values=lambda item: [item.description],
+        url=lambda item: f"{organisation_url}/foresight/canvases/{item.canvas_id}?tab=drivers",
+        limit=12,
+    )
+    add(
+        items=FeedbackLoop.objects.filter(canvas__organisation=organisation),
+        kind="foresight_feedback_loop",
+        title=lambda item: item.name,
+        values=lambda item: [item.description, item.rationale],
+        url=lambda item: f"{organisation_url}/foresight/canvases/{item.canvas_id}?tab=system",
+        limit=10,
+    )
+    add(
+        items=ScenarioSet.objects.filter(canvas__organisation=organisation),
+        kind="foresight_scenario_set",
+        title=lambda item: item.title,
+        values=lambda item: [
+            item.purpose,
+            item.axis_x_low_label,
+            item.axis_x_high_label,
+            item.axis_y_low_label,
+            item.axis_y_high_label,
+        ],
+        decision_id=lambda item: item.linked_decision_id,
+        url=lambda item: (
+            f"{organisation_url}/foresight/canvases/{item.canvas_id}/scenarios/{item.id}"
+        ),
+        limit=10,
+    )
+    add(
+        items=Scenario.objects.filter(
+            scenario_set__canvas__organisation=organisation
+        ).select_related("scenario_set"),
+        kind="foresight_scenario",
+        title=lambda item: item.title,
+        values=lambda item: [item.headline, item.narrative, item.key_assumptions],
+        decision_id=lambda item: item.scenario_set.linked_decision_id,
+        url=lambda item: (
+            f"{organisation_url}/foresight/canvases/{item.scenario_set.canvas_id}/scenarios/"
+            f"{item.scenario_set_id}"
+        ),
+        limit=12,
+    )
+    add(
+        items=Signpost.objects.filter(
+            scenario_set__canvas__organisation=organisation
+        ).select_related("scenario_set"),
+        kind="foresight_signpost",
+        title=lambda item: item.title,
+        values=lambda item: [item.description, item.indicator, item.threshold],
+        decision_id=lambda item: item.scenario_set.linked_decision_id,
+        url=lambda item: (
+            f"{organisation_url}/foresight/canvases/{item.scenario_set.canvas_id}/scenarios/"
+            f"{item.scenario_set_id}?tab=signposts"
+        ),
+        limit=10,
+    )
+    add(
+        items=StrategicImplication.objects.filter(canvas__organisation=organisation),
+        kind="strategic_implication",
+        title=lambda item: item.title,
+        values=lambda item: [item.description],
+        decision_id=lambda item: item.linked_decision_id,
+        url=lambda item: f"{organisation_url}/foresight/canvases/{item.canvas_id}?tab=implications",
+        limit=12,
+    )
+    add(
+        items=Decision.objects.filter(organisation=organisation),
+        kind="decision",
+        title=lambda item: item.title,
+        values=lambda item: [
+            item.decision_question,
+            item.purpose,
+            item.context,
+            item.scope,
+        ],
+        decision_id=lambda item: item.id,
+        url=lambda item: f"/decisions/{item.id}",
+    )
+    add(
+        items=DecisionOption.objects.filter(organisation=organisation),
+        kind="option",
+        title=lambda item: item.title,
+        values=lambda item: [
+            item.description,
+            item.expected_benefits,
+            item.tradeoffs,
+        ],
+        decision_id=lambda item: item.decision_id,
+        url=lambda item: f"/decisions/{item.decision_id}/reasoning/options",
+        limit=10,
+    )
+    add(
+        items=Evidence.objects.filter(organisation=organisation),
+        kind="evidence",
+        title=lambda item: item.title,
+        values=lambda item: [item.summary, item.source_reference],
+        decision_id=lambda item: item.decision_id,
+        url=lambda item: f"/decisions/{item.decision_id}/reasoning/evidence",
+        limit=10,
+    )
+    add(
+        items=Assumption.objects.filter(organisation=organisation),
+        kind="assumption",
+        title=lambda item: item.statement[:160],
+        values=lambda item: [
+            item.statement,
+            item.rationale,
+            item.impact_if_false,
+            item.verification_notes,
+        ],
+        decision_id=lambda item: item.decision_id,
+        url=lambda item: f"/decisions/{item.decision_id}/reasoning/assumptions",
+        limit=10,
+    )
+    add(
+        items=Risk.objects.filter(organisation=organisation),
+        kind="risk",
+        title=lambda item: item.title,
+        values=lambda item: [item.description, item.mitigation_plan],
+        decision_id=lambda item: item.decision_id,
+        url=lambda item: f"/decisions/{item.decision_id}/reasoning/risks",
+        limit=10,
+    )
+    add(
+        items=DecisionReview.objects.filter(organisation=organisation).select_related("decision"),
+        kind="outcome review",
+        title=lambda item: f"Outcome: {item.decision.title}",
+        values=lambda item: [
+            item.commitment_statement,
+            item.success_measures,
+            item.implementation_plan,
+            item.implementation_summary,
+            item.outcome_summary,
+            item.review_evidence,
+            item.unintended_consequences,
+        ],
+        decision_id=lambda item: item.decision_id,
+        url=lambda item: f"/decisions/{item.decision_id}/outcomes",
+        limit=10,
+    )
+    add(
+        items=Lesson.objects.filter(organisation=organisation, status=Lesson.Status.ACTIVE),
+        kind="lesson",
+        title=lambda item: item.title,
+        values=lambda item: [
+            item.insight,
+            item.applicability,
+            item.recommended_change,
+        ],
+        decision_id=lambda item: item.decision_id,
+        url=lambda item: f"/decisions/{item.decision_id}/outcomes",
+    )
+    add(
+        items=EvaluationExercise.objects.filter(organisation=organisation),
+        kind="collective evaluation",
+        title=lambda item: item.title,
+        values=lambda item: [item.purpose],
+        decision_id=lambda item: item.decision_id,
+        url=lambda item: f"/decisions/{item.decision_id}/evaluations",
+        limit=10,
+    )
+    add(
+        items=MinorityReport.objects.filter(
+            organisation=organisation, status=MinorityReport.Status.PUBLISHED
+        ).select_related("exercise"),
+        kind="minority report",
+        title=lambda item: item.title,
+        values=lambda item: [item.analysis, item.recommendation],
+        decision_id=lambda item: item.exercise.decision_id,
+        url=lambda item: f"/decisions/{item.exercise.decision_id}/evaluations",
+        limit=10,
+    )
+    add(
+        items=PrioritisationPortfolio.objects.filter(organisation=organisation),
+        kind="prioritisation portfolio",
+        title=lambda item: item.title,
+        values=lambda item: [item.purpose],
+        url=lambda item: f"{organisation_url}/prioritisation",
+        limit=10,
+    )
+    add(
+        items=DecisionIssue.objects.filter(organisation=organisation),
+        kind="decision analysis issue",
+        title=lambda item: item.title,
+        values=lambda item: [item.description, item.resolution],
+        decision_id=lambda item: item.decision_id,
+        url=lambda item: f"/decisions/{item.decision_id}/analysis",
+        limit=12,
+    )
+    add(
+        items=ExecutiveDecisionSummary.objects.filter(organisation=organisation)
+        .exclude(status=ExecutiveDecisionSummary.Status.SUPERSEDED)
+        .select_related("decision"),
+        kind="executive decision summary",
+        title=lambda item: f"{item.decision.title} - executive summary",
+        values=lambda item: [
+            item.context_summary,
+            item.proposed_judgement,
+            item.unresolved_issues,
+            item.implementation_implications,
+        ],
+        decision_id=lambda item: item.decision_id,
+        url=lambda item: f"/decisions/{item.decision_id}/analysis",
+        limit=10,
+    )
+    add(
+        items=ContributionRequest.objects.filter(organisation=organisation).exclude(
+            status=ContributionRequest.Status.DRAFT
+        ),
+        kind="contribution request",
+        title=lambda item: item.title,
+        values=lambda item: [item.instructions],
+        decision_id=lambda item: item.decision_id,
+        url=lambda item: f"/decisions/{item.decision_id}/contributions#request-{item.id}",
+        limit=12,
+    )
+    add(
+        items=FacilitationSession.objects.filter(organisation=organisation),
+        kind="facilitation session",
+        title=lambda item: item.title,
+        values=lambda item: [item.objective, item.agenda],
+        decision_id=lambda item: item.decision_id,
+        url=lambda item: f"/decisions/{item.decision_id}/contributions#session-{item.id}",
+        limit=10,
+    )
+    return sorted(results, key=lambda item: (-item.rank, item.kind, item.title))[:40]
+
+
 def search_organisation(*, organisation: Organisation, query_text: str) -> list[SearchResult]:
     """Search only records within one established tenant boundary."""
     term = query_text.strip()
     if len(term) < 2:
         return []
+    if connection.vendor != "postgresql":
+        return _fallback_search_organisation(organisation=organisation, query_text=term)
     query = SearchQuery(term, search_type="websearch", config="english")
     results: list[SearchResult] = []
+    # Django's dynamically annotated querysets do not preserve a reusable item
+    # type across the many heterogeneous loops in this aggregation function.
+    item: Any
 
     method_vector = (
         SearchVector("name", weight="A", config="english")
@@ -138,7 +477,9 @@ def search_organisation(*, organisation: Organisation, query_text: str) -> list[
                 object_id=str(item.id),
                 decision_id="",
                 title=item.title,
-                snippet=_snippet([item.summary, item.future_implication, item.domain, item.geography], term),
+                snippet=_snippet(
+                    [item.summary, item.future_implication, item.domain, item.geography], term
+                ),
                 url=f"/organisations/{organisation.id}/foresight?signal={item.id}",
                 rank=float(item.rank),
             )
@@ -168,9 +509,8 @@ def search_organisation(*, organisation: Organisation, query_text: str) -> list[
             )
         )
 
-    driver_vector = (
-        SearchVector("title", weight="A", config="english")
-        + SearchVector("description", weight="A", config="english")
+    driver_vector = SearchVector("title", weight="A", config="english") + SearchVector(
+        "description", weight="A", config="english"
     )
     drivers = (
         Driver.objects.filter(canvas__organisation=organisation)
@@ -313,9 +653,8 @@ def search_organisation(*, organisation: Organisation, query_text: str) -> list[
             )
         )
 
-    implication_vector = (
-        SearchVector("title", weight="A", config="english")
-        + SearchVector("description", weight="A", config="english")
+    implication_vector = SearchVector("title", weight="A", config="english") + SearchVector(
+        "description", weight="A", config="english"
     )
     implications = (
         StrategicImplication.objects.filter(canvas__organisation=organisation)
@@ -385,9 +724,7 @@ def search_organisation(*, organisation: Organisation, query_text: str) -> list[
                 object_id=str(item.id),
                 decision_id=str(item.decision_id),
                 title=item.title,
-                snippet=_snippet(
-                    [item.description, item.expected_benefits, item.tradeoffs], term
-                ),
+                snippet=_snippet([item.description, item.expected_benefits, item.tradeoffs], term),
                 url=f"/decisions/{item.decision_id}/reasoning/options",
                 rank=float(item.rank),
             )
@@ -529,17 +866,14 @@ def search_organisation(*, organisation: Organisation, query_text: str) -> list[
                 object_id=str(item.id),
                 decision_id=str(item.decision_id),
                 title=item.title,
-                snippet=_snippet(
-                    [item.insight, item.applicability, item.recommended_change], term
-                ),
+                snippet=_snippet([item.insight, item.applicability, item.recommended_change], term),
                 url=f"/decisions/{item.decision_id}/outcomes",
                 rank=float(item.rank),
             )
         )
 
-    evaluation_vector = (
-        SearchVector("title", weight="A", config="english")
-        + SearchVector("purpose", weight="A", config="english")
+    evaluation_vector = SearchVector("title", weight="A", config="english") + SearchVector(
+        "purpose", weight="A", config="english"
     )
     evaluations = (
         EvaluationExercise.objects.filter(organisation=organisation)
@@ -567,7 +901,9 @@ def search_organisation(*, organisation: Organisation, query_text: str) -> list[
         + SearchVector("recommendation", weight="B", config="english")
     )
     minority_reports = (
-        MinorityReport.objects.filter(organisation=organisation, status=MinorityReport.Status.PUBLISHED)
+        MinorityReport.objects.filter(
+            organisation=organisation, status=MinorityReport.Status.PUBLISHED
+        )
         .select_related("exercise__decision")
         .annotate(search=minority_vector, rank=SearchRank(minority_vector, query))
         .filter(search=query)
@@ -586,9 +922,8 @@ def search_organisation(*, organisation: Organisation, query_text: str) -> list[
             )
         )
 
-    prioritisation_vector = (
-        SearchVector("title", weight="A", config="english")
-        + SearchVector("purpose", weight="A", config="english")
+    prioritisation_vector = SearchVector("title", weight="A", config="english") + SearchVector(
+        "purpose", weight="A", config="english"
     )
     prioritisation_items = (
         PrioritisationPortfolio.objects.filter(organisation=organisation)
@@ -628,7 +963,9 @@ def search_organisation(*, organisation: Organisation, query_text: str) -> list[
                 object_id=str(item.id),
                 decision_id=str(item.decision_id),
                 title=item.title,
-                snippet=_snippet([item.description, item.resolution, item.get_issue_type_display()], term),
+                snippet=_snippet(
+                    [item.description, item.resolution, item.get_issue_type_display()], term
+                ),
                 url=f"/decisions/{item.decision_id}/analysis",
                 rank=float(item.rank),
             )
@@ -655,16 +992,21 @@ def search_organisation(*, organisation: Organisation, query_text: str) -> list[
                 object_id=str(item.id),
                 decision_id=str(item.decision_id),
                 title=f"{item.decision.title} - executive summary",
-                snippet=_snippet([item.proposed_judgement, item.unresolved_issues, item.implementation_implications], term),
+                snippet=_snippet(
+                    [
+                        item.proposed_judgement,
+                        item.unresolved_issues,
+                        item.implementation_implications,
+                    ],
+                    term,
+                ),
                 url=f"/decisions/{item.decision_id}/analysis",
                 rank=float(item.rank),
             )
         )
 
-
-    contribution_vector = (
-        SearchVector("title", weight="A", config="english")
-        + SearchVector("instructions", weight="A", config="english")
+    contribution_vector = SearchVector("title", weight="A", config="english") + SearchVector(
+        "instructions", weight="A", config="english"
     )
     contribution_requests = (
         ContributionRequest.objects.filter(organisation=organisation)
@@ -681,7 +1023,9 @@ def search_organisation(*, organisation: Organisation, query_text: str) -> list[
                 object_id=str(item.id),
                 decision_id=str(item.decision_id),
                 title=item.title,
-                snippet=_snippet([item.instructions, item.get_kind_display(), item.get_status_display()], term),
+                snippet=_snippet(
+                    [item.instructions, item.get_kind_display(), item.get_status_display()], term
+                ),
                 url=f"/decisions/{item.decision_id}/contributions#request-{item.id}",
                 rank=float(item.rank),
             )

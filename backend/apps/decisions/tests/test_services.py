@@ -49,9 +49,7 @@ def test_contributor_creates_owned_draft_with_owner_participant(
 
 
 @pytest.mark.django_db
-def test_viewer_cannot_create_decision(
-    user_factory, organisation_factory, workspace_factory
-):  # type: ignore[no-untyped-def]
+def test_viewer_cannot_create_decision(user_factory, organisation_factory, workspace_factory):  # type: ignore[no-untyped-def]
     owner = user_factory()
     viewer = user_factory()
     organisation = organisation_factory(owner=owner)
@@ -88,9 +86,7 @@ def test_contributor_cannot_assign_another_owner(
 
 
 @pytest.mark.django_db
-def test_only_owner_or_manager_can_edit_draft(
-    user_factory, decision_factory
-):  # type: ignore[no-untyped-def]
+def test_only_owner_or_manager_can_edit_draft(user_factory, decision_factory):  # type: ignore[no-untyped-def]
     decision = decision_factory()
     other_contributor = user_factory()
     Membership.objects.create(
@@ -125,9 +121,7 @@ def test_draft_to_framing_requires_complete_frame(decision_factory):  # type: ig
 
 
 @pytest.mark.django_db
-def test_lifecycle_reaches_under_review_with_history(
-    user_factory, decision_factory
-):  # type: ignore[no-untyped-def]
+def test_lifecycle_reaches_under_review_with_history(user_factory, decision_factory):  # type: ignore[no-untyped-def]
     decision = decision_factory(
         decision_question="Which operating model should we adopt?",
         purpose="Choose a model that improves accountability.",
@@ -335,6 +329,7 @@ def test_manager_transfers_decision_ownership_and_participant_authority(
         role=Membership.Role.OWNER,
         status=Membership.Status.ACTIVE,
     ).exists()
+
 
 @pytest.mark.django_db
 def test_post_decision_transition_uses_dedicated_outcome_workflow(

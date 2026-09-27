@@ -92,9 +92,7 @@ def request_ai_review(*, actor: User, decision: Decision) -> AIReview:
     return execute_ai_review(review=review, provider=provider)
 
 
-def execute_ai_review(
-    *, review: AIReview, provider: AIProvider | None = None
-) -> AIReview:
+def execute_ai_review(*, review: AIReview, provider: AIProvider | None = None) -> AIReview:
     """Execute outside a long database transaction and preserve failures."""
     provider = provider or get_provider()
     with transaction.atomic():
@@ -104,9 +102,7 @@ def execute_ai_review(
         current.status = AIReview.Status.RUNNING
         current.started_at = timezone.now()
         current.error_message = ""
-        current.save(
-            update_fields=["status", "started_at", "error_message", "updated_at"]
-        )
+        current.save(update_fields=["status", "started_at", "error_message", "updated_at"])
     try:
         output = provider.review_decision(snapshot=current.input_snapshot).as_dict()
     except Exception:  # noqa: BLE001 - provider failure must degrade gracefully
@@ -138,9 +134,11 @@ def execute_ai_review(
         )
         return failed
     with transaction.atomic():
-        completed = AIReview.objects.select_for_update().select_related(
-            "requested_by", "organisation", "decision"
-        ).get(id=current.id)
+        completed = (
+            AIReview.objects.select_for_update()
+            .select_related("requested_by", "organisation", "decision")
+            .get(id=current.id)
+        )
         completed.status = AIReview.Status.COMPLETED
         completed.output = output
         completed.completed_at = timezone.now()
@@ -162,8 +160,7 @@ def execute_ai_review(
             kind=Notification.Kind.AI_REVIEW,
             title="AI review ready",
             message=(
-                f"The advisory review for “{completed.decision.title}” "
-                "is ready for human review."
+                f"The advisory review for “{completed.decision.title}” is ready for human review."
             ),
             url=f"/decisions/{completed.decision_id}/ai-review",
             dedup_key=f"ai-review-completed:{completed.id}",
@@ -183,12 +180,12 @@ def execute_ai_review(
 
 
 @transaction.atomic
-def mark_ai_review_reviewed(
-    *, actor: User, review: AIReview, notes: str = ""
-) -> AIReview:
-    current = AIReview.objects.select_for_update().select_related(
-        "decision__owner", "organisation"
-    ).get(id=review.id)
+def mark_ai_review_reviewed(*, actor: User, review: AIReview, notes: str = "") -> AIReview:
+    current = (
+        AIReview.objects.select_for_update()
+        .select_related("decision__owner", "organisation")
+        .get(id=review.id)
+    )
     if not can_moderate_ai_review(actor=actor, review=current):
         raise PermissionDenied("You cannot review this AI output.")
     if current.status != AIReview.Status.COMPLETED:
@@ -200,9 +197,7 @@ def mark_ai_review_reviewed(
     current.reviewed_by = actor
     current.reviewed_at = timezone.now()
     current.review_notes = notes.strip()
-    current.save(
-        update_fields=["reviewed_by", "reviewed_at", "review_notes", "updated_at"]
-    )
+    current.save(update_fields=["reviewed_by", "reviewed_at", "review_notes", "updated_at"])
     record_event(
         action="ai_review.reviewed",
         object_type="ai_review",
@@ -216,9 +211,11 @@ def mark_ai_review_reviewed(
 
 @transaction.atomic
 def dismiss_ai_review(*, actor: User, review: AIReview, reason: str) -> AIReview:
-    current = AIReview.objects.select_for_update().select_related(
-        "decision__owner", "organisation"
-    ).get(id=review.id)
+    current = (
+        AIReview.objects.select_for_update()
+        .select_related("decision__owner", "organisation")
+        .get(id=review.id)
+    )
     if not can_moderate_ai_review(actor=actor, review=current):
         raise PermissionDenied("You cannot dismiss this AI output.")
     if current.status != AIReview.Status.COMPLETED:
@@ -262,16 +259,12 @@ def ai_review_quality_metrics(*, organisation) -> dict[str, Any]:  # type: ignor
     this is the harness the roadmap calls "user correction rate," built
     entirely from the reviewed_at/dismissed_at fields humans already set.
     """
-    completed = AIReview.objects.filter(
-        organisation=organisation, status=AIReview.Status.COMPLETED
-    )
+    completed = AIReview.objects.filter(organisation=organisation, status=AIReview.Status.COMPLETED)
     total_completed = completed.count()
     reviewed_count = completed.filter(reviewed_at__isnull=False).count()
     dismissed_count = completed.filter(dismissed_at__isnull=False).count()
     actioned_count = reviewed_count + dismissed_count
-    correction_rate = (
-        round(dismissed_count / actioned_count * 100, 2) if actioned_count else None
-    )
+    correction_rate = round(dismissed_count / actioned_count * 100, 2) if actioned_count else None
     return {
         "total_completed": total_completed,
         "reviewed_count": reviewed_count,

@@ -99,6 +99,22 @@ class PasswordChangeSerializer(StrictSerializer):
         return value
 
 
+class EmailChangeRequestSerializer(StrictSerializer):
+    """Authenticated request to verify and adopt a replacement email."""
+
+    new_email = serializers.EmailField()
+    current_password = serializers.CharField(trim_whitespace=False, write_only=True)
+
+    def validate_new_email(self, value: str) -> str:
+        return value.strip().lower()
+
+
+class EmailChangeConfirmSerializer(StrictSerializer):
+    """Anonymous confirmation carrying the single-use verification token."""
+
+    token = serializers.CharField(max_length=256, trim_whitespace=True)
+
+
 class PasswordResetRequestSerializer(StrictSerializer):
     """Anonymous password-reset request."""
 

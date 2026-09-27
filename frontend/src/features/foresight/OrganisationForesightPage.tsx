@@ -25,9 +25,10 @@ import {
   updateSignal,
   uploadSourceAttachment,
 } from "./api";
+import { ResearchClaimsPanel } from "./ResearchClaimsPanel";
 import { steepDotColour } from "./steepColours";
 
-type Tab = "radar" | "signals" | "sources" | "watchlists";
+type Tab = "radar" | "signals" | "sources" | "claims" | "watchlists";
 
 const steepCategories: Array<{ value: ForesightSignal["steep_category"]; label: string }> = [
   { value: "social", label: "Social" },
@@ -141,8 +142,12 @@ export function OrganisationForesightPage() {
     author: "",
     publisher: "",
     published_on: "",
+    accessed_on: "",
+    review_due_on: "",
     source_url: "",
+    archived_url: "",
     reference: "",
+    jurisdiction: "",
     credibility: "unassessed",
     credibility_rationale: "",
     notes: "",
@@ -217,13 +222,15 @@ export function OrganisationForesightPage() {
       const source = await createSource(organisationId, {
         ...sourceForm,
         published_on: sourceForm.published_on || null,
+        accessed_on: sourceForm.accessed_on || null,
+        review_due_on: sourceForm.review_due_on || null,
         reference: sourceForm.reference || (selectedFile ? `Uploaded file: ${selectedFile.name}` : ""),
       });
       if (selectedFile) await uploadSourceAttachment(source.id, selectedFile);
       return source;
     },
     onSuccess: async () => {
-      setSourceForm({ title: "", source_type: "research", author: "", publisher: "", published_on: "", source_url: "", reference: "", credibility: "unassessed", credibility_rationale: "", notes: "" });
+      setSourceForm({ title: "", source_type: "research", author: "", publisher: "", published_on: "", accessed_on: "", review_due_on: "", source_url: "", archived_url: "", reference: "", jurisdiction: "", credibility: "unassessed", credibility_rationale: "", notes: "" });
       setSelectedFile(null);
       await refresh();
     },
@@ -343,6 +350,11 @@ export function OrganisationForesightPage() {
           drivers, stakeholders, and causal relationships - and are where signals connect through to
           scenarios and, ultimately, to specific decisions.
         </p>
+        <p>
+          A <strong>research claim</strong> is a proposition that may change the roadmap or a live
+          decision. Claims keep supporting and contrary sources together, expose evidence quality,
+          and record review and reversal conditions so desk research remains accountable.
+        </p>
       </PageHelp>
 
       {error ? <StatusMessage kind="error">{error instanceof ApiError ? error.message : "The foresight action could not be completed."}</StatusMessage> : null}
@@ -351,14 +363,15 @@ export function OrganisationForesightPage() {
       <section className="foresight-metrics" aria-label="Foresight overview">
         <article><span>Signals</span><strong>{overview.data?.signal_count ?? "N/A"}</strong><small>active observations</small></article>
         <article><span>Sources</span><strong>{overview.data?.source_count ?? "N/A"}</strong><small>attributable records</small></article>
+        <article><span>Research claims</span><strong>{overview.data?.claim_count ?? "N/A"}</strong><small>{overview.data?.claims_with_evidence_gaps ?? 0} evidence gaps</small></article>
         <article><span>Watchlists</span><strong>{overview.data?.watchlist_count ?? "N/A"}</strong><small>strategic concerns</small></article>
         <article><span>Systems canvases</span><strong>{overview.data?.canvas_count ?? "N/A"}</strong><small>structured inquiries</small></article>
         <article className="foresight-metric--attention"><span>High attention</span><strong>{overview.data?.high_attention_count ?? "N/A"}</strong><small>high impact and uncertainty</small></article>
       </section>
 
       <div className="foresight-tabs" role="tablist" aria-label="Foresight sections">
-        {(["radar", "signals", "sources", "watchlists"] as Tab[]).map((item) => (
-          <button key={item} className={tab === item ? "is-active" : ""} type="button" role="tab" aria-selected={tab === item} onClick={() => setTab(item)}>{item === "radar" ? "Foresight radar" : item.charAt(0).toUpperCase() + item.slice(1)}</button>
+        {(["radar", "signals", "sources", "claims", "watchlists"] as Tab[]).map((item) => (
+          <button key={item} className={tab === item ? "is-active" : ""} type="button" role="tab" aria-selected={tab === item} onClick={() => setTab(item)}>{item === "radar" ? "Foresight radar" : item === "claims" ? "Research claims" : item.charAt(0).toUpperCase() + item.slice(1)}</button>
         ))}
       </div>
 
@@ -482,9 +495,13 @@ export function OrganisationForesightPage() {
               {canContribute ? <form className="feed-form" onSubmit={(event) => { event.preventDefault(); feedCreate.mutate(); }}><div><label htmlFor="feed-name">Feed name</label><input id="feed-name" required value={feedForm.name} onChange={(event) => setFeedForm({ ...feedForm, name: event.target.value })} /></div><div><label htmlFor="feed-url">Public RSS or Atom URL</label><input id="feed-url" type="url" required placeholder="https://example.org/feed.xml" value={feedForm.feed_url} onChange={(event) => setFeedForm({ ...feedForm, feed_url: event.target.value })} /></div><div><label htmlFor="feed-owner">Owner</label><select id="feed-owner" value={feedForm.owner_id} onChange={(event) => setFeedForm({ ...feedForm, owner_id: event.target.value })}><option value="">Me</option>{memberships.data?.filter((item) => item.status === "active").map((item) => <option key={item.user.id} value={item.user.id}>{personName(item.user)}</option>)}</select></div><button className="button button--primary" type="submit" disabled={feedCreate.isPending}>{feedCreate.isPending ? "Saving…" : "Add feed"}</button></form> : null}
             </div>
           </details>
-          <div className="source-library">{sources.data?.map((source) => <article id={`source-${source.id}`} className={`source-card${focusedSourceId === source.id ? " is-focused" : ""}`} key={source.id}><div><div className="inline-badges"><span className="status-badge">{source.source_type_label}</span><span className="role-badge">{source.credibility_label} credibility</span></div><h3>{source.title}</h3><p>{[source.author, source.publisher, source.published_on].filter(Boolean).join(" · ") || source.reference}</p>{source.credibility_rationale ? <p className="muted">{source.credibility_rationale}</p> : null}</div><div className="source-card__links">{source.source_url ? <a className="button button--quiet" href={source.source_url} target="_blank" rel="noreferrer"><Icon name="external" /> Open source</a> : null}{source.attachments.map((file) => <a className="attachment-link" key={file.id} href={file.download_url}><Icon name="external" /><span><strong>{file.original_name}</strong><small>{formatBytes(file.size_bytes)} · private</small></span></a>)}</div></article>)}{sources.data?.length === 0 ? <div className="empty-state"><Icon name="layers" /><h3>No sources recorded</h3><p>Add the source before interpreting it as a signal.</p></div> : null}</div></section>
-          <aside className="side-panel foresight-create-panel"><p className="eyebrow">Attributable intelligence</p><h2>Add source</h2>{!canContribute ? <p className="muted">Your organisation role is read-only.</p> : <form onSubmit={(event) => { event.preventDefault(); sourceCreate.mutate(); }}><label htmlFor="source-title">Title</label><input id="source-title" required value={sourceForm.title} onChange={(event) => setSourceForm({ ...sourceForm, title: event.target.value })} /><div className="form-row"><div><label htmlFor="source-type">Type</label><select id="source-type" value={sourceForm.source_type} onChange={(event) => setSourceForm({ ...sourceForm, source_type: event.target.value })}><option value="research">Research publication</option><option value="news">News or media</option><option value="government">Government or regulation</option><option value="internal">Internal record</option><option value="expert">Expert contribution</option><option value="stakeholder">Stakeholder contribution</option><option value="dataset">Dataset</option><option value="other">Other</option></select></div><div><label htmlFor="source-date">Published</label><input id="source-date" type="date" value={sourceForm.published_on} onChange={(event) => setSourceForm({ ...sourceForm, published_on: event.target.value })} /></div></div><label htmlFor="source-author">Author</label><input id="source-author" value={sourceForm.author} onChange={(event) => setSourceForm({ ...sourceForm, author: event.target.value })} /><label htmlFor="source-publisher">Publisher</label><input id="source-publisher" value={sourceForm.publisher} onChange={(event) => setSourceForm({ ...sourceForm, publisher: event.target.value })} /><label htmlFor="source-url">URL</label><input id="source-url" type="url" placeholder="https://…" value={sourceForm.source_url} onChange={(event) => setSourceForm({ ...sourceForm, source_url: event.target.value })} /><label htmlFor="source-reference">Reference</label><input id="source-reference" placeholder="Report ID, dataset version, interview…" value={sourceForm.reference} onChange={(event) => setSourceForm({ ...sourceForm, reference: event.target.value })} /><label htmlFor="source-credibility">Credibility assessment</label><select id="source-credibility" value={sourceForm.credibility} onChange={(event) => setSourceForm({ ...sourceForm, credibility: event.target.value })}><option value="unassessed">Not assessed</option><option value="low">Low</option><option value="moderate">Moderate</option><option value="high">High</option></select><label htmlFor="source-rationale">Assessment rationale</label><textarea id="source-rationale" rows={3} value={sourceForm.credibility_rationale} onChange={(event) => setSourceForm({ ...sourceForm, credibility_rationale: event.target.value })} /><label htmlFor="source-file">Private attachment</label><input id="source-file" type="file" accept=".pdf,.txt,.csv,.docx,.xlsx,.png,.jpg,.jpeg,.webp" onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)} /><small>Maximum 15 MB. Files are permission-controlled and never served as public media.</small><button className="button button--primary button--full" disabled={sourceCreate.isPending || (!sourceForm.source_url && !sourceForm.reference && !selectedFile)} type="submit">{sourceCreate.isPending ? "Saving…" : "Save source"}</button></form>}</aside>
+          <div className="source-library">{sources.data?.map((source) => <article id={`source-${source.id}`} className={`source-card${focusedSourceId === source.id ? " is-focused" : ""}`} key={source.id}><div><div className="inline-badges"><span className="status-badge">{source.source_type_label}</span><span className="role-badge">{source.credibility_label} credibility</span>{source.jurisdiction ? <span className="role-badge">{source.jurisdiction}</span> : null}</div><h3>{source.title}</h3><p>{[source.author, source.publisher, source.published_on].filter(Boolean).join(" · ") || source.reference}</p>{source.accessed_on ? <small className="source-freshness">Accessed {new Date(`${source.accessed_on}T00:00:00`).toLocaleDateString("en-GB")}{source.review_due_on ? ` · review ${new Date(`${source.review_due_on}T00:00:00`).toLocaleDateString("en-GB")}` : ""}</small> : null}{source.credibility_rationale ? <p className="muted">{source.credibility_rationale}</p> : null}</div><div className="source-card__links">{source.source_url ? <a className="button button--quiet" href={source.source_url} target="_blank" rel="noreferrer"><Icon name="external" /> Open source</a> : null}{source.archived_url ? <a className="button button--quiet" href={source.archived_url} target="_blank" rel="noreferrer"><Icon name="external" /> Archived copy</a> : null}{source.attachments.map((file) => <a className="attachment-link" key={file.id} href={file.download_url}><Icon name="external" /><span><strong>{file.original_name}</strong><small>{formatBytes(file.size_bytes)} · private · {file.malware_scan_status === "clean" ? "scanned" : file.malware_scan_status.replace("_", " ")}</small></span></a>)}</div></article>)}{sources.data?.length === 0 ? <div className="empty-state"><Icon name="layers" /><h3>No sources recorded</h3><p>Add the source before interpreting it as a signal.</p></div> : null}</div></section>
+          <aside className="side-panel foresight-create-panel"><p className="eyebrow">Attributable intelligence</p><h2>Add source</h2>{!canContribute ? <p className="muted">Your organisation role is read-only.</p> : <form onSubmit={(event) => { event.preventDefault(); sourceCreate.mutate(); }}><label htmlFor="source-title">Title</label><input id="source-title" required value={sourceForm.title} onChange={(event) => setSourceForm({ ...sourceForm, title: event.target.value })} /><div className="form-row"><div><label htmlFor="source-type">Type</label><select id="source-type" value={sourceForm.source_type} onChange={(event) => setSourceForm({ ...sourceForm, source_type: event.target.value })}><option value="research">Research publication</option><option value="news">News or media</option><option value="government">Government or regulation</option><option value="internal">Internal record</option><option value="expert">Expert contribution</option><option value="stakeholder">Stakeholder contribution</option><option value="dataset">Dataset</option><option value="other">Other</option></select></div><div><label htmlFor="source-date">Published</label><input id="source-date" type="date" value={sourceForm.published_on} onChange={(event) => setSourceForm({ ...sourceForm, published_on: event.target.value })} /></div></div><div className="form-row"><div><label htmlFor="source-accessed">Accessed</label><input id="source-accessed" type="date" value={sourceForm.accessed_on} onChange={(event) => setSourceForm({ ...sourceForm, accessed_on: event.target.value })} /></div><div><label htmlFor="source-review">Review due</label><input id="source-review" type="date" value={sourceForm.review_due_on} onChange={(event) => setSourceForm({ ...sourceForm, review_due_on: event.target.value })} /></div></div><label htmlFor="source-author">Author</label><input id="source-author" value={sourceForm.author} onChange={(event) => setSourceForm({ ...sourceForm, author: event.target.value })} /><label htmlFor="source-publisher">Publisher</label><input id="source-publisher" value={sourceForm.publisher} onChange={(event) => setSourceForm({ ...sourceForm, publisher: event.target.value })} /><label htmlFor="source-url">URL</label><input id="source-url" type="url" placeholder="https://…" value={sourceForm.source_url} onChange={(event) => setSourceForm({ ...sourceForm, source_url: event.target.value })} /><label htmlFor="source-archive">Archived URL</label><input id="source-archive" type="url" placeholder="https://web.archive.org/…" value={sourceForm.archived_url} onChange={(event) => setSourceForm({ ...sourceForm, archived_url: event.target.value })} /><div className="form-row"><div><label htmlFor="source-reference">Reference</label><input id="source-reference" placeholder="Report ID or version" value={sourceForm.reference} onChange={(event) => setSourceForm({ ...sourceForm, reference: event.target.value })} /></div><div><label htmlFor="source-jurisdiction">Jurisdiction</label><input id="source-jurisdiction" placeholder="Global, country, region…" value={sourceForm.jurisdiction} onChange={(event) => setSourceForm({ ...sourceForm, jurisdiction: event.target.value })} /></div></div><label htmlFor="source-credibility">Credibility assessment</label><select id="source-credibility" value={sourceForm.credibility} onChange={(event) => setSourceForm({ ...sourceForm, credibility: event.target.value })}><option value="unassessed">Not assessed</option><option value="low">Low</option><option value="moderate">Moderate</option><option value="high">High</option></select><label htmlFor="source-rationale">Assessment rationale</label><textarea id="source-rationale" rows={3} value={sourceForm.credibility_rationale} onChange={(event) => setSourceForm({ ...sourceForm, credibility_rationale: event.target.value })} /><label htmlFor="source-file">Private attachment</label><input id="source-file" type="file" accept=".pdf,.txt,.csv,.docx,.xlsx,.png,.jpg,.jpeg,.webp" onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)} /><small>Maximum 15 MB. Files are permission-controlled, malware-scanned, and never served as public media.</small><button className="button button--primary button--full" disabled={sourceCreate.isPending || (!sourceForm.source_url && !sourceForm.reference && !selectedFile)} type="submit">{sourceCreate.isPending ? "Saving…" : "Save source"}</button></form>}</aside>
         </div>
+      ) : null}
+
+      {tab === "claims" ? (
+        <ResearchClaimsPanel organisationId={organisationId} canContribute={canContribute} />
       ) : null}
 
       {tab === "watchlists" ? (

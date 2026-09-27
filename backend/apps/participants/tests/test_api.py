@@ -7,9 +7,7 @@ from apps.participants.models import Participant
 
 
 @pytest.mark.django_db
-def test_participant_endpoints_are_tenant_isolated(
-    api_client, user_factory, decision_factory
-):  # type: ignore[no-untyped-def]
+def test_participant_endpoints_are_tenant_isolated(api_client, user_factory, decision_factory):  # type: ignore[no-untyped-def]
     decision = decision_factory()
     participant = Participant.objects.get(
         decision=decision,
@@ -18,26 +16,30 @@ def test_participant_endpoints_are_tenant_isolated(
     outsider = user_factory()
     api_client.force_authenticate(outsider)
 
-    assert api_client.get(
-        reverse(
-            "participants:list-create",
-            kwargs={"decision_id": decision.id},
-        )
-    ).status_code == 404
-    assert api_client.patch(
-        reverse(
-            "participants:detail",
-            kwargs={"participant_id": participant.id},
-        ),
-        {"role": "reviewer"},
-        format="json",
-    ).status_code == 404
+    assert (
+        api_client.get(
+            reverse(
+                "participants:list-create",
+                kwargs={"decision_id": decision.id},
+            )
+        ).status_code
+        == 404
+    )
+    assert (
+        api_client.patch(
+            reverse(
+                "participants:detail",
+                kwargs={"participant_id": participant.id},
+            ),
+            {"role": "reviewer"},
+            format="json",
+        ).status_code
+        == 404
+    )
 
 
 @pytest.mark.django_db
-def test_add_list_change_and_remove_participant(
-    api_client, user_factory, decision_factory
-):  # type: ignore[no-untyped-def]
+def test_add_list_change_and_remove_participant(api_client, user_factory, decision_factory):  # type: ignore[no-untyped-def]
     decision = decision_factory()
     stakeholder = user_factory(email="stakeholder@example.com")
     Membership.objects.create(
@@ -46,9 +48,7 @@ def test_add_list_change_and_remove_participant(
         role=Membership.Role.CONTRIBUTOR,
     )
     api_client.force_authenticate(decision.owner)
-    collection_url = reverse(
-        "participants:list-create", kwargs={"decision_id": decision.id}
-    )
+    collection_url = reverse("participants:list-create", kwargs={"decision_id": decision.id})
 
     create_response = api_client.post(
         collection_url,
@@ -159,20 +159,29 @@ def test_under_review_decision_rejects_participant_changes(
 
 @pytest.mark.django_db
 def test_reviewer_declares_and_withdraws_conflict_via_api(
-    api_client, user_factory, decision_factory,
+    api_client,
+    user_factory,
+    decision_factory,
 ):  # type: ignore[no-untyped-def]
     from apps.decision_options.services import create_option
 
     decision = decision_factory()
-    option = create_option(actor=decision.owner, decision=decision, title="App", description="Desc.")
+    option = create_option(
+        actor=decision.owner, decision=decision, title="App", description="Desc."
+    )
     reviewer = user_factory()
     Membership.objects.create(
-        organisation=decision.organisation, user=reviewer, role=Membership.Role.CONTRIBUTOR,
+        organisation=decision.organisation,
+        user=reviewer,
+        role=Membership.Role.CONTRIBUTOR,
         status=Membership.Status.ACTIVE,
     )
     participant = Participant.objects.create(
-        organisation=decision.organisation, decision=decision, user=reviewer,
-        role=Participant.Role.REVIEWER, added_by=decision.owner,
+        organisation=decision.organisation,
+        decision=decision,
+        user=reviewer,
+        role=Participant.Role.REVIEWER,
+        added_by=decision.owner,
     )
     api_client.force_authenticate(reviewer)
 

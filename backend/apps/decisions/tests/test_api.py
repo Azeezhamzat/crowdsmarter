@@ -9,22 +9,24 @@ from apps.organisations.models import Membership
 
 
 @pytest.mark.django_db
-def test_decision_endpoints_are_tenant_isolated(
-    api_client, user_factory, decision_factory
-):  # type: ignore[no-untyped-def]
+def test_decision_endpoints_are_tenant_isolated(api_client, user_factory, decision_factory):  # type: ignore[no-untyped-def]
     outsider = user_factory()
     decision = decision_factory()
     api_client.force_authenticate(outsider)
 
-    assert api_client.get(
-        reverse("decisions:detail", kwargs={"decision_id": decision.id})
-    ).status_code == 404
-    assert api_client.get(
-        reverse(
-            "decisions:list-create",
-            kwargs={"workspace_id": decision.workspace_id},
-        )
-    ).status_code == 404
+    assert (
+        api_client.get(reverse("decisions:detail", kwargs={"decision_id": decision.id})).status_code
+        == 404
+    )
+    assert (
+        api_client.get(
+            reverse(
+                "decisions:list-create",
+                kwargs={"workspace_id": decision.workspace_id},
+            )
+        ).status_code
+        == 404
+    )
 
 
 @pytest.mark.django_db
@@ -71,9 +73,7 @@ def test_create_list_retrieve_and_update_decision(
     assert create_response.json()["status"] == "draft"
     assert api_client.get(collection_url).status_code == 200
 
-    detail_url = reverse(
-        "decisions:detail", kwargs={"decision_id": create_response.json()["id"]}
-    )
+    detail_url = reverse("decisions:detail", kwargs={"decision_id": create_response.json()["id"]})
     patch_response = api_client.patch(
         detail_url,
         {
@@ -93,9 +93,7 @@ def test_create_list_retrieve_and_update_decision(
 
 
 @pytest.mark.django_db
-def test_status_cannot_be_patched_directly(
-    api_client, decision_factory
-):  # type: ignore[no-untyped-def]
+def test_status_cannot_be_patched_directly(api_client, decision_factory):  # type: ignore[no-untyped-def]
     decision = decision_factory()
     api_client.force_authenticate(decision.owner)
 
@@ -140,9 +138,7 @@ def test_transition_endpoint_validates_and_records_history(
 
 
 @pytest.mark.django_db
-def test_open_contribution_requires_deadline_and_stakeholder(
-    api_client, decision_factory
-):  # type: ignore[no-untyped-def]
+def test_open_contribution_requires_deadline_and_stakeholder(api_client, decision_factory):  # type: ignore[no-untyped-def]
     decision = decision_factory(
         status=Decision.Status.FRAMING,
         contribution_guidance="Submit relevant evidence.",
@@ -164,9 +160,7 @@ def test_open_contribution_requires_deadline_and_stakeholder(
 
 
 @pytest.mark.django_db
-def test_non_owner_contributor_cannot_transition(
-    api_client, user_factory, decision_factory
-):  # type: ignore[no-untyped-def]
+def test_non_owner_contributor_cannot_transition(api_client, user_factory, decision_factory):  # type: ignore[no-untyped-def]
     decision = decision_factory(
         decision_question="Question?",
         purpose="Purpose.",

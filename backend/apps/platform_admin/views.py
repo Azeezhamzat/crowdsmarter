@@ -11,7 +11,6 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.audit.models import AuditEvent
 from apps.audit.serializers import AuditEventSerializer
 from apps.demo_requests.models import DemoRequest
 from apps.invitations.models import OrganisationInvitation
@@ -49,7 +48,6 @@ from .serializers import (
 from .services import (
     clear_ai_provider_api_key,
     create_support_access,
-    current_support_access,
     grant_platform_administrator,
     platform_change_organisation_state,
     platform_invitation_action,
@@ -108,7 +106,9 @@ class PlatformOverviewView(PlatformAdminBaseView):
                 user__is_active=True,
             ).count(),
             "organisations": Organisation.objects.count(),
-            "active_organisations": Organisation.objects.filter(status=Organisation.Status.ACTIVE).count(),
+            "active_organisations": Organisation.objects.filter(
+                status=Organisation.Status.ACTIVE
+            ).count(),
             "deactivated_organisations": Organisation.objects.filter(
                 status=Organisation.Status.DEACTIVATED
             ).count(),
@@ -138,8 +138,12 @@ class PlatformOverviewView(PlatformAdminBaseView):
             {
                 "counts": counts,
                 "recent_audit_events": AuditEventSerializer(recent_events, many=True).data,
-                "recent_demo_requests": PlatformDemoRequestSerializer(recent_demo_requests, many=True).data,
-                "active_support_access": SupportAccessGrantSerializer(active_grants, many=True).data,
+                "recent_demo_requests": PlatformDemoRequestSerializer(
+                    recent_demo_requests, many=True
+                ).data,
+                "active_support_access": SupportAccessGrantSerializer(
+                    active_grants, many=True
+                ).data,
             }
         )
 
@@ -224,9 +228,11 @@ class PlatformOrganisationStateView(PlatformAdminBaseView):
             organisation=organisation,
             **serializer.validated_data,
         )
-        return Response(PlatformOrganisationSummarySerializer(
-            platform_organisations().get(id=organisation.id)
-        ).data)
+        return Response(
+            PlatformOrganisationSummarySerializer(
+                platform_organisations().get(id=organisation.id)
+            ).data
+        )
 
 
 class PlatformInvitationActionView(PlatformAdminBaseView):
@@ -298,7 +304,9 @@ class PlatformAdministratorActionView(PlatformAdminBaseView):
                 rationale=serializer.validated_data["rationale"],
             )
         else:
-            return Response({"action": ["Choose grant or suspend."]}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"action": ["Choose grant or suspend."]}, status=status.HTTP_400_BAD_REQUEST
+            )
         return Response(PlatformAdministratorSerializer(item).data)
 
 

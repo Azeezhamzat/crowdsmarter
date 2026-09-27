@@ -3,7 +3,13 @@ from unittest.mock import patch
 import pytest
 from django.test import override_settings
 
-from apps.foresight.feeds import FeedDocument, FeedEntry, FeedFetchError, parse_feed, validate_public_feed_url
+from apps.foresight.feeds import (
+    FeedDocument,
+    FeedEntry,
+    FeedFetchError,
+    parse_feed,
+    validate_public_feed_url,
+)
 from apps.foresight.models import FeedSubscription, Source
 from apps.foresight.services import create_feed_subscription, sync_feed_subscription
 

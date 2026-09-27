@@ -68,7 +68,7 @@ export function TrustPage() {
       <header className="demo-request-header">
         <Link className="public-brand" to="/" aria-label="CrowdSmarter home">
           <LogoMark size={38} />
-          <span><strong>CrowdSmarter</strong><small>Systems. Futures. Collective intelligence.</small></span>
+          <span><strong>CrowdSmarter</strong><small>Facilitation. Systems. Collective intelligence.</small></span>
         </Link>
       </header>
 

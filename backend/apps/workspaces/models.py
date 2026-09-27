@@ -13,7 +13,7 @@ from apps.core.models import UUIDTimeStampedModel
 class WorkspaceQuerySet(models.QuerySet["Workspace"]):
     """Tenant-safe workspace queries."""
 
-    def for_user(self, user: Any) -> models.QuerySet["Workspace"]:
+    def for_user(self, user: Any) -> models.QuerySet[Workspace]:
         if user.is_anonymous:
             return self.none()
         return self.filter(

@@ -127,16 +127,18 @@ class DecisionFinalisationView(APIView):
 
     def get(self, request, decision_id):  # type: ignore[no-untyped-def]
         decision = decision_for_user(user=request.user, decision_id=decision_id)
-        finalisation = DecisionFinalisation.objects.select_related(
-            "selected_option",
-            "decided_by",
-        ).filter(decision=decision).first()
+        finalisation = (
+            DecisionFinalisation.objects.select_related(
+                "selected_option",
+                "decided_by",
+            )
+            .filter(decision=decision)
+            .first()
+        )
         return Response(
             {
                 "finalisation": (
-                    DecisionFinalisationSerializer(finalisation).data
-                    if finalisation
-                    else None
+                    DecisionFinalisationSerializer(finalisation).data if finalisation else None
                 )
             }
         )

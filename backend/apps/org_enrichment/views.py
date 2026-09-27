@@ -29,7 +29,9 @@ class LookupConfigurationView(APIView):
         organisation = organisation_for_user(user=request.user, organisation_id=organisation_id)
         serializer = SetLookupProviderSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        config = services.set_lookup_provider(actor=request.user, organisation=organisation, **serializer.validated_data)
+        config = services.set_lookup_provider(
+            actor=request.user, organisation=organisation, **serializer.validated_data
+        )
         return Response(LookupConfigurationSerializer(config).data)
 
 
@@ -40,7 +42,9 @@ class LookupApiKeyView(APIView):
         organisation = organisation_for_user(user=request.user, organisation_id=organisation_id)
         serializer = SetLookupApiKeySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        config = services.set_lookup_api_key(actor=request.user, organisation=organisation, **serializer.validated_data)
+        config = services.set_lookup_api_key(
+            actor=request.user, organisation=organisation, **serializer.validated_data
+        )
         return Response(LookupConfigurationSerializer(config).data)
 
     def delete(self, request, organisation_id):
@@ -54,7 +58,9 @@ class LookupConnectionTestView(APIView):
 
     def post(self, request, organisation_id):
         organisation = organisation_for_user(user=request.user, organisation_id=organisation_id)
-        return Response(services.test_lookup_connection(actor=request.user, organisation=organisation))
+        return Response(
+            services.test_lookup_connection(actor=request.user, organisation=organisation)
+        )
 
 
 class LookupOrganisationView(APIView):
@@ -64,5 +70,7 @@ class LookupOrganisationView(APIView):
         organisation = organisation_for_user(user=request.user, organisation_id=organisation_id)
         serializer = LookupOrganisationQuerySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        result = services.lookup_organisation(actor=request.user, organisation=organisation, **serializer.validated_data)
+        result = services.lookup_organisation(
+            actor=request.user, organisation=organisation, **serializer.validated_data
+        )
         return Response(result)

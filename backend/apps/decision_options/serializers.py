@@ -1,5 +1,7 @@
 """API contracts for decision options."""
 
+from typing import Any
+
 from rest_framework import serializers
 
 from apps.core.serializers import StrictSerializer
@@ -26,10 +28,10 @@ class DecisionOptionSerializer(serializers.ModelSerializer):
     outcome_status_label = serializers.CharField(
         source="get_outcome_status_display", read_only=True
     )
-    depends_on_ids = serializers.PrimaryKeyRelatedField(
+    depends_on_ids: Any = serializers.PrimaryKeyRelatedField(
         source="depends_on", many=True, read_only=True
     )
-    mutually_exclusive_with_ids = serializers.PrimaryKeyRelatedField(
+    mutually_exclusive_with_ids: Any = serializers.PrimaryKeyRelatedField(
         source="mutually_exclusive_with", many=True, read_only=True
     )
     can_edit = serializers.SerializerMethodField()
@@ -91,8 +93,7 @@ class DecisionOptionSerializer(serializers.ModelSerializer):
     def get_can_manage_eligibility(self, obj: DecisionOption) -> bool:
         request = self.context.get("request")
         return bool(
-            request
-            and can_manage_option_eligibility(actor=request.user, decision=obj.decision)
+            request and can_manage_option_eligibility(actor=request.user, decision=obj.decision)
         )
 
     def get_can_manage_outcome(self, obj: DecisionOption) -> bool:
@@ -200,7 +201,10 @@ class DecisionOptionOutcomeSerializer(StrictSerializer):
     )
 
     def validate(self, attrs):  # type: ignore[no-untyped-def]
-        if attrs["outcome_status"] == DecisionOption.OutcomeStatus.FUNDED and attrs.get("awarded_amount") is None:
+        if (
+            attrs["outcome_status"] == DecisionOption.OutcomeStatus.FUNDED
+            and attrs.get("awarded_amount") is None
+        ):
             raise serializers.ValidationError(
                 {"awarded_amount": "A funded outcome requires an awarded amount."}
             )
@@ -209,7 +213,7 @@ class DecisionOptionOutcomeSerializer(StrictSerializer):
 
 class BudgetRollupMonthSerializer(serializers.Serializer):
     month = serializers.CharField()
-    label = serializers.CharField()
+    label = serializers.CharField()  # type: ignore[assignment]  # DRF field shadows Field.label.
     awarded_total = serializers.DecimalField(max_digits=14, decimal_places=2)
 
 

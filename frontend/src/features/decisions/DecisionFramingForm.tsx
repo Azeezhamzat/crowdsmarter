@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { FieldError } from "../../components/FieldError";
-import type { Decision, DecisionUrgency, Membership } from "../../lib/types";
+import type { Decision, Membership } from "../../lib/types";
 import type { DecisionUpdateInput } from "./api";
 
 const framingSchema = z.object({
@@ -72,7 +72,7 @@ export function DecisionFramingForm({
       context: values.context,
       scope: values.scope,
       contribution_guidance: values.contribution_guidance,
-      urgency: values.urgency as DecisionUrgency,
+      urgency: values.urgency,
       target_decision_date: values.target_decision_date || null,
       contribution_deadline: values.contribution_deadline
         ? new Date(values.contribution_deadline).toISOString()

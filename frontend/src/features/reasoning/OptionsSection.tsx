@@ -1,7 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 
 import { FieldError } from "../../components/FieldError";
@@ -34,7 +34,7 @@ function PaymentControl({ option }: { option: DecisionOption }) {
           {disbursements.data.map((item) => (
             <li key={item.id}>
               <span className={`status-badge status-badge--${item.status}`}>{item.status_label}</span>
-              {item.amount} via {item.provider_key_label}
+              {item.currency} {item.amount} via {item.provider_key_label}
               {item.external_reference ? ` · ${item.external_reference}` : ""}
               {item.note ? ` - ${item.note}` : ""}
             </li>
@@ -218,6 +218,11 @@ export function OptionsSection({
       depends_on_ids: [],
       mutually_exclusive_with_ids: [],
     },
+  });
+  const dependsOnIds = useWatch({ control: form.control, name: "depends_on_ids" });
+  const mutuallyExclusiveWithIds = useWatch({
+    control: form.control,
+    name: "mutually_exclusive_with_ids",
   });
 
   const refresh = async () => {
@@ -504,7 +509,7 @@ export function OptionsSection({
                   id="option-depends-on"
                   multiple
                   size={Math.min(4, activeOptions.length)}
-                  value={form.watch("depends_on_ids")}
+                  value={dependsOnIds}
                   onChange={(event) =>
                     form.setValue(
                       "depends_on_ids",
@@ -524,7 +529,7 @@ export function OptionsSection({
                   id="option-mutually-exclusive"
                   multiple
                   size={Math.min(4, activeOptions.length)}
-                  value={form.watch("mutually_exclusive_with_ids")}
+                  value={mutuallyExclusiveWithIds}
                   onChange={(event) =>
                     form.setValue(
                       "mutually_exclusive_with_ids",

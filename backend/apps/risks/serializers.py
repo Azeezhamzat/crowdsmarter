@@ -20,10 +20,25 @@ class RiskSerializer(serializers.ModelSerializer):
     class Meta:
         model = Risk
         fields = [
-            "id", "decision_id", "option_id", "title", "description", "likelihood",
-            "impact", "score", "response_strategy", "response_strategy_label",
-            "mitigation_plan", "owner", "review_date", "status", "status_label",
-            "created_by", "can_edit", "created_at", "updated_at",
+            "id",
+            "decision_id",
+            "option_id",
+            "title",
+            "description",
+            "likelihood",
+            "impact",
+            "score",
+            "response_strategy",
+            "response_strategy_label",
+            "mitigation_plan",
+            "owner",
+            "review_date",
+            "status",
+            "status_label",
+            "created_by",
+            "can_edit",
+            "created_at",
+            "updated_at",
         ]
         read_only_fields = fields
 

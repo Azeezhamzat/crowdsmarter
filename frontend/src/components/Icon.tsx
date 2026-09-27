@@ -56,6 +56,7 @@ export function Icon({ name, size = 20, ...props }: IconProps) {
   return (
     <svg
       aria-hidden="true"
+      data-icon={name}
       fill="none"
       height={size}
       viewBox="0 0 24 24"

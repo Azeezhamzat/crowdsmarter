@@ -1,4 +1,4 @@
-"""Administrative review of public demo requests."""
+"""Administrative review of public decision enquiries."""
 
 from django.contrib import admin
 
@@ -7,7 +7,7 @@ from .models import DemoRequest
 
 @admin.register(DemoRequest)
 class DemoRequestAdmin(admin.ModelAdmin):
-    """Expose a restrained lead-review surface to Django administrators."""
+    """Expose a restrained decision-enquiry review surface to administrators."""
 
     list_display = (
         "full_name",

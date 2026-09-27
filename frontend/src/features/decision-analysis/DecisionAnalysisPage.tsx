@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { FormEvent, useEffect, useState } from "react";
+import type { FormEvent} from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
 
 import { PageHelp } from "../../components/PageHelp";
@@ -35,7 +36,7 @@ const QUALITY_QUESTIONS: Array<[string, string]> = [
   ["review_timing_defined", "Review timing and conditions are defined"],
 ];
 
-const SUMMARY_FIELDS: Array<[keyof ExecutiveDecisionSummary, string]> = [
+const SUMMARY_FIELDS = [
   ["context_summary", "Context"],
   ["options_summary", "Options considered"],
   ["evidence_summary", "Principal evidence"],
@@ -48,7 +49,7 @@ const SUMMARY_FIELDS: Array<[keyof ExecutiveDecisionSummary, string]> = [
   ["proposed_judgement", "Proposed judgement"],
   ["conditions", "Conditions and reservations"],
   ["implementation_implications", "Implementation implications"],
-];
+] as const satisfies ReadonlyArray<readonly [keyof ExecutiveDecisionSummary, string]>;
 
 type View = "comparison" | "issues" | "quality" | "summary";
 
@@ -173,7 +174,7 @@ export function DecisionAnalysisPage() {
 
   useEffect(() => {
     if (draftSummary && Object.keys(summaryForm).length === 0) {
-      setSummaryForm(Object.fromEntries(SUMMARY_FIELDS.map(([key]) => [key, String(draftSummary[key] ?? "")] )));
+      setSummaryForm(Object.fromEntries(SUMMARY_FIELDS.map(([key]) => [key, draftSummary[key]])));
     }
   }, [draftSummary, summaryForm]);
 

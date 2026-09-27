@@ -41,7 +41,7 @@ export async function joinSession(
   await ensureCsrfCookie();
   const result = await apiRequest<{ participant_token: string; name: string }>(
     `/public/sessions/${publicSlug}/join/`,
-    { method: "POST", body: JSON.stringify(input) },
+    { method: "POST", body: JSON.stringify(input), headers: participantHeaders(publicSlug) },
   );
   storeParticipantToken(publicSlug, result.participant_token);
   return result;

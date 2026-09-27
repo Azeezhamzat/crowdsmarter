@@ -12,9 +12,7 @@ class UserManager(BaseUserManager["User"]):
 
     use_in_migrations = True
 
-    def create_user(
-        self, email: str, password: str | None = None, **extra_fields: Any
-    ) -> "User":
+    def create_user(self, email: str, password: str | None = None, **extra_fields: Any) -> User:
         if not email:
             raise ValueError("An email address is required.")
         email = self.normalize_email(email).lower()
@@ -26,7 +24,7 @@ class UserManager(BaseUserManager["User"]):
 
     def create_superuser(
         self, email: str, password: str | None = None, **extra_fields: Any
-    ) -> "User":
+    ) -> User:
         extra_fields.setdefault("is_staff", True)
         extra_fields.setdefault("is_superuser", True)
         extra_fields.setdefault("is_active", True)

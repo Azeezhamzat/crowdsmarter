@@ -180,15 +180,16 @@ def test_team_builds_scenarios_tests_option_and_records_signpost(
     assert scenario.implication_links.count() == 1
     assert signpost.scenarios.get() == scenario
     assert observation.signpost == signpost
-    assert AuditEvent.objects.filter(
-        organisation=organisation, action__startswith="foresight."
-    ).count() >= 12
+    assert (
+        AuditEvent.objects.filter(
+            organisation=organisation, action__startswith="foresight."
+        ).count()
+        >= 12
+    )
 
 
 @pytest.mark.django_db
-def test_wind_tunnel_rejects_option_from_another_decision(
-    organisation_factory, decision_factory
-):  # type: ignore[no-untyped-def]
+def test_wind_tunnel_rejects_option_from_another_decision(organisation_factory, decision_factory):  # type: ignore[no-untyped-def]
     organisation = organisation_factory()
     actor = organisation.created_by
     canvas = create_canvas(

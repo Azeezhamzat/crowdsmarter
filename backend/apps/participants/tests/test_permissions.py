@@ -57,7 +57,4 @@ def test_participant_object_permission_matrix(
     force_authenticate(request, actor)
     request = Request(request)
 
-    assert (
-        CanAccessParticipant().has_object_permission(request, object(), participant)
-        is can_patch
-    )
+    assert CanAccessParticipant().has_object_permission(request, object(), participant) is can_patch

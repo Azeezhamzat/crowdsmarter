@@ -17,10 +17,10 @@ from django.utils.translation import gettext as _
 
 from apps.accounts.models import User
 from apps.audit.services import record_event
-from apps.platform_admin.contact import notification_sender_email
 from apps.notifications.models import Notification
 from apps.notifications.services import create_notification
 from apps.organisations.models import Membership, MembershipEvent, Organisation
+from apps.platform_admin.contact import notification_sender_email
 
 from .models import OrganisationInvitation
 from .tokens import digest_token, generate_token
@@ -113,10 +113,14 @@ def create_invitation(
     ).exists():
         raise InvitationServiceError("That person is already a member of this organisation.")
 
-    invitation = OrganisationInvitation.objects.select_for_update().filter(
-        organisation=organisation,
-        email=normalised_email,
-    ).first()
+    invitation = (
+        OrganisationInvitation.objects.select_for_update()
+        .filter(
+            organisation=organisation,
+            email=normalised_email,
+        )
+        .first()
+    )
     if (
         invitation is not None
         and invitation.status == OrganisationInvitation.Status.PENDING
@@ -183,9 +187,11 @@ def rotate_invitation(
     invitation: OrganisationInvitation,
 ) -> tuple[OrganisationInvitation, str]:
     """Rotate the secret and extend expiry for a pending invitation."""
-    invitation = OrganisationInvitation.objects.select_for_update().select_related(
-        "organisation"
-    ).get(id=invitation.id)
+    invitation = (
+        OrganisationInvitation.objects.select_for_update()
+        .select_related("organisation")
+        .get(id=invitation.id)
+    )
     actor_membership = _manager_membership(actor=actor, organisation=invitation.organisation)
     _validate_assignable_role(actor_membership=actor_membership, role=invitation.role)
     if invitation.status != OrganisationInvitation.Status.PENDING:
@@ -195,9 +201,7 @@ def rotate_invitation(
     invitation.token_digest = digest_token(raw_token)
     invitation.expires_at = _expiry_time()
     invitation.invited_by = actor
-    invitation.save(
-        update_fields=["token_digest", "expires_at", "invited_by", "updated_at"]
-    )
+    invitation.save(update_fields=["token_digest", "expires_at", "invited_by", "updated_at"])
     record_event(
         action="invitation.resent",
         object_type="organisation_invitation",
@@ -220,9 +224,11 @@ def revoke_invitation(
     invitation: OrganisationInvitation,
 ) -> OrganisationInvitation:
     """Revoke a pending invitation immediately."""
-    invitation = OrganisationInvitation.objects.select_for_update().select_related(
-        "organisation"
-    ).get(id=invitation.id)
+    invitation = (
+        OrganisationInvitation.objects.select_for_update()
+        .select_related("organisation")
+        .get(id=invitation.id)
+    )
     actor_membership = _manager_membership(actor=actor, organisation=invitation.organisation)
     _validate_assignable_role(actor_membership=actor_membership, role=invitation.role)
     if invitation.status != OrganisationInvitation.Status.PENDING:
@@ -334,9 +340,11 @@ def accept_invitation(
 ) -> tuple[User, Membership, bool]:
     """Accept an invitation, creating an account only when one does not exist."""
     try:
-        invitation = OrganisationInvitation.objects.select_for_update().select_related(
-            "organisation"
-        ).get(token_digest=digest_token(raw_token))
+        invitation = (
+            OrganisationInvitation.objects.select_for_update()
+            .select_related("organisation")
+            .get(token_digest=digest_token(raw_token))
+        )
     except OrganisationInvitation.DoesNotExist as exc:
         raise InvitationServiceError("This invitation link is invalid.") from exc
 
@@ -347,34 +355,33 @@ def accept_invitation(
     if invitation.expires_at <= timezone.now():
         raise InvitationServiceError("This invitation has expired. Ask for a new invitation.")
 
-    issuer_membership = Membership.objects.select_for_update().filter(
-        organisation=invitation.organisation,
-        user=invitation.invited_by,
-        status=Membership.Status.ACTIVE,
-    ).first()
+    issuer_membership = (
+        Membership.objects.select_for_update()
+        .filter(
+            organisation=invitation.organisation,
+            user=invitation.invited_by,
+            status=Membership.Status.ACTIVE,
+        )
+        .first()
+    )
     issuer_can_manage = issuer_membership is not None and issuer_membership.role in {
         Membership.Role.OWNER,
         Membership.Role.ADMIN,
     }
-    issuer_can_assign_role = (
-        invitation.role != Membership.Role.OWNER
-        or (issuer_membership is not None and issuer_membership.role == Membership.Role.OWNER)
+    issuer_can_assign_role = invitation.role != Membership.Role.OWNER or (
+        issuer_membership is not None and issuer_membership.role == Membership.Role.OWNER
     )
     if not issuer_can_manage or not issuer_can_assign_role:
         raise InvitationServiceError(
             "This invitation is no longer authorised. Ask an organisation owner for a new one."
         )
 
-    existing_user = User.objects.select_for_update().filter(
-        email__iexact=invitation.email
-    ).first()
+    existing_user = User.objects.select_for_update().filter(email__iexact=invitation.email).first()
     created_user = False
 
     if authenticated_user is not None:
         if authenticated_user.email.lower() != invitation.email:
-            raise PermissionDenied(
-                "Sign in with the email address that received this invitation."
-            )
+            raise PermissionDenied("Sign in with the email address that received this invitation.")
         user = authenticated_user
     elif existing_user is not None:
         raise InvitationServiceError(
@@ -422,9 +429,7 @@ def accept_invitation(
     invitation.status = OrganisationInvitation.Status.ACCEPTED
     invitation.accepted_by = user
     invitation.accepted_at = timezone.now()
-    invitation.save(
-        update_fields=["status", "accepted_by", "accepted_at", "updated_at"]
-    )
+    invitation.save(update_fields=["status", "accepted_by", "accepted_at", "updated_at"])
     if invitation.invited_by_id != user.id:
         create_notification(
             recipient=invitation.invited_by,

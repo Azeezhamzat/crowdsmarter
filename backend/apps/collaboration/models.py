@@ -122,16 +122,12 @@ class DiscussionEntry(UUIDTimeStampedModel):
                     {"organisation": "The entry must share the decision organisation."}
                 )
         if self.reply_to_id and self.reply_to.decision_id != self.decision_id:
-            raise ValidationError(
-                {"reply_to": "A reply must belong to the same decision."}
-            )
+            raise ValidationError({"reply_to": "A reply must belong to the same decision."})
         if self.resolved_at and self.kind not in {
             self.Kind.QUESTION,
             self.Kind.CONCERN,
         }:
-            raise ValidationError(
-                {"resolved_at": "Only questions and concerns can be resolved."}
-            )
+            raise ValidationError({"resolved_at": "Only questions and concerns can be resolved."})
         if self.resolved_at and not self.resolution_note:
             raise ValidationError(
                 {"resolution_note": "Record how the question or concern was resolved."}

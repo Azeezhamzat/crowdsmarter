@@ -73,9 +73,7 @@ def _build_signpost(*, organisation, actor, decision=None):  # type: ignore[no-u
 
 
 @pytest.mark.django_db
-def test_signpost_links_to_assumption_and_risk(
-    organisation_factory, decision_factory
-):  # type: ignore[no-untyped-def]
+def test_signpost_links_to_assumption_and_risk(organisation_factory, decision_factory):  # type: ignore[no-untyped-def]
     organisation = organisation_factory()
     actor = organisation.created_by
     decision = decision_factory(
@@ -151,9 +149,7 @@ def test_signpost_cannot_link_to_assumption_from_another_organisation(
 
 
 @pytest.mark.django_db
-def test_only_contributor_can_link_signpost_watchlist(
-    organisation_factory, user_factory
-):  # type: ignore[no-untyped-def]
+def test_only_contributor_can_link_signpost_watchlist(organisation_factory, user_factory):  # type: ignore[no-untyped-def]
     organisation = organisation_factory()
     actor = organisation.created_by
     outsider = user_factory()
@@ -169,9 +165,7 @@ def test_only_contributor_can_link_signpost_watchlist(
 
 
 @pytest.mark.django_db
-def test_signpost_watchlist_link_requires_rationale(
-    organisation_factory, decision_factory
-):  # type: ignore[no-untyped-def]
+def test_signpost_watchlist_link_requires_rationale(organisation_factory, decision_factory):  # type: ignore[no-untyped-def]
     organisation = organisation_factory()
     actor = organisation.created_by
     decision = decision_factory(
@@ -191,9 +185,7 @@ def test_signpost_watchlist_link_requires_rationale(
     )
 
     with pytest.raises(ValidationError):
-        link_signpost_to_risk(
-            actor=actor, signpost=signpost, risk_id=risk.id, rationale="   "
-        )
+        link_signpost_to_risk(actor=actor, signpost=signpost, risk_id=risk.id, rationale="   ")
 
 
 @pytest.mark.django_db
@@ -218,9 +210,7 @@ def test_signpost_watchlist_api_creates_links_and_exposes_them(
     )
 
     response = api_client.post(
-        reverse(
-            "foresight:signpost-assumption-links", kwargs={"signpost_id": signpost.id}
-        ),
+        reverse("foresight:signpost-assumption-links", kwargs={"signpost_id": signpost.id}),
         {
             "assumption_id": str(assumption.id),
             "rationale": "This signpost is the clearest test of this assumption.",
@@ -232,9 +222,7 @@ def test_signpost_watchlist_api_creates_links_and_exposes_them(
     assert response.json()["assumption_links"][0]["assumption_id"] == str(assumption.id)
 
     unknown_field = api_client.post(
-        reverse(
-            "foresight:signpost-assumption-links", kwargs={"signpost_id": signpost.id}
-        ),
+        reverse("foresight:signpost-assumption-links", kwargs={"signpost_id": signpost.id}),
         {
             "assumption_id": str(assumption.id),
             "rationale": "Repeat.",

@@ -49,14 +49,19 @@ class DecisionIssueListCreateView(APIView):
 
     def get(self, request, decision_id):
         items = issues_for_decision(user=request.user, decision_id=decision_id)
-        return Response(DecisionIssueSerializer(items, many=True, context={"request": request}).data)
+        return Response(
+            DecisionIssueSerializer(items, many=True, context={"request": request}).data
+        )
 
     def post(self, request, decision_id):
         decision = analysis_decision_for_user(user=request.user, decision_id=decision_id)
         serializer = DecisionIssueWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         item = create_issue(actor=request.user, decision=decision, **serializer.validated_data)
-        return Response(DecisionIssueSerializer(item, context={"request": request}).data, status=status.HTTP_201_CREATED)
+        return Response(
+            DecisionIssueSerializer(item, context={"request": request}).data,
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class DecisionIssueDetailView(APIView):
@@ -75,14 +80,21 @@ class QualityReviewListCreateView(APIView):
 
     def get(self, request, decision_id):
         items = reviews_for_decision(user=request.user, decision_id=decision_id)
-        return Response(QualityReviewSerializer(items, many=True, context={"request": request}).data)
+        return Response(
+            QualityReviewSerializer(items, many=True, context={"request": request}).data
+        )
 
     def post(self, request, decision_id):
         decision = analysis_decision_for_user(user=request.user, decision_id=decision_id)
         serializer = QualityReviewWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        item = create_quality_review(actor=request.user, decision=decision, **serializer.validated_data)
-        return Response(QualityReviewSerializer(item, context={"request": request}).data, status=status.HTTP_201_CREATED)
+        item = create_quality_review(
+            actor=request.user, decision=decision, **serializer.validated_data
+        )
+        return Response(
+            QualityReviewSerializer(item, context={"request": request}).data,
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class QualityReviewDetailView(APIView):
@@ -92,7 +104,9 @@ class QualityReviewDetailView(APIView):
         item = review_for_user(user=request.user, review_id=review_id)
         serializer = QualityReviewPatchSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        item = update_quality_review(actor=request.user, review=item, fields=dict(serializer.validated_data))
+        item = update_quality_review(
+            actor=request.user, review=item, fields=dict(serializer.validated_data)
+        )
         return Response(QualityReviewSerializer(item, context={"request": request}).data)
 
 
@@ -101,14 +115,21 @@ class ExecutiveSummaryListCreateView(APIView):
 
     def get(self, request, decision_id):
         items = summaries_for_decision(user=request.user, decision_id=decision_id)
-        return Response(ExecutiveSummarySerializer(items, many=True, context={"request": request}).data)
+        return Response(
+            ExecutiveSummarySerializer(items, many=True, context={"request": request}).data
+        )
 
     def post(self, request, decision_id):
         decision = analysis_decision_for_user(user=request.user, decision_id=decision_id)
         serializer = ExecutiveSummaryWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        item = create_executive_summary(actor=request.user, decision=decision, **serializer.validated_data)
-        return Response(ExecutiveSummarySerializer(item, context={"request": request}).data, status=status.HTTP_201_CREATED)
+        item = create_executive_summary(
+            actor=request.user, decision=decision, **serializer.validated_data
+        )
+        return Response(
+            ExecutiveSummarySerializer(item, context={"request": request}).data,
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class ExecutiveSummaryDetailView(APIView):
@@ -118,5 +139,7 @@ class ExecutiveSummaryDetailView(APIView):
         item = summary_for_user(user=request.user, summary_id=summary_id)
         serializer = ExecutiveSummaryPatchSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        item = update_executive_summary(actor=request.user, summary=item, fields=dict(serializer.validated_data))
+        item = update_executive_summary(
+            actor=request.user, summary=item, fields=dict(serializer.validated_data)
+        )
         return Response(ExecutiveSummarySerializer(item, context={"request": request}).data)

@@ -20,12 +20,15 @@ class ApplicantAccount(UUIDTimeStampedModel):
     name = models.CharField(max_length=200, blank=True)
     email_verified_at = models.DateTimeField(null=True, blank=True)
     portal_token_digest = models.CharField(max_length=64, unique=True, null=True, blank=True)
+    portal_token_expires_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ["email"]
         constraints = [
             models.UniqueConstraint(Lower("email"), name="unique_applicant_account_email_ci"),
-            models.CheckConstraint(condition=~models.Q(email=""), name="applicant_account_email_not_empty"),
+            models.CheckConstraint(
+                condition=~models.Q(email=""), name="applicant_account_email_not_empty"
+            ),
         ]
 
     def clean(self) -> None:
@@ -48,7 +51,9 @@ class MagicLinkToken(UUIDTimeStampedModel):
     raw token exists only in the email body and the momentary request.
     """
 
-    account = models.ForeignKey(ApplicantAccount, on_delete=models.CASCADE, related_name="magic_links")
+    account = models.ForeignKey(
+        ApplicantAccount, on_delete=models.CASCADE, related_name="magic_links"
+    )
     token_digest = models.CharField(max_length=64, unique=True)
     expires_at = models.DateTimeField()
     consumed_at = models.DateTimeField(null=True, blank=True)
@@ -66,14 +71,20 @@ class MagicLinkToken(UUIDTimeStampedModel):
 class ProgressReport(UUIDTimeStampedModel):
     """A post-award update a grantee submits against their funded application."""
 
-    idea = models.ForeignKey("ideation.Idea", on_delete=models.CASCADE, related_name="progress_reports")
-    account = models.ForeignKey(ApplicantAccount, on_delete=models.PROTECT, related_name="progress_reports")
+    idea = models.ForeignKey(
+        "ideation.Idea", on_delete=models.CASCADE, related_name="progress_reports"
+    )
+    account = models.ForeignKey(
+        ApplicantAccount, on_delete=models.PROTECT, related_name="progress_reports"
+    )
     body = models.TextField()
 
     class Meta:
         ordering = ["-created_at", "id"]
         constraints = [
-            models.CheckConstraint(condition=~models.Q(body=""), name="progress_report_body_not_empty"),
+            models.CheckConstraint(
+                condition=~models.Q(body=""), name="progress_report_body_not_empty"
+            ),
         ]
         indexes = [
             models.Index(fields=["idea", "-created_at"], name="progress_report_idea_idx"),

@@ -46,9 +46,7 @@ def test_archive_requires_active_lesson(decision_factory):  # type: ignore[no-un
 
 
 @pytest.mark.django_db
-def test_contributor_cannot_curate_lessons(
-    user_factory, decision_factory
-):  # type: ignore[no-untyped-def]
+def test_contributor_cannot_curate_lessons(user_factory, decision_factory):  # type: ignore[no-untyped-def]
     decision = decision_factory(status=Decision.Status.LESSONS_LEARNED)
     contributor = user_factory()
     Membership.objects.create(

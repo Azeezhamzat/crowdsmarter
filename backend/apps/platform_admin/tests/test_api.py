@@ -158,7 +158,9 @@ def test_operational_support_transfers_ownership_without_joining_tenant(
     assert response.status_code == 200
     candidate_membership.refresh_from_db()
     assert candidate_membership.role == Membership.Role.OWNER
-    assert Membership.objects.get(organisation=organisation, user=owner).role == Membership.Role.ADMIN
+    assert (
+        Membership.objects.get(organisation=organisation, user=owner).role == Membership.Role.ADMIN
+    )
     assert not Membership.objects.filter(organisation=organisation, user=administrator).exists()
     assert AuditEvent.objects.filter(action="platform_organisation.ownership_transferred").exists()
 

@@ -24,9 +24,7 @@ def test_must_have_criterion_requires_threshold(decision_factory):  # type: igno
 
 
 @pytest.mark.django_db
-def test_criterion_belongs_to_decision_organisation(
-    decision_factory, organisation_factory
-):  # type: ignore[no-untyped-def]
+def test_criterion_belongs_to_decision_organisation(decision_factory, organisation_factory):  # type: ignore[no-untyped-def]
     decision = decision_factory()
     other_organisation = organisation_factory()
     criterion = Criterion(

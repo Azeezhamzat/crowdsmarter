@@ -2,12 +2,10 @@
 
 ## Canonical source
 
-`~/Downloads/crowdsmarter` is the single canonical Git working tree, tracking
-`origin/main` at `https://github.com/Azeezhamzat/crowdsmarter.git`. There is no
-second independently edited source tree. A previous separate publishing clone
-(`~/Downloads/crowdsmarter-github-publish`) is retained only as a historical
-backup and must not be edited directly; if you find yourself about to edit it,
-edit this tree instead.
+Use one Git clone as the canonical working tree and publish from that clone.
+Archive downloads such as `crowdsmarter-main` may not contain `.git` metadata;
+changes made in an archive must be copied into a reviewed Git branch before
+they can be committed or published.
 
 Runtime-only files — `.env`, `node_modules/`, `dist/`, `staticfiles/`, `media/`,
 caches, and local Claude Code settings (`.claude/`) — remain local and ignored.
@@ -53,6 +51,16 @@ docker compose run --rm frontend npm test -- --run
 docker compose run --rm frontend npm run build
 ```
 
+Playwright browsers are intentionally installed by the CI runner rather than
+inside the small Alpine development image. To run E2E tests directly on a Mac:
+
+```bash
+cd frontend
+npm ci
+npx playwright install chromium
+npm run test:e2e
+```
+
 Report exact failures. Do not invent a passing result.
 
 ## Local environment
@@ -78,9 +86,9 @@ docker compose --profile workers up -d worker scheduler
 
 - Frontend dependencies are pinned via `frontend/package-lock.json`. Install
   with `npm ci` in CI and `npm install` locally; do not delete the lockfile.
-- Backend dependencies in `backend/pyproject.toml` use range constraints only
-  (no committed lockfile yet). See `docs/known-issues.md` for the plan to add
-  one (`pip-compile` or `uv lock`).
+- Backend's human-maintained ranges remain in `backend/pyproject.toml`; runtime
+  and development installations are reproducible through the committed
+  hash-locked `requirements.lock` and `requirements-dev.lock` files.
 
 ## Releases
 

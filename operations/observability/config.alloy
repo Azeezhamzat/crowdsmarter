@@ -1,0 +1,52 @@
+discovery.docker "crowdsmarter" {
+  host = "unix:///var/run/docker.sock"
+}
+
+discovery.relabel "crowdsmarter" {
+  targets = discovery.docker.crowdsmarter.targets
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    regex         = "(backend|frontend|worker|scheduler|db|redis|clamav)"
+    action        = "keep"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(crowdsmarter.*)"
+    target_label  = "container"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label  = "service"
+  }
+}
+
+loki.source.docker "crowdsmarter" {
+  host       = "unix:///var/run/docker.sock"
+  targets    = discovery.relabel.crowdsmarter.output
+  labels     = { application = "crowdsmarter" }
+  forward_to = [loki.process.crowdsmarter.receiver]
+}
+
+loki.process "crowdsmarter" {
+  stage.docker {}
+  stage.json {
+    expressions = {
+      level      = "level",
+      request_id = "request_id",
+      route      = "route",
+    }
+  }
+  stage.labels {
+    values = { level = "", route = "" }
+  }
+  forward_to = [loki.write.local.receiver]
+}
+
+loki.write "local" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}

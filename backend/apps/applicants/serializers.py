@@ -71,4 +71,4 @@ class MyApplicationSerializer(serializers.Serializer):
 
     def get_progress_reports(self, obj) -> list[dict]:  # type: ignore[no-untyped-def]
         reports = self.context.get("progress_reports_by_idea", {}).get(obj.id, [])
-        return ProgressReportSerializer(reports, many=True).data
+        return [dict(item) for item in ProgressReportSerializer(reports, many=True).data]

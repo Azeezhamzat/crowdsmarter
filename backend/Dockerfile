@@ -10,14 +10,14 @@ RUN apt-get update \
     && apt-get install --no-install-recommends -y curl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY pyproject.toml manage.py ./
+COPY pyproject.toml requirements.lock requirements-dev.lock manage.py ./
 COPY conftest.py ./
 COPY crowdsmarter ./crowdsmarter
 COPY apps ./apps
-RUN pip install --upgrade pip && pip install .
+RUN python -m pip install --require-hashes -r requirements.lock
 
 FROM base AS development
-RUN pip install -e ".[dev]"
+RUN python -m pip install --require-hashes -r requirements-dev.lock
 CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
 
 FROM base AS production

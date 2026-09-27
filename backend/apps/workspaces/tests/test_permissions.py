@@ -11,9 +11,7 @@ from apps.workspaces.permissions import CanAccessWorkspace
     ("role", "can_patch"),
     [("owner", True), ("admin", True), ("contributor", False), ("viewer", False)],
 )
-def test_workspace_object_permission_matrix(
-    user_factory, workspace_factory, role, can_patch
-):  # type: ignore[no-untyped-def]
+def test_workspace_object_permission_matrix(user_factory, workspace_factory, role, can_patch):  # type: ignore[no-untyped-def]
     workspace = workspace_factory()
     actor = workspace.organisation.created_by if role == "owner" else user_factory()
     if role != "owner":

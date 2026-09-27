@@ -75,7 +75,9 @@ class DiscussionResolveSerializer(StrictSerializer):
 
 class DecisionActivityItemSerializer(serializers.Serializer):
     id = serializers.CharField()
-    source = serializers.ChoiceField(choices=["audit", "discussion"])
+    source = serializers.ChoiceField(  # type: ignore[assignment]  # API field shadows DRF Field.source.
+        choices=["audit", "discussion"]
+    )
     action = serializers.CharField()
     title = serializers.CharField()
     actor = DecisionUserSerializer(allow_null=True)

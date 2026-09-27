@@ -23,17 +23,13 @@ class WorkspaceListCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, organisation_id):  # type: ignore[no-untyped-def]
-        workspaces = workspaces_for_organisation(
-            user=request.user, organisation_id=organisation_id
-        )
+        workspaces = workspaces_for_organisation(user=request.user, organisation_id=organisation_id)
         return Response(
             WorkspaceSerializer(workspaces, many=True, context={"request": request}).data
         )
 
     def post(self, request, organisation_id):  # type: ignore[no-untyped-def]
-        organisation = organisation_for_user(
-            user=request.user, organisation_id=organisation_id
-        )
+        organisation = organisation_for_user(user=request.user, organisation_id=organisation_id)
         serializer = WorkspaceCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         workspace = create_workspace(

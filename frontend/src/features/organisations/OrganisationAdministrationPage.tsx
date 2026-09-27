@@ -63,6 +63,7 @@ export function OrganisationAdministrationPage() {
   const [deletion, setDeletion] = useState({ confirmation: "", reason: "" });
   const [disbursementProviderKey, setDisbursementProviderKey] = useState<"manual" | "stripe">("manual");
   const [stripeAccountId, setStripeAccountId] = useState("");
+  const [disbursementCurrency, setDisbursementCurrency] = useState("USD");
   const [disbursementApiKeyInput, setDisbursementApiKeyInput] = useState("");
   const [connectionResult, setConnectionResult] = useState<{ ok: boolean; detail: string } | null>(null);
   const [lookupProviderKey, setLookupProviderKey] = useState<"manual" | "candid">("manual");
@@ -92,6 +93,7 @@ export function OrganisationAdministrationPage() {
     if (!disbursementConfig.data) return;
     setDisbursementProviderKey(disbursementConfig.data.provider_key);
     setStripeAccountId(disbursementConfig.data.stripe_account_id);
+    setDisbursementCurrency(disbursementConfig.data.currency);
   }, [disbursementConfig.data]);
 
   useEffect(() => {
@@ -120,7 +122,7 @@ export function OrganisationAdministrationPage() {
   const changePlan = useMutation({ mutationFn: () => changeOrganisationPlan(organisationId, { plan_key: selectedPlanKey }), onSuccess: refresh });
   const setBillingContact = useMutation({ mutationFn: (userId: string) => setOrganisationBillingContact(organisationId, { user_id: userId || null }), onSuccess: refresh });
   const saveDisbursementProvider = useMutation({
-    mutationFn: () => setDisbursementProvider(organisationId, { provider_key: disbursementProviderKey, stripe_account_id: stripeAccountId }),
+    mutationFn: () => setDisbursementProvider(organisationId, { provider_key: disbursementProviderKey, stripe_account_id: stripeAccountId, currency: disbursementCurrency }),
     onSuccess: async () => { setConnectionResult(null); await refresh(); },
   });
   const saveDisbursementApiKey = useMutation({
@@ -242,6 +244,9 @@ export function OrganisationAdministrationPage() {
                   <option value="manual">Manual ledger</option>
                   <option value="stripe">Stripe Connect</option>
                 </select>
+              </label>
+              <label>Currency (ISO 4217)
+                <input value={disbursementCurrency} maxLength={3} onChange={(event) => setDisbursementCurrency(event.target.value.toUpperCase())} placeholder="USD" />
               </label>
               {disbursementProviderKey === "stripe" ? (
                 <label>Stripe connected account ID

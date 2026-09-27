@@ -52,7 +52,9 @@ class PlatformAdministrator(UUIDTimeStampedModel):
             models.CheckConstraint(
                 condition=(
                     models.Q(status="active", suspended_by__isnull=True, suspended_at__isnull=True)
-                    | models.Q(status="suspended", suspended_by__isnull=False, suspended_at__isnull=False)
+                    | models.Q(
+                        status="suspended", suspended_by__isnull=False, suspended_at__isnull=False
+                    )
                 ),
                 name="platform_administrator_suspension_consistent",
             ),
@@ -119,7 +121,7 @@ class PlatformConfiguration(UUIDTimeStampedModel):
         ]
 
     @classmethod
-    def load(cls) -> "PlatformConfiguration":
+    def load(cls) -> PlatformConfiguration:
         item, _ = cls.objects.get_or_create(singleton_key=1)
         return item
 

@@ -21,6 +21,7 @@ def env_list(name: str, default: str = "") -> list[str]:
 
 
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "")
+MFA_ENCRYPTION_KEY = os.getenv("MFA_ENCRYPTION_KEY", "")
 DEBUG = env_bool("DJANGO_DEBUG", False)
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1,backend")
 CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS")
@@ -71,6 +72,8 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    "apps.core.middleware.RequestIDMiddleware",
+    "apps.core.middleware.HTTPObservabilityMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -124,7 +127,7 @@ LANGUAGE_CODE = "en-gb"
 LANGUAGES = [
     ("en-gb", "English"),
     ("fr", "Français"),
-    ("pt", "Português"),
+    ("ar", "العربية"),
 ]
 LOCALE_PATHS = [BASE_DIR / "locale"]
 TIME_ZONE = "UTC"
@@ -142,6 +145,8 @@ SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = "Lax"
 CSRF_COOKIE_HTTPONLY = False
 CSRF_COOKIE_SAMESITE = "Lax"
+APPLICANT_SESSION_TTL_HOURS = int(os.getenv("APPLICANT_SESSION_TTL_HOURS", "8"))
+APPLICANT_SESSION_COOKIE_NAME = "crowdsmarter_applicant_session"
 X_FRAME_OPTIONS = "DENY"
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "same-origin"
@@ -178,8 +183,12 @@ REST_FRAMEWORK = {
         "idea_vote": os.getenv("API_IDEA_VOTE_THROTTLE_RATE", "120/hour"),
         "idea_comment": os.getenv("API_IDEA_COMMENT_THROTTLE_RATE", "60/hour"),
         "applicant_magic_link": os.getenv("API_APPLICANT_MAGIC_LINK_THROTTLE_RATE", "10/hour"),
-        "applicant_magic_link_consume": os.getenv("API_APPLICANT_MAGIC_LINK_CONSUME_THROTTLE_RATE", "20/hour"),
-        "applicant_progress_report": os.getenv("API_APPLICANT_PROGRESS_REPORT_THROTTLE_RATE", "30/hour"),
+        "applicant_magic_link_consume": os.getenv(
+            "API_APPLICANT_MAGIC_LINK_CONSUME_THROTTLE_RATE", "20/hour"
+        ),
+        "applicant_progress_report": os.getenv(
+            "API_APPLICANT_PROGRESS_REPORT_THROTTLE_RATE", "30/hour"
+        ),
     },
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 50,
@@ -187,14 +196,14 @@ REST_FRAMEWORK = {
     "EXCEPTION_HANDLER": "apps.core.api.exception_handler",
 }
 
-EMAIL_BACKEND = os.getenv(
-    "EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend"
-)
+EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")
 EMAIL_HOST = os.getenv("EMAIL_HOST", "")
 EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
 EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", True)
+EMAIL_USE_SSL = env_bool("EMAIL_USE_SSL", False)
+EMAIL_TIMEOUT = int(os.getenv("EMAIL_TIMEOUT", "15"))
 PUBLIC_CONTACT_EMAIL = os.getenv("PUBLIC_CONTACT_EMAIL", "hello@crowdsmarter.com").strip()
 SUPPORT_EMAIL = os.getenv("SUPPORT_EMAIL", PUBLIC_CONTACT_EMAIL).strip()
 PRIVACY_EMAIL = os.getenv("PRIVACY_EMAIL", PUBLIC_CONTACT_EMAIL).strip()
@@ -205,12 +214,11 @@ DEFAULT_FROM_EMAIL = os.getenv(
 ).strip()
 EMAIL_REPLY_TO = os.getenv("EMAIL_REPLY_TO", PUBLIC_CONTACT_EMAIL).strip()
 DEMO_REQUEST_RECIPIENT = os.getenv("DEMO_REQUEST_RECIPIENT", PUBLIC_CONTACT_EMAIL).strip()
-DEMO_REQUEST_SEND_ACKNOWLEDGEMENT = env_bool(
-    "DEMO_REQUEST_SEND_ACKNOWLEDGEMENT", False
-)
+DEMO_REQUEST_SEND_ACKNOWLEDGEMENT = env_bool("DEMO_REQUEST_SEND_ACKNOWLEDGEMENT", False)
 FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "http://localhost:5173")
 INVITATION_EXPIRY_HOURS = int(os.getenv("INVITATION_EXPIRY_HOURS", "168"))
 PASSWORD_RESET_TIMEOUT = int(os.getenv("PASSWORD_RESET_TIMEOUT", "3600"))
+EMAIL_CHANGE_TOKEN_TTL_SECONDS = int(os.getenv("EMAIL_CHANGE_TOKEN_TTL_SECONDS", "1800"))
 MFA_PENDING_SESSION_SECONDS = int(os.getenv("MFA_PENDING_SESSION_SECONDS", "300"))
 
 SOURCE_ATTACHMENT_MAX_BYTES = int(os.getenv("SOURCE_ATTACHMENT_MAX_BYTES", str(15 * 1024 * 1024)))
@@ -222,6 +230,14 @@ SOURCE_ATTACHMENT_ALLOWED_EXTENSIONS = env_list(
     "SOURCE_ATTACHMENT_ALLOWED_EXTENSIONS",
     ".pdf,.txt,.csv,.docx,.xlsx,.png,.jpg,.jpeg,.webp",
 )
+SOURCE_ATTACHMENT_MALWARE_SCANNER = os.getenv("SOURCE_ATTACHMENT_MALWARE_SCANNER", "test")
+SOURCE_ATTACHMENT_MALWARE_FAIL_CLOSED = env_bool("SOURCE_ATTACHMENT_MALWARE_FAIL_CLOSED", True)
+SOURCE_ATTACHMENT_ENFORCE_CLEAN_DOWNLOADS = env_bool(
+    "SOURCE_ATTACHMENT_ENFORCE_CLEAN_DOWNLOADS", False
+)
+CLAMAV_HOST = os.getenv("CLAMAV_HOST", "clamav")
+CLAMAV_PORT = int(os.getenv("CLAMAV_PORT", "3310"))
+CLAMAV_TIMEOUT_SECONDS = int(os.getenv("CLAMAV_TIMEOUT_SECONDS", "30"))
 
 AI_PROVIDER_BACKEND = os.getenv(
     "AI_PROVIDER_BACKEND",
@@ -253,6 +269,10 @@ CELERY_TASK_REJECT_ON_WORKER_LOST = True
 CELERY_TASK_TRACK_STARTED = True
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 CELERY_BEAT_SCHEDULE = {
+    "report-due-retention-reviews-daily": {
+        "task": "apps.organisations.tasks.report_due_retention_reviews",
+        "schedule": 86400.0,
+    },
     "send-due-review-notifications-daily": {
         "task": "apps.notifications.tasks.send_due_review_notifications",
         "schedule": 86400.0,
@@ -271,9 +291,7 @@ STORAGE_BACKEND = os.getenv("STORAGE_BACKEND", "local").lower()
 if STORAGE_BACKEND == "s3":
     STORAGES = {
         "default": {"BACKEND": "storages.backends.s3.S3Storage"},
-        "staticfiles": {
-            "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"
-        },
+        "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
     }
     AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID", "")
     AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY", "")
@@ -285,9 +303,7 @@ if STORAGE_BACKEND == "s3":
 else:
     STORAGES = {
         "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
-        "staticfiles": {
-            "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"
-        },
+        "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
     }
 
 LOGGING = {
@@ -297,8 +313,18 @@ LOGGING = {
         "verbose": {
             "format": "{asctime} {levelname} {name} {message}",
             "style": "{",
+        },
+        "json": {"()": "apps.core.observability.JSONFormatter"},
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "json"
+            if os.getenv("LOG_FORMAT", "plain").lower() == "json"
+            else "verbose",
         }
     },
-    "handlers": {"console": {"class": "logging.StreamHandler", "formatter": "verbose"}},
     "root": {"handlers": ["console"], "level": os.getenv("LOG_LEVEL", "INFO")},
 }
+
+ENABLE_METRICS_ENDPOINT = env_bool("ENABLE_METRICS_ENDPOINT", DEBUG)

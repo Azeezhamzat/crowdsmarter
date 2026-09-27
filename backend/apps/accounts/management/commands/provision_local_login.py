@@ -53,16 +53,18 @@ class Command(BaseCommand):
         user.full_clean(exclude=["password"])
         user.save()
 
-        active_membership = Membership.objects.filter(
-            user=user, status=Membership.Status.ACTIVE
-        ).select_related("organisation").first()
+        active_membership = (
+            Membership.objects.filter(user=user, status=Membership.Status.ACTIVE)
+            .select_related("organisation")
+            .first()
+        )
         if active_membership is None:
             organisation_name = options["organisation"].strip()
             slug_base = slugify(organisation_name)[:70] or "crowdsmarter-local"
             slug = slug_base
             counter = 2
             while Organisation.objects.filter(slug=slug).exists():
-                slug = f"{slug_base[:70-len(str(counter))-1]}-{counter}"
+                slug = f"{slug_base[: 70 - len(str(counter)) - 1]}-{counter}"
                 counter += 1
             organisation = create_organisation(actor=user, name=organisation_name, slug=slug)
             active_membership = Membership.objects.get(organisation=organisation, user=user)

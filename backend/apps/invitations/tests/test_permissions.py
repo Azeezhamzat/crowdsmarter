@@ -42,11 +42,14 @@ def test_invitation_management_permission_by_role(
     force_authenticate(request, actor)
     request = Request(request)
 
-    assert CanManageInvitations().has_object_permission(
-        request,
-        object(),
-        organisation,
-    ) is expected
+    assert (
+        CanManageInvitations().has_object_permission(
+            request,
+            object(),
+            organisation,
+        )
+        is expected
+    )
 
 
 @pytest.mark.django_db

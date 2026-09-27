@@ -17,10 +17,25 @@ class CriterionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Criterion
         fields = [
-            "id", "decision_id", "title", "description", "measurement_note",
-            "direction", "direction_label", "weight", "weight_rationale",
-            "is_must_have", "threshold_note", "owner", "order", "status",
-            "status_label", "created_by", "can_edit", "created_at", "updated_at",
+            "id",
+            "decision_id",
+            "title",
+            "description",
+            "measurement_note",
+            "direction",
+            "direction_label",
+            "weight",
+            "weight_rationale",
+            "is_must_have",
+            "threshold_note",
+            "owner",
+            "order",
+            "status",
+            "status_label",
+            "created_by",
+            "can_edit",
+            "created_at",
+            "updated_at",
         ]
         read_only_fields = fields
 

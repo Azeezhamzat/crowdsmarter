@@ -11,6 +11,7 @@ from django.urls import reverse
 from rest_framework.test import APIClient
 
 from apps.applicants.models import ApplicantAccount
+from apps.applicants.views import APPLICANT_SESSION_COOKIE
 from apps.decision_options.services import set_outcome
 from apps.ideation import services as ideation_services
 from apps.ideation.services import promote_idea_to_decision
@@ -51,12 +52,10 @@ def test_magic_link_request_and_consume_flow():  # type: ignore[no-untyped-def]
     )
     assert consume.status_code == 200
     assert consume.json()["email"] == "amina@example.com"
-    applicant_token = consume.json()["applicant_token"]
+    assert "applicant_token" not in consume.json()
+    assert consume.cookies[APPLICANT_SESSION_COOKIE]["httponly"] is True
 
-    my_apps = client.get(
-        reverse("applicants:my-applications"),
-        HTTP_X_APPLICANT_TOKEN=applicant_token,
-    )
+    my_apps = client.get(reverse("applicants:my-applications"))
     assert my_apps.status_code == 200
     assert my_apps.json()["applications"] == []
 
@@ -86,33 +85,40 @@ def test_progress_report_flow_end_to_end(organisation_factory):  # type: ignore[
         HTTP_X_CSRFTOKEN=csrf_token,
     )
     raw_token = _extract_token(mail.outbox[-1].body)
-    consume = client.post(
+    client.post(
         reverse("applicants:magic-link-consume"),
         {"token": raw_token},
         format="json",
         HTTP_X_CSRFTOKEN=csrf_token,
     )
-    applicant_token = consume.json()["applicant_token"]
+    applicant_token = client.cookies[APPLICANT_SESSION_COOKIE].value
 
     participant, _ = ideation_services.identify_participant(
-        session=session, name="Amina", email="amina@example.com"
+        session=session,
+        name="Amina",
+        email="amina@example.com",
+        applicant_token=applicant_token,
     )
     idea = ideation_services.submit_idea(
-        session=session, participant=participant, title="Well project", description="Drill a community well."
+        session=session,
+        participant=participant,
+        title="Well project",
+        description="Drill a community well.",
     )
 
     from apps.decisions.services import create_decision
     from apps.workspaces.models import Workspace
 
     workspace = Workspace.objects.filter(organisation=organisation, is_default=True).first()
-    decision = create_decision(actor=owner, workspace=workspace, title="Grants", purpose="p", template_key="grant_round")
-    option = promote_idea_to_decision(actor=owner, idea=idea, decision=decision)
-    set_outcome(actor=owner, option=option, outcome_status="funded", awarded_amount=500, outcome_note="")
-
-    my_apps = client.get(
-        reverse("applicants:my-applications"),
-        HTTP_X_APPLICANT_TOKEN=applicant_token,
+    decision = create_decision(
+        actor=owner, workspace=workspace, title="Grants", purpose="p", template_key="grant_round"
     )
+    option = promote_idea_to_decision(actor=owner, idea=idea, decision=decision)
+    set_outcome(
+        actor=owner, option=option, outcome_status="funded", awarded_amount=500, outcome_note=""
+    )
+
+    my_apps = client.get(reverse("applicants:my-applications"))
     assert my_apps.status_code == 200
     applications = my_apps.json()["applications"]
     assert len(applications) == 1
@@ -123,7 +129,13 @@ def test_progress_report_flow_end_to_end(organisation_factory):  # type: ignore[
         {"body": "We drilled the well."},
         format="json",
         HTTP_X_CSRFTOKEN=csrf_token,
-        HTTP_X_APPLICANT_TOKEN=applicant_token,
     )
     assert report.status_code == 201
     assert report.json()["applications"][0]["progress_reports"][0]["body"] == "We drilled the well."
+
+    logout = client.delete(
+        reverse("applicants:session-logout"),
+        HTTP_X_CSRFTOKEN=csrf_token,
+    )
+    assert logout.status_code == 204
+    assert client.get(reverse("applicants:my-applications")).status_code == 403

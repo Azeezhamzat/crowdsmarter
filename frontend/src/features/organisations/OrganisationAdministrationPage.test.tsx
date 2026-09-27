@@ -82,7 +82,7 @@ describe("OrganisationAdministrationPage", () => {
     ]);
     vi.mocked(getDisbursementConfiguration).mockResolvedValue({
       id: "d1", organisation_id: "o1", provider_key: "manual", provider_key_label: "Manual ledger",
-      stripe_account_id: "", api_key_is_set: false, created_at: "2026-08-01T10:00:00Z", updated_at: "2026-08-01T10:00:00Z",
+      stripe_account_id: "", currency: "USD", api_key_is_set: false, created_at: "2026-08-01T10:00:00Z", updated_at: "2026-08-01T10:00:00Z",
     });
     vi.mocked(getLookupConfiguration).mockResolvedValue({
       id: "l1", organisation_id: "o1", provider_key: "manual", provider_key_label: "Manual verification",

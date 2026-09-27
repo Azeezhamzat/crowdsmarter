@@ -55,9 +55,7 @@ def test_is_trial_expired(organisation_factory, plan):  # type: ignore[no-untype
 
 
 @pytest.mark.django_db
-def test_billing_contact_must_be_active_member(
-    organisation_factory, plan, user_factory
-):  # type: ignore[no-untyped-def]
+def test_billing_contact_must_be_active_member(organisation_factory, plan, user_factory):  # type: ignore[no-untyped-def]
     organisation = organisation_factory()
     outsider = user_factory()
     subscription = OrganisationSubscription(

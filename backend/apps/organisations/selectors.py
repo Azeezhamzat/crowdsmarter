@@ -59,8 +59,8 @@ def deletion_request_for_user(*, user: User, request_id: UUID):
     from .models import OrganisationDeletionRequest
 
     return get_object_or_404(
-        OrganisationDeletionRequest.objects.select_related("organisation", "requested_by", "cancelled_by").filter(
-            organisation__in=Organisation.objects.for_user(user)
-        ),
+        OrganisationDeletionRequest.objects.select_related(
+            "organisation", "requested_by", "cancelled_by"
+        ).filter(organisation__in=Organisation.objects.for_user(user)),
         id=request_id,
     )

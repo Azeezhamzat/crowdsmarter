@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -11,7 +12,7 @@ from django.db import models
 from apps.core.models import UUIDTimeStampedModel
 
 
-def source_attachment_path(instance: "SourceAttachment", filename: str) -> str:
+def source_attachment_path(instance: SourceAttachment, filename: str) -> str:
     """Store private source files under stable tenant and source identifiers."""
     suffix = Path(filename).suffix.lower()
     return f"foresight/{instance.source.organisation_id}/{instance.source_id}/{instance.id}{suffix}"
@@ -41,8 +42,12 @@ class FeedSubscription(UUIDTimeStampedModel):
     class Meta:
         ordering = ["name", "id"]
         constraints = [
-            models.UniqueConstraint(fields=["organisation", "feed_url"], name="unique_feed_url_per_org"),
-            models.CheckConstraint(condition=~models.Q(name=""), name="foresight_feed_name_not_empty"),
+            models.UniqueConstraint(
+                fields=["organisation", "feed_url"], name="unique_feed_url_per_org"
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(name=""), name="foresight_feed_name_not_empty"
+            ),
         ]
 
     def clean(self) -> None:
@@ -50,7 +55,12 @@ class FeedSubscription(UUIDTimeStampedModel):
         self.name = self.name.strip()
         self.feed_url = self.feed_url.strip()
         self.last_error = self.last_error.strip()
-        if self.owner_id and not self.organisation.memberships.filter(user_id=self.owner_id, status="active").exists():
+        if (
+            self.owner_id
+            and not self.organisation.memberships.filter(
+                user_id=self.owner_id, status="active"
+            ).exists()
+        ):
             raise ValidationError({"owner": "The owner must be an active organisation member."})
 
     def __str__(self) -> str:
@@ -97,8 +107,13 @@ class Source(UUIDTimeStampedModel):
     author = models.CharField(max_length=240, blank=True)
     publisher = models.CharField(max_length=240, blank=True)
     published_on = models.DateField(null=True, blank=True)
+    accessed_on = models.DateField(null=True, blank=True)
+    last_verified_at = models.DateTimeField(null=True, blank=True)
+    review_due_on = models.DateField(null=True, blank=True)
     source_url = models.URLField(max_length=1200, blank=True)
+    archived_url = models.URLField(max_length=1200, blank=True)
     reference = models.CharField(max_length=800, blank=True)
+    jurisdiction = models.CharField(max_length=160, blank=True)
     credibility = models.CharField(
         max_length=20, choices=Credibility.choices, default=Credibility.UNASSESSED
     )
@@ -115,9 +130,22 @@ class Source(UUIDTimeStampedModel):
     class Meta:
         ordering = ["-published_on", "-created_at", "title"]
         constraints = [
-            models.CheckConstraint(condition=~models.Q(title=""), name="foresight_source_title_not_empty"),
             models.CheckConstraint(
-                condition=models.Q(source_type__in=["research", "news", "government", "internal", "expert", "stakeholder", "dataset", "other"]),
+                condition=~models.Q(title=""), name="foresight_source_title_not_empty"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(
+                    source_type__in=[
+                        "research",
+                        "news",
+                        "government",
+                        "internal",
+                        "expert",
+                        "stakeholder",
+                        "dataset",
+                        "other",
+                    ]
+                ),
                 name="foresight_source_type_valid",
             ),
             models.CheckConstraint(
@@ -135,7 +163,9 @@ class Source(UUIDTimeStampedModel):
             ),
         ]
         indexes = [
-            models.Index(fields=["organisation", "status", "source_type"], name="foresight_source_org_idx"),
+            models.Index(
+                fields=["organisation", "status", "source_type"], name="foresight_source_org_idx"
+            ),
             models.Index(fields=["organisation", "credibility"], name="foresight_source_cred_idx"),
         ]
 
@@ -145,7 +175,9 @@ class Source(UUIDTimeStampedModel):
         self.author = self.author.strip()
         self.publisher = self.publisher.strip()
         self.source_url = self.source_url.strip()
+        self.archived_url = self.archived_url.strip()
         self.reference = self.reference.strip()
+        self.jurisdiction = self.jurisdiction.strip()
         self.credibility_rationale = self.credibility_rationale.strip()
         self.notes = self.notes.strip()
         if not self.source_url and not self.reference and not self.attachments.exists():
@@ -156,14 +188,188 @@ class Source(UUIDTimeStampedModel):
             if self.supersedes_id == self.id:
                 raise ValidationError({"supersedes": "A source cannot supersede itself."})
             if self.supersedes.organisation_id != self.organisation_id:
-                raise ValidationError({"supersedes": "The earlier source must share the organisation."})
+                raise ValidationError(
+                    {"supersedes": "The earlier source must share the organisation."}
+                )
 
     def __str__(self) -> str:
         return self.title
 
 
+class ResearchClaim(UUIDTimeStampedModel):
+    """A reviewable proposition that turns desk research into a product decision."""
+
+    class State(models.TextChoices):
+        DEMONSTRATED = "demonstrated", "Demonstrated"
+        SUPPORTED = "supported", "Supported"
+        PLAUSIBLE = "plausible", "Plausible"
+        UNKNOWN = "unknown", "Unknown"
+        CONTRADICTED = "contradicted", "Contradicted"
+
+    class Recommendation(models.TextChoices):
+        BUILD = "build", "Build"
+        INTEGRATE = "integrate", "Integrate"
+        DEFER = "defer", "Defer"
+        AVOID = "avoid", "Avoid"
+        MONITOR = "monitor", "Monitor"
+
+    class Relevance(models.TextChoices):
+        FACILITATION = "facilitation", "Facilitation"
+        PLATFORM = "platform", "Platform"
+        OPERATIONS = "operations", "Operations"
+        MIXED = "mixed", "Mixed"
+
+    class LifecycleStatus(models.TextChoices):
+        DRAFT = "draft", "Draft"
+        ACTIVE = "active", "Active"
+        RETIRED = "retired", "Retired"
+
+    organisation = models.ForeignKey(
+        "organisations.Organisation", on_delete=models.CASCADE, related_name="research_claims"
+    )
+    statement = models.TextField()
+    state = models.CharField(max_length=20, choices=State.choices, default=State.UNKNOWN)
+    recommendation = models.CharField(
+        max_length=20, choices=Recommendation.choices, default=Recommendation.DEFER
+    )
+    relevance = models.CharField(
+        max_length=20, choices=Relevance.choices, default=Relevance.PLATFORM
+    )
+    evidence_summary = models.TextField(blank=True)
+    limitations = models.TextField(blank=True)
+    assumptions = models.TextField(blank=True)
+    reversal_conditions = models.TextField(blank=True)
+    expected_outcome = models.TextField(blank=True)
+    authority_score = models.PositiveSmallIntegerField(default=0)
+    directness_score = models.PositiveSmallIntegerField(default=0)
+    recency_score = models.PositiveSmallIntegerField(default=0)
+    triangulation_score = models.PositiveSmallIntegerField(default=0)
+    linked_decision = models.ForeignKey(
+        "decisions.Decision",
+        on_delete=models.PROTECT,
+        related_name="research_claims",
+        null=True,
+        blank=True,
+    )
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="owned_research_claims"
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_research_claims"
+    )
+    review_due_on = models.DateField(null=True, blank=True)
+    last_reviewed_at = models.DateTimeField(null=True, blank=True)
+    lifecycle_status = models.CharField(
+        max_length=20, choices=LifecycleStatus.choices, default=LifecycleStatus.DRAFT
+    )
+    sources: Any = models.ManyToManyField(
+        Source, through="ResearchClaimSource", related_name="research_claims"
+    )
+
+    class Meta:
+        ordering = ["lifecycle_status", "review_due_on", "-updated_at"]
+        constraints = [
+            models.CheckConstraint(
+                condition=~models.Q(statement=""), name="foresight_claim_statement_not_empty"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(authority_score__lte=3), name="foresight_claim_authority_max"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(directness_score__lte=3), name="foresight_claim_directness_max"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(recency_score__lte=2), name="foresight_claim_recency_max"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(triangulation_score__lte=2),
+                name="foresight_claim_triangulation_max",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=["organisation", "lifecycle_status", "state"],
+                name="foresight_claim_org_idx",
+            ),
+            models.Index(
+                fields=["organisation", "review_due_on"], name="foresight_claim_review_idx"
+            ),
+        ]
+
+    @property
+    def evidence_score(self) -> int:
+        return (
+            self.authority_score
+            + self.directness_score
+            + self.recency_score
+            + self.triangulation_score
+        )
+
+    def clean(self) -> None:
+        super().clean()
+        self.statement = self.statement.strip()
+        self.evidence_summary = self.evidence_summary.strip()
+        self.limitations = self.limitations.strip()
+        self.assumptions = self.assumptions.strip()
+        self.reversal_conditions = self.reversal_conditions.strip()
+        self.expected_outcome = self.expected_outcome.strip()
+        if (
+            self.owner_id
+            and not self.organisation.memberships.filter(
+                user_id=self.owner_id, status="active"
+            ).exists()
+        ):
+            raise ValidationError({"owner": "The owner must be an active organisation member."})
+        if self.linked_decision_id and self.linked_decision.organisation_id != self.organisation_id:
+            raise ValidationError(
+                {"linked_decision": "The decision must share the claim organisation."}
+            )
+
+    def __str__(self) -> str:
+        return self.statement[:120]
+
+
+class ResearchClaimSource(UUIDTimeStampedModel):
+    """The explicit evidential relationship between one claim and one source."""
+
+    class Relationship(models.TextChoices):
+        SUPPORTS = "supports", "Supports"
+        CONTRADICTS = "contradicts", "Contradicts"
+        CONTEXT = "context", "Context only"
+
+    claim = models.ForeignKey(ResearchClaim, on_delete=models.CASCADE, related_name="source_links")
+    source = models.ForeignKey(Source, on_delete=models.PROTECT, related_name="claim_links")
+    relationship = models.CharField(max_length=20, choices=Relationship.choices)
+    note = models.TextField(blank=True)
+    linked_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="linked_research_sources"
+    )
+
+    class Meta:
+        ordering = ["relationship", "created_at"]
+        constraints = [
+            models.UniqueConstraint(fields=["claim", "source"], name="unique_research_claim_source")
+        ]
+
+    def clean(self) -> None:
+        super().clean()
+        self.note = self.note.strip()
+        if self.claim_id and self.source_id:
+            if self.claim.organisation_id != self.source.organisation_id:
+                raise ValidationError("The claim and source must share an organisation.")
+
+    def __str__(self) -> str:
+        return f"{self.claim_id}: {self.relationship} {self.source_id}"
+
+
 class SourceAttachment(UUIDTimeStampedModel):
     """A private, permission-controlled file attached to a source."""
+
+    class ScanStatus(models.TextChoices):
+        NOT_SCANNED = "not_scanned", "Not scanned"
+        CLEAN = "clean", "Clean"
+        INFECTED = "infected", "Infected"
+        ERROR = "error", "Scan error"
 
     source = models.ForeignKey(Source, on_delete=models.CASCADE, related_name="attachments")
     file = models.FileField(upload_to=source_attachment_path, max_length=600)
@@ -171,14 +377,29 @@ class SourceAttachment(UUIDTimeStampedModel):
     content_type = models.CharField(max_length=160)
     size_bytes = models.PositiveBigIntegerField()
     sha256 = models.CharField(max_length=64)
+    malware_scan_status = models.CharField(
+        max_length=20, choices=ScanStatus.choices, default=ScanStatus.NOT_SCANNED
+    )
+    malware_scan_engine = models.CharField(max_length=80, blank=True)
+    malware_scanned_at = models.DateTimeField(null=True, blank=True)
     uploaded_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="uploaded_source_attachments"
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="uploaded_source_attachments",
     )
 
     class Meta:
         ordering = ["created_at", "original_name"]
         constraints = [
-            models.UniqueConstraint(fields=["source", "sha256"], name="unique_source_attachment_hash"),
+            models.UniqueConstraint(
+                fields=["source", "sha256"], name="unique_source_attachment_hash"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(
+                    malware_scan_status__in=["not_scanned", "clean", "infected", "error"]
+                ),
+                name="source_attachment_scan_status_valid",
+            ),
         ]
 
     def __str__(self) -> str:
@@ -255,21 +476,54 @@ class Signal(UUIDTimeStampedModel):
     class Meta:
         ordering = ["-impact", "-created_at", "title"]
         constraints = [
-            models.CheckConstraint(condition=~models.Q(title=""), name="foresight_signal_title_not_empty"),
-            models.CheckConstraint(condition=models.Q(impact__gte=1, impact__lte=5), name="signal_impact_1_to_5"),
-            models.CheckConstraint(condition=models.Q(uncertainty__gte=1, uncertainty__lte=5), name="signal_uncertainty_1_to_5"),
             models.CheckConstraint(
-                condition=models.Q(steep_category__in=["social", "technological", "economic", "environmental", "political", "legal", "ethical"]),
+                condition=~models.Q(title=""), name="foresight_signal_title_not_empty"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(impact__gte=1, impact__lte=5), name="signal_impact_1_to_5"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(uncertainty__gte=1, uncertainty__lte=5),
+                name="signal_uncertainty_1_to_5",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(
+                    steep_category__in=[
+                        "social",
+                        "technological",
+                        "economic",
+                        "environmental",
+                        "political",
+                        "legal",
+                        "ethical",
+                    ]
+                ),
                 name="signal_steep_valid",
             ),
-            models.CheckConstraint(condition=models.Q(time_horizon__in=["near", "medium", "long"]), name="signal_horizon_valid"),
-            models.CheckConstraint(condition=models.Q(maturity__in=["weak", "emerging", "established"]), name="signal_maturity_valid"),
-            models.CheckConstraint(condition=models.Q(polarity__in=["opportunity", "threat", "both", "unclear"]), name="signal_polarity_valid"),
-            models.CheckConstraint(condition=models.Q(status__in=["draft", "reviewed", "monitoring", "retired"]), name="signal_status_valid"),
+            models.CheckConstraint(
+                condition=models.Q(time_horizon__in=["near", "medium", "long"]),
+                name="signal_horizon_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(maturity__in=["weak", "emerging", "established"]),
+                name="signal_maturity_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(polarity__in=["opportunity", "threat", "both", "unclear"]),
+                name="signal_polarity_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(status__in=["draft", "reviewed", "monitoring", "retired"]),
+                name="signal_status_valid",
+            ),
         ]
         indexes = [
-            models.Index(fields=["organisation", "status", "steep_category"], name="signal_org_steep_idx"),
-            models.Index(fields=["organisation", "time_horizon", "maturity"], name="signal_org_horizon_idx"),
+            models.Index(
+                fields=["organisation", "status", "steep_category"], name="signal_org_steep_idx"
+            ),
+            models.Index(
+                fields=["organisation", "time_horizon", "maturity"], name="signal_org_horizon_idx"
+            ),
         ]
 
     def clean(self) -> None:
@@ -283,8 +537,15 @@ class Signal(UUIDTimeStampedModel):
             raise ValidationError({"source": "The source must share the signal organisation."})
         for field_name in ("owner", "created_by"):
             user_id = getattr(self, f"{field_name}_id")
-            if user_id and not self.organisation.memberships.filter(user_id=user_id, status="active").exists():
-                raise ValidationError({field_name: "The person must be an active organisation member."})
+            if (
+                user_id
+                and not self.organisation.memberships.filter(
+                    user_id=user_id, status="active"
+                ).exists()
+            ):
+                raise ValidationError(
+                    {field_name: "The person must be an active organisation member."}
+                )
 
     @property
     def priority_score(self) -> int:
@@ -303,18 +564,26 @@ class Watchlist(UUIDTimeStampedModel):
     name = models.CharField(max_length=180)
     description = models.TextField(blank=True)
     owner = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="owned_foresight_watchlists"
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="owned_foresight_watchlists",
     )
     created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_foresight_watchlists"
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="created_foresight_watchlists",
     )
     is_active = models.BooleanField(default=True)
-    signals = models.ManyToManyField(Signal, through="WatchlistSignal", related_name="watchlists")
+    signals: Any = models.ManyToManyField(
+        Signal, through="WatchlistSignal", related_name="watchlists"
+    )
 
     class Meta:
         ordering = ["name", "id"]
         constraints = [
-            models.UniqueConstraint(fields=["organisation", "name"], name="unique_watchlist_name_per_org"),
+            models.UniqueConstraint(
+                fields=["organisation", "name"], name="unique_watchlist_name_per_org"
+            ),
             models.CheckConstraint(condition=~models.Q(name=""), name="watchlist_name_not_empty"),
         ]
 
@@ -322,7 +591,12 @@ class Watchlist(UUIDTimeStampedModel):
         super().clean()
         self.name = self.name.strip()
         self.description = self.description.strip()
-        if self.owner_id and not self.organisation.memberships.filter(user_id=self.owner_id, status="active").exists():
+        if (
+            self.owner_id
+            and not self.organisation.memberships.filter(
+                user_id=self.owner_id, status="active"
+            ).exists()
+        ):
             raise ValidationError({"owner": "The owner must be an active organisation member."})
 
     def __str__(self) -> str:
@@ -340,7 +614,9 @@ class WatchlistSignal(UUIDTimeStampedModel):
     class Meta:
         ordering = ["-created_at"]
         constraints = [
-            models.UniqueConstraint(fields=["watchlist", "signal"], name="unique_signal_per_watchlist"),
+            models.UniqueConstraint(
+                fields=["watchlist", "signal"], name="unique_signal_per_watchlist"
+            ),
         ]
 
     def clean(self) -> None:
@@ -365,7 +641,9 @@ class SignalDecisionLink(UUIDTimeStampedModel):
     class Meta:
         ordering = ["-created_at"]
         constraints = [
-            models.UniqueConstraint(fields=["signal", "decision"], name="unique_signal_decision_link"),
+            models.UniqueConstraint(
+                fields=["signal", "decision"], name="unique_signal_decision_link"
+            ),
         ]
 
     def clean(self) -> None:
@@ -395,14 +673,18 @@ class ForesightCanvas(UUIDTimeStampedModel):
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="owned_foresight_canvases"
     )
     created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_foresight_canvases"
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="created_foresight_canvases",
     )
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT)
 
     class Meta:
         ordering = ["-updated_at", "title"]
         constraints = [
-            models.CheckConstraint(condition=~models.Q(title=""), name="foresight_canvas_title_not_empty"),
+            models.CheckConstraint(
+                condition=~models.Q(title=""), name="foresight_canvas_title_not_empty"
+            ),
             models.CheckConstraint(
                 condition=models.Q(horizon_year__gte=2000, horizon_year__lte=2200),
                 name="foresight_canvas_horizon_year_valid",
@@ -413,7 +695,9 @@ class ForesightCanvas(UUIDTimeStampedModel):
             ),
         ]
         indexes = [
-            models.Index(fields=["organisation", "status", "horizon_year"], name="foresight_canvas_org_idx"),
+            models.Index(
+                fields=["organisation", "status", "horizon_year"], name="foresight_canvas_org_idx"
+            ),
         ]
 
     def clean(self) -> None:
@@ -427,10 +711,15 @@ class ForesightCanvas(UUIDTimeStampedModel):
             raise ValidationError({"scope": "Define the system boundary and scope."})
         for field_name in ("owner", "created_by"):
             user_id = getattr(self, f"{field_name}_id")
-            if user_id and not self.organisation.memberships.filter(
-                user_id=user_id, status="active"
-            ).exists():
-                raise ValidationError({field_name: "The person must be an active organisation member."})
+            if (
+                user_id
+                and not self.organisation.memberships.filter(
+                    user_id=user_id, status="active"
+                ).exists()
+            ):
+                raise ValidationError(
+                    {field_name: "The person must be an active organisation member."}
+                )
 
     def __str__(self) -> str:
         return self.title
@@ -458,7 +747,9 @@ class Driver(UUIDTimeStampedModel):
     description = models.TextField()
     driver_type = models.CharField(max_length=30, choices=DriverType.choices)
     steep_category = models.CharField(max_length=30, choices=Signal.SteepCategory.choices)
-    direction = models.CharField(max_length=20, choices=Direction.choices, default=Direction.UNCLEAR)
+    direction = models.CharField(
+        max_length=20, choices=Direction.choices, default=Direction.UNCLEAR
+    )
     impact = models.PositiveSmallIntegerField(default=3)
     uncertainty = models.PositiveSmallIntegerField(default=3)
     owner = models.ForeignKey(
@@ -468,23 +759,43 @@ class Driver(UUIDTimeStampedModel):
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_foresight_drivers"
     )
     is_active = models.BooleanField(default=True)
-    signals = models.ManyToManyField(Signal, through="DriverSignal", related_name="drivers")
+    signals: Any = models.ManyToManyField(Signal, through="DriverSignal", related_name="drivers")
 
     class Meta:
         ordering = ["-impact", "-uncertainty", "title"]
         constraints = [
-            models.CheckConstraint(condition=~models.Q(title=""), name="foresight_driver_title_not_empty"),
-            models.CheckConstraint(condition=models.Q(impact__gte=1, impact__lte=5), name="foresight_driver_impact_valid"),
-            models.CheckConstraint(condition=models.Q(uncertainty__gte=1, uncertainty__lte=5), name="foresight_driver_uncertainty_valid"),
             models.CheckConstraint(
-                condition=models.Q(driver_type__in=["trend", "driver", "critical_uncertainty", "predetermined", "wild_card"]),
+                condition=~models.Q(title=""), name="foresight_driver_title_not_empty"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(impact__gte=1, impact__lte=5),
+                name="foresight_driver_impact_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(uncertainty__gte=1, uncertainty__lte=5),
+                name="foresight_driver_uncertainty_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(
+                    driver_type__in=[
+                        "trend",
+                        "driver",
+                        "critical_uncertainty",
+                        "predetermined",
+                        "wild_card",
+                    ]
+                ),
                 name="foresight_driver_type_valid",
             ),
             models.CheckConstraint(
-                condition=models.Q(direction__in=["increasing", "decreasing", "stable", "volatile", "unclear"]),
+                condition=models.Q(
+                    direction__in=["increasing", "decreasing", "stable", "volatile", "unclear"]
+                ),
                 name="foresight_driver_direction_valid",
             ),
-            models.UniqueConstraint(fields=["canvas", "title"], name="unique_driver_title_per_canvas"),
+            models.UniqueConstraint(
+                fields=["canvas", "title"], name="unique_driver_title_per_canvas"
+            ),
         ]
 
     def clean(self) -> None:
@@ -496,8 +807,13 @@ class Driver(UUIDTimeStampedModel):
         organisation = self.canvas.organisation
         for field_name in ("owner", "created_by"):
             user_id = getattr(self, f"{field_name}_id")
-            if user_id and not organisation.memberships.filter(user_id=user_id, status="active").exists():
-                raise ValidationError({field_name: "The person must be an active organisation member."})
+            if (
+                user_id
+                and not organisation.memberships.filter(user_id=user_id, status="active").exists()
+            ):
+                raise ValidationError(
+                    {field_name: "The person must be an active organisation member."}
+                )
 
     @property
     def attention_score(self) -> int:
@@ -551,7 +867,9 @@ class SystemStakeholder(UUIDTimeStampedModel):
         MIXED = "mixed", "Mixed"
         UNCLEAR = "unclear", "Unclear"
 
-    canvas = models.ForeignKey(ForesightCanvas, on_delete=models.CASCADE, related_name="stakeholders")
+    canvas = models.ForeignKey(
+        ForesightCanvas, on_delete=models.CASCADE, related_name="stakeholders"
+    )
     name = models.CharField(max_length=240)
     stakeholder_type = models.CharField(max_length=30, choices=StakeholderType.choices)
     role = models.TextField()
@@ -560,16 +878,28 @@ class SystemStakeholder(UUIDTimeStampedModel):
     exposure = models.PositiveSmallIntegerField(default=3)
     stance = models.CharField(max_length=20, choices=Stance.choices, default=Stance.UNCLEAR)
     created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_system_stakeholders"
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="created_system_stakeholders",
     )
 
     class Meta:
         ordering = ["-influence", "name"]
         constraints = [
-            models.CheckConstraint(condition=~models.Q(name=""), name="system_stakeholder_name_not_empty"),
-            models.CheckConstraint(condition=models.Q(influence__gte=1, influence__lte=5), name="system_stakeholder_influence_valid"),
-            models.CheckConstraint(condition=models.Q(exposure__gte=1, exposure__lte=5), name="system_stakeholder_exposure_valid"),
-            models.UniqueConstraint(fields=["canvas", "name"], name="unique_stakeholder_name_per_canvas"),
+            models.CheckConstraint(
+                condition=~models.Q(name=""), name="system_stakeholder_name_not_empty"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(influence__gte=1, influence__lte=5),
+                name="system_stakeholder_influence_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(exposure__gte=1, exposure__lte=5),
+                name="system_stakeholder_exposure_valid",
+            ),
+            models.UniqueConstraint(
+                fields=["canvas", "name"], name="unique_stakeholder_name_per_canvas"
+            ),
         ]
 
     def clean(self) -> None:
@@ -599,22 +929,36 @@ class CausalRelationship(UUIDTimeStampedModel):
         LONG = "long", "Long delay"
         UNKNOWN = "unknown", "Unknown"
 
-    canvas = models.ForeignKey(ForesightCanvas, on_delete=models.CASCADE, related_name="relationships")
-    source_driver = models.ForeignKey(Driver, on_delete=models.CASCADE, related_name="outgoing_relationships")
-    target_driver = models.ForeignKey(Driver, on_delete=models.CASCADE, related_name="incoming_relationships")
+    canvas = models.ForeignKey(
+        ForesightCanvas, on_delete=models.CASCADE, related_name="relationships"
+    )
+    source_driver = models.ForeignKey(
+        Driver, on_delete=models.CASCADE, related_name="outgoing_relationships"
+    )
+    target_driver = models.ForeignKey(
+        Driver, on_delete=models.CASCADE, related_name="incoming_relationships"
+    )
     polarity = models.CharField(max_length=20, choices=Polarity.choices)
     strength = models.PositiveSmallIntegerField(default=3)
     delay = models.CharField(max_length=20, choices=Delay.choices, default=Delay.UNKNOWN)
     rationale = models.TextField()
     created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_causal_relationships"
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="created_causal_relationships",
     )
 
     class Meta:
         ordering = ["source_driver__title", "target_driver__title"]
         constraints = [
-            models.CheckConstraint(condition=models.Q(strength__gte=1, strength__lte=5), name="causal_relationship_strength_valid"),
-            models.CheckConstraint(condition=~models.Q(source_driver=models.F("target_driver")), name="causal_relationship_not_self"),
+            models.CheckConstraint(
+                condition=models.Q(strength__gte=1, strength__lte=5),
+                name="causal_relationship_strength_valid",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(source_driver=models.F("target_driver")),
+                name="causal_relationship_not_self",
+            ),
             models.UniqueConstraint(
                 fields=["canvas", "source_driver", "target_driver"],
                 name="unique_directed_relationship_per_canvas",
@@ -624,10 +968,14 @@ class CausalRelationship(UUIDTimeStampedModel):
     def clean(self) -> None:
         super().clean()
         self.rationale = self.rationale.strip()
-        if self.source_driver.canvas_id != self.canvas_id or self.target_driver.canvas_id != self.canvas_id:
+        if (
+            self.source_driver.canvas_id != self.canvas_id
+            or self.target_driver.canvas_id != self.canvas_id
+        ):
             raise ValidationError("Both drivers must belong to this canvas.")
         if not self.rationale:
             raise ValidationError({"rationale": "Explain the causal mechanism and evidence."})
+
 
 class FeedbackLoop(UUIDTimeStampedModel):
     """A human-interpreted feedback structure grounded in connected drivers."""
@@ -644,7 +992,7 @@ class FeedbackLoop(UUIDTimeStampedModel):
     name = models.CharField(max_length=240)
     description = models.TextField()
     loop_type = models.CharField(max_length=20, choices=LoopType.choices)
-    drivers = models.ManyToManyField(
+    drivers: Any = models.ManyToManyField(
         Driver,
         through="FeedbackLoopDriver",
         related_name="feedback_loops",
@@ -718,9 +1066,7 @@ class FeedbackLoopDriver(UUIDTimeStampedModel):
     def clean(self) -> None:
         super().clean()
         if self.driver.canvas_id != self.feedback_loop.canvas_id:
-            raise ValidationError(
-                "The feedback-loop driver must belong to the same canvas."
-            )
+            raise ValidationError("The feedback-loop driver must belong to the same canvas.")
 
 
 class FuturesWheelConsequence(UUIDTimeStampedModel):
@@ -732,7 +1078,9 @@ class FuturesWheelConsequence(UUIDTimeStampedModel):
         MIXED = "mixed", "Mixed"
         UNCLEAR = "unclear", "Unclear"
 
-    canvas = models.ForeignKey(ForesightCanvas, on_delete=models.CASCADE, related_name="consequences")
+    canvas = models.ForeignKey(
+        ForesightCanvas, on_delete=models.CASCADE, related_name="consequences"
+    )
     originating_driver = models.ForeignKey(
         Driver, on_delete=models.CASCADE, related_name="consequences", null=True, blank=True
     )
@@ -748,15 +1096,26 @@ class FuturesWheelConsequence(UUIDTimeStampedModel):
     likelihood = models.PositiveSmallIntegerField(default=3)
     impact = models.PositiveSmallIntegerField(default=3)
     created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_futures_consequences"
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="created_futures_consequences",
     )
 
     class Meta:
         ordering = ["order", "-impact", "title"]
         constraints = [
-            models.CheckConstraint(condition=models.Q(order__gte=1, order__lte=3), name="futures_consequence_order_valid"),
-            models.CheckConstraint(condition=models.Q(likelihood__gte=1, likelihood__lte=5), name="futures_consequence_likelihood_valid"),
-            models.CheckConstraint(condition=models.Q(impact__gte=1, impact__lte=5), name="futures_consequence_impact_valid"),
+            models.CheckConstraint(
+                condition=models.Q(order__gte=1, order__lte=3),
+                name="futures_consequence_order_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(likelihood__gte=1, likelihood__lte=5),
+                name="futures_consequence_likelihood_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(impact__gte=1, impact__lte=5),
+                name="futures_consequence_impact_valid",
+            ),
         ]
 
     def clean(self) -> None:
@@ -769,9 +1128,13 @@ class FuturesWheelConsequence(UUIDTimeStampedModel):
             raise ValidationError({"originating_driver": "The driver must belong to this canvas."})
         if self.parent_id:
             if self.parent.canvas_id != self.canvas_id:
-                raise ValidationError({"parent": "The parent consequence must belong to this canvas."})
+                raise ValidationError(
+                    {"parent": "The parent consequence must belong to this canvas."}
+                )
             if self.order != self.parent.order + 1:
-                raise ValidationError({"order": "A child consequence must be exactly one order beyond its parent."})
+                raise ValidationError(
+                    {"order": "A child consequence must be exactly one order beyond its parent."}
+                )
         elif self.order != 1:
             raise ValidationError({"order": "A consequence without a parent must be first-order."})
 
@@ -784,21 +1147,31 @@ class ThreeHorizonItem(UUIDTimeStampedModel):
         H2 = "h2", "Horizon 2 - transition"
         H3 = "h3", "Horizon 3 - emerging future"
 
-    canvas = models.ForeignKey(ForesightCanvas, on_delete=models.CASCADE, related_name="horizon_items")
+    canvas = models.ForeignKey(
+        ForesightCanvas, on_delete=models.CASCADE, related_name="horizon_items"
+    )
     horizon = models.CharField(max_length=10, choices=Horizon.choices)
     title = models.CharField(max_length=260)
     description = models.TextField()
     evidence = models.TextField(blank=True)
     created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_three_horizon_items"
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="created_three_horizon_items",
     )
 
     class Meta:
         ordering = ["horizon", "title"]
         constraints = [
-            models.CheckConstraint(condition=~models.Q(title=""), name="three_horizon_title_not_empty"),
-            models.CheckConstraint(condition=models.Q(horizon__in=["h1", "h2", "h3"]), name="three_horizon_value_valid"),
-            models.UniqueConstraint(fields=["canvas", "horizon", "title"], name="unique_horizon_item_per_canvas"),
+            models.CheckConstraint(
+                condition=~models.Q(title=""), name="three_horizon_title_not_empty"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(horizon__in=["h1", "h2", "h3"]), name="three_horizon_value_valid"
+            ),
+            models.UniqueConstraint(
+                fields=["canvas", "horizon", "title"], name="unique_horizon_item_per_canvas"
+            ),
         ]
 
     def clean(self) -> None:
@@ -825,29 +1198,47 @@ class StrategicImplication(UUIDTimeStampedModel):
         ADDRESSED = "addressed", "Addressed"
         DISMISSED = "dismissed", "Dismissed"
 
-    canvas = models.ForeignKey(ForesightCanvas, on_delete=models.CASCADE, related_name="implications")
+    canvas = models.ForeignKey(
+        ForesightCanvas, on_delete=models.CASCADE, related_name="implications"
+    )
     title = models.CharField(max_length=260)
     description = models.TextField()
     implication_type = models.CharField(max_length=30, choices=ImplicationType.choices)
     priority = models.PositiveSmallIntegerField(default=3)
     owner = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="owned_strategic_implications"
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="owned_strategic_implications",
     )
     linked_decision = models.ForeignKey(
-        "decisions.Decision", on_delete=models.SET_NULL, related_name="foresight_implications", null=True, blank=True
+        "decisions.Decision",
+        on_delete=models.SET_NULL,
+        related_name="foresight_implications",
+        null=True,
+        blank=True,
     )
     drivers = models.ManyToManyField(Driver, related_name="implications", blank=True)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.OPEN)
     created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_strategic_implications"
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="created_strategic_implications",
     )
 
     class Meta:
         ordering = ["-priority", "title"]
         constraints = [
-            models.CheckConstraint(condition=~models.Q(title=""), name="strategic_implication_title_not_empty"),
-            models.CheckConstraint(condition=models.Q(priority__gte=1, priority__lte=5), name="strategic_implication_priority_valid"),
-            models.CheckConstraint(condition=models.Q(status__in=["open", "addressed", "dismissed"]), name="strategic_implication_status_valid"),
+            models.CheckConstraint(
+                condition=~models.Q(title=""), name="strategic_implication_title_not_empty"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(priority__gte=1, priority__lte=5),
+                name="strategic_implication_priority_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(status__in=["open", "addressed", "dismissed"]),
+                name="strategic_implication_status_valid",
+            ),
         ]
 
     def clean(self) -> None:
@@ -857,10 +1248,15 @@ class StrategicImplication(UUIDTimeStampedModel):
         if not self.description:
             raise ValidationError({"description": "Explain the strategic implication."})
         organisation = self.canvas.organisation
-        if self.owner_id and not organisation.memberships.filter(user_id=self.owner_id, status="active").exists():
+        if (
+            self.owner_id
+            and not organisation.memberships.filter(user_id=self.owner_id, status="active").exists()
+        ):
             raise ValidationError({"owner": "The owner must be an active organisation member."})
         if self.linked_decision_id and self.linked_decision.organisation_id != organisation.id:
-            raise ValidationError({"linked_decision": "The decision must share the canvas organisation."})
+            raise ValidationError(
+                {"linked_decision": "The decision must share the canvas organisation."}
+            )
 
 
 class ScenarioSet(UUIDTimeStampedModel):
@@ -908,9 +1304,7 @@ class ScenarioSet(UUIDTimeStampedModel):
         on_delete=models.PROTECT,
         related_name="created_scenario_sets",
     )
-    status = models.CharField(
-        max_length=20, choices=Status.choices, default=Status.DRAFT
-    )
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT)
 
     class Meta:
         ordering = ["-updated_at", "title"]
@@ -923,9 +1317,7 @@ class ScenarioSet(UUIDTimeStampedModel):
                 name="scenario_set_axes_distinct",
             ),
             models.CheckConstraint(
-                condition=models.Q(
-                    status__in=["draft", "active", "complete", "archived"]
-                ),
+                condition=models.Q(status__in=["draft", "active", "complete", "archived"]),
                 name="scenario_set_status_valid",
             ),
             models.UniqueConstraint(
@@ -965,9 +1357,7 @@ class ScenarioSet(UUIDTimeStampedModel):
         for field_name in ("axis_x_driver", "axis_y_driver"):
             driver = getattr(self, field_name, None)
             if driver and driver.driver_type != Driver.DriverType.CRITICAL_UNCERTAINTY:
-                raise ValidationError(
-                    {field_name: "Scenario axes must be critical uncertainties."}
-                )
+                raise ValidationError({field_name: "Scenario axes must be critical uncertainties."})
         if self.linked_decision_id:
             if self.linked_decision.organisation_id != self.canvas.organisation_id:
                 raise ValidationError(
@@ -976,9 +1366,10 @@ class ScenarioSet(UUIDTimeStampedModel):
         organisation = self.canvas.organisation
         for field_name in ("owner", "created_by"):
             user_id = getattr(self, f"{field_name}_id")
-            if user_id and not organisation.memberships.filter(
-                user_id=user_id, status="active"
-            ).exists():
+            if (
+                user_id
+                and not organisation.memberships.filter(user_id=user_id, status="active").exists()
+            ):
                 raise ValidationError(
                     {field_name: "The person must be an active organisation member."}
                 )
@@ -1010,9 +1401,7 @@ class Scenario(UUIDTimeStampedModel):
     key_assumptions = models.TextField()
     opportunities = models.TextField(blank=True)
     threats = models.TextField(blank=True)
-    status = models.CharField(
-        max_length=20, choices=Status.choices, default=Status.DRAFT
-    )
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
@@ -1022,9 +1411,7 @@ class Scenario(UUIDTimeStampedModel):
     class Meta:
         ordering = ["axis_y_position", "axis_x_position", "title"]
         constraints = [
-            models.CheckConstraint(
-                condition=~models.Q(title=""), name="scenario_title_not_empty"
-            ),
+            models.CheckConstraint(condition=~models.Q(title=""), name="scenario_title_not_empty"),
             models.CheckConstraint(
                 condition=models.Q(axis_x_position__in=["low", "high"]),
                 name="scenario_x_position_valid",
@@ -1065,9 +1452,7 @@ class Scenario(UUIDTimeStampedModel):
         if not self.narrative:
             raise ValidationError({"narrative": "Describe the scenario world."})
         if not self.key_assumptions:
-            raise ValidationError(
-                {"key_assumptions": "Make the scenario assumptions explicit."}
-            )
+            raise ValidationError({"key_assumptions": "Make the scenario assumptions explicit."})
 
     def __str__(self) -> str:
         return f"{self.scenario_set}: {self.title}"
@@ -1084,12 +1469,8 @@ class ScenarioDriverState(UUIDTimeStampedModel):
         TRANSFORMED = "transformed", "Transformed"
         UNCERTAIN = "uncertain", "Uncertain"
 
-    scenario = models.ForeignKey(
-        Scenario, on_delete=models.CASCADE, related_name="driver_states"
-    )
-    driver = models.ForeignKey(
-        Driver, on_delete=models.PROTECT, related_name="scenario_states"
-    )
+    scenario = models.ForeignKey(Scenario, on_delete=models.CASCADE, related_name="driver_states")
+    driver = models.ForeignKey(Driver, on_delete=models.PROTECT, related_name="scenario_states")
     state = models.CharField(max_length=20, choices=State.choices)
     salience = models.PositiveSmallIntegerField(default=3)
     description = models.TextField()
@@ -1123,9 +1504,7 @@ class ScenarioDriverState(UUIDTimeStampedModel):
 class ScenarioReview(UUIDTimeStampedModel):
     """One member's structured review of a scenario's quality and usefulness."""
 
-    scenario = models.ForeignKey(
-        Scenario, on_delete=models.CASCADE, related_name="reviews"
-    )
+    scenario = models.ForeignKey(Scenario, on_delete=models.CASCADE, related_name="reviews")
     reviewer = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
@@ -1146,9 +1525,7 @@ class ScenarioReview(UUIDTimeStampedModel):
                 name="scenario_review_plausibility_valid",
             ),
             models.CheckConstraint(
-                condition=models.Q(
-                    internal_consistency__gte=1, internal_consistency__lte=5
-                ),
+                condition=models.Q(internal_consistency__gte=1, internal_consistency__lte=5),
                 name="scenario_review_consistency_valid",
             ),
             models.CheckConstraint(
@@ -1172,9 +1549,12 @@ class ScenarioReview(UUIDTimeStampedModel):
         super().clean()
         self.comment = self.comment.strip()
         organisation = self.scenario.scenario_set.canvas.organisation
-        if self.reviewer_id and not organisation.memberships.filter(
-            user_id=self.reviewer_id, status="active"
-        ).exists():
+        if (
+            self.reviewer_id
+            and not organisation.memberships.filter(
+                user_id=self.reviewer_id, status="active"
+            ).exists()
+        ):
             raise ValidationError(
                 {"reviewer": "The reviewer must be an active organisation member."}
             )
@@ -1298,19 +1678,15 @@ class Signpost(UUIDTimeStampedModel):
         on_delete=models.PROTECT,
         related_name="created_foresight_signposts",
     )
-    status = models.CharField(
-        max_length=20, choices=Status.choices, default=Status.ACTIVE
-    )
-    scenarios = models.ManyToManyField(
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE)
+    scenarios: Any = models.ManyToManyField(
         Scenario, through="ScenarioSignpost", related_name="signposts"
     )
 
     class Meta:
         ordering = ["status", "title"]
         constraints = [
-            models.CheckConstraint(
-                condition=~models.Q(title=""), name="signpost_title_not_empty"
-            ),
+            models.CheckConstraint(condition=~models.Q(title=""), name="signpost_title_not_empty"),
             models.UniqueConstraint(
                 fields=["scenario_set", "title"], name="unique_signpost_title_per_set"
             ),
@@ -1334,9 +1710,10 @@ class Signpost(UUIDTimeStampedModel):
         organisation = self.scenario_set.canvas.organisation
         for field_name in ("owner", "created_by"):
             user_id = getattr(self, f"{field_name}_id")
-            if user_id and not organisation.memberships.filter(
-                user_id=user_id, status="active"
-            ).exists():
+            if (
+                user_id
+                and not organisation.memberships.filter(user_id=user_id, status="active").exists()
+            ):
                 raise ValidationError(
                     {field_name: "The person must be an active organisation member."}
                 )
@@ -1350,12 +1727,8 @@ class ScenarioSignpost(UUIDTimeStampedModel):
         CONTRADICTS = "contradicts", "Contradicts"
         CONTEXTUAL = "contextual", "Contextual"
 
-    signpost = models.ForeignKey(
-        Signpost, on_delete=models.CASCADE, related_name="scenario_links"
-    )
-    scenario = models.ForeignKey(
-        Scenario, on_delete=models.CASCADE, related_name="signpost_links"
-    )
+    signpost = models.ForeignKey(Signpost, on_delete=models.CASCADE, related_name="scenario_links")
+    scenario = models.ForeignKey(Scenario, on_delete=models.CASCADE, related_name="signpost_links")
     relationship = models.CharField(max_length=20, choices=Relationship.choices)
     rationale = models.TextField()
     linked_by = models.ForeignKey(
@@ -1393,9 +1766,7 @@ class SignpostObservation(UUIDTimeStampedModel):
         STRONG = "strong", "Strong movement"
         CONTRADICTORY = "contradictory", "Contradictory evidence"
 
-    signpost = models.ForeignKey(
-        Signpost, on_delete=models.CASCADE, related_name="observations"
-    )
+    signpost = models.ForeignKey(Signpost, on_delete=models.CASCADE, related_name="observations")
     observed_on = models.DateField()
     value = models.CharField(max_length=500)
     assessment = models.CharField(max_length=20, choices=Assessment.choices)
@@ -1473,12 +1844,8 @@ class SignpostAssumptionLink(UUIDTimeStampedModel):
 class SignpostRiskLink(UUIDTimeStampedModel):
     """An explicit explanation of why a signpost should trigger re-review of a risk."""
 
-    signpost = models.ForeignKey(
-        Signpost, on_delete=models.CASCADE, related_name="risk_links"
-    )
-    risk = models.ForeignKey(
-        "risks.Risk", on_delete=models.CASCADE, related_name="signpost_links"
-    )
+    signpost = models.ForeignKey(Signpost, on_delete=models.CASCADE, related_name="risk_links")
+    risk = models.ForeignKey("risks.Risk", on_delete=models.CASCADE, related_name="signpost_links")
     rationale = models.TextField()
     linked_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -1489,9 +1856,7 @@ class SignpostRiskLink(UUIDTimeStampedModel):
     class Meta:
         ordering = ["-created_at"]
         constraints = [
-            models.UniqueConstraint(
-                fields=["signpost", "risk"], name="unique_signpost_risk_link"
-            ),
+            models.UniqueConstraint(fields=["signpost", "risk"], name="unique_signpost_risk_link"),
         ]
 
     def clean(self) -> None:
@@ -1503,9 +1868,7 @@ class SignpostRiskLink(UUIDTimeStampedModel):
             self.risk_id
             and self.risk.organisation_id != self.signpost.scenario_set.canvas.organisation_id
         ):
-            raise ValidationError(
-                {"risk": "The risk must share the signpost's organisation."}
-            )
+            raise ValidationError({"risk": "The risk must share the signpost's organisation."})
 
 
 class ScenarioImplicationLink(UUIDTimeStampedModel):

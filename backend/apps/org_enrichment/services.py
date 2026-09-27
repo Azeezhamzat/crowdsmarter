@@ -20,9 +20,13 @@ class OrgEnrichmentServiceError(ValidationError):
 
 
 def _require_manager(*, actor, organisation) -> Membership:
-    membership = organisation.memberships.filter(user=actor, status=Membership.Status.ACTIVE).first()
+    membership = organisation.memberships.filter(
+        user=actor, status=Membership.Status.ACTIVE
+    ).first()
     if membership is None or membership.role not in {Membership.Role.OWNER, Membership.Role.ADMIN}:
-        raise PermissionDenied("Only an organisation owner or administrator may manage organisation lookups.")
+        raise PermissionDenied(
+            "Only an organisation owner or administrator may manage organisation lookups."
+        )
     return membership
 
 
@@ -32,9 +36,13 @@ def configuration_for_organisation(*, organisation) -> OrganisationLookupConfigu
 
 
 @transaction.atomic
-def set_lookup_provider(*, actor, organisation, provider_key: str) -> OrganisationLookupConfiguration:
+def set_lookup_provider(
+    *, actor, organisation, provider_key: str
+) -> OrganisationLookupConfiguration:
     _require_manager(actor=actor, organisation=organisation)
-    config = OrganisationLookupConfiguration.objects.select_for_update().get_or_create(organisation=organisation)[0]
+    config = OrganisationLookupConfiguration.objects.select_for_update().get_or_create(
+        organisation=organisation
+    )[0]
     previous = config.provider_key
     config.provider_key = provider_key
     config.full_clean(validate_unique=False, validate_constraints=False)
@@ -56,7 +64,9 @@ def set_lookup_api_key(*, actor, organisation, api_key: str) -> OrganisationLook
     api_key = api_key.strip()
     if not api_key:
         raise OrgEnrichmentServiceError({"api_key": "Provide a non-empty API key."})
-    config = OrganisationLookupConfiguration.objects.select_for_update().get_or_create(organisation=organisation)[0]
+    config = OrganisationLookupConfiguration.objects.select_for_update().get_or_create(
+        organisation=organisation
+    )[0]
     had_key_before = config.api_key_is_set
     config.api_key_encrypted = encrypt_secret(api_key)
     config.save(update_fields=["api_key_encrypted", "updated_at"])
@@ -66,7 +76,10 @@ def set_lookup_api_key(*, actor, organisation, api_key: str) -> OrganisationLook
         object_id=str(config.id),
         actor=actor,
         organisation=organisation,
-        metadata={"had_key_before": had_key_before, "key_last_4": api_key[-4:] if len(api_key) >= 4 else "****"},
+        metadata={
+            "had_key_before": had_key_before,
+            "key_last_4": api_key[-4:] if len(api_key) >= 4 else "****",
+        },
     )
     return config
 
@@ -74,7 +87,9 @@ def set_lookup_api_key(*, actor, organisation, api_key: str) -> OrganisationLook
 @transaction.atomic
 def clear_lookup_api_key(*, actor, organisation) -> OrganisationLookupConfiguration:
     _require_manager(actor=actor, organisation=organisation)
-    config = OrganisationLookupConfiguration.objects.select_for_update().get_or_create(organisation=organisation)[0]
+    config = OrganisationLookupConfiguration.objects.select_for_update().get_or_create(
+        organisation=organisation
+    )[0]
     config.api_key_encrypted = ""
     if config.provider_key != OrganisationLookupConfiguration.ProviderKey.MANUAL:
         config.provider_key = OrganisationLookupConfiguration.ProviderKey.MANUAL
@@ -100,9 +115,19 @@ def test_lookup_connection(*, actor, organisation) -> dict[str, Any]:
     try:
         provider = _decrypted_provider(config)
         outcome = provider.test_connection()
-        result = {"ok": outcome.ok, "detail": outcome.detail, "provider_key": provider.key, "provider_label": provider.label}
+        result = {
+            "ok": outcome.ok,
+            "detail": outcome.detail,
+            "provider_key": provider.key,
+            "provider_label": provider.label,
+        }
     except Exception as error:  # noqa: BLE001 - surface any failure as a diagnosable result
-        result = {"ok": False, "detail": str(error), "provider_key": config.provider_key, "provider_label": ""}
+        result = {
+            "ok": False,
+            "detail": str(error),
+            "provider_key": config.provider_key,
+            "provider_label": "",
+        }
     record_event(
         action="lookup_configuration.connection_tested",
         object_type="org_enrichment.OrganisationLookupConfiguration",
@@ -116,12 +141,16 @@ def test_lookup_connection(*, actor, organisation) -> dict[str, Any]:
 
 def lookup_organisation(*, actor, organisation, query: str) -> dict[str, Any]:
     """Look up an applicant organisation. Any active member may use this - it's a review aid, not an admin action."""
-    membership = organisation.memberships.filter(user=actor, status=Membership.Status.ACTIVE).first()
+    membership = organisation.memberships.filter(
+        user=actor, status=Membership.Status.ACTIVE
+    ).first()
     if membership is None:
         raise PermissionDenied("You are not an active member of this organisation.")
     query = query.strip()
     if not query:
-        raise OrgEnrichmentServiceError({"query": "Enter an organisation name or registration number."})
+        raise OrgEnrichmentServiceError(
+            {"query": "Enter an organisation name or registration number."}
+        )
     config = configuration_for_organisation(organisation=organisation)
     provider = _decrypted_provider(config)
     result = provider.lookup(query=query)

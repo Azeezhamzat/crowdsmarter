@@ -15,7 +15,7 @@ from apps.core.models import UUIDTimeStampedModel
 class DecisionQuerySet(models.QuerySet["Decision"]):
     """Tenant-safe decision queries."""
 
-    def for_user(self, user: Any) -> models.QuerySet["Decision"]:
+    def for_user(self, user: Any) -> models.QuerySet[Decision]:
         if user.is_anonymous:
             return self.none()
         return self.filter(
@@ -107,23 +107,23 @@ class Decision(UUIDTimeStampedModel):
             models.CheckConstraint(
                 condition=models.Q(
                     status__in=[
-                        'draft',
-                        'framing',
-                        'open_for_contribution',
-                        'under_review',
-                        'ready_for_decision',
-                        'decision_finalised',
-                        'commitment',
-                        'implementation',
-                        'outcome_review',
-                        'lessons_learned',
-                        'archived',
+                        "draft",
+                        "framing",
+                        "open_for_contribution",
+                        "under_review",
+                        "ready_for_decision",
+                        "decision_finalised",
+                        "commitment",
+                        "implementation",
+                        "outcome_review",
+                        "lessons_learned",
+                        "archived",
                     ]
                 ),
                 name="decision_status_valid",
             ),
             models.CheckConstraint(
-                condition=models.Q(urgency__in=['low', 'normal', 'high', 'critical']),
+                condition=models.Q(urgency__in=["low", "normal", "high", "critical"]),
                 name="decision_urgency_valid",
             ),
         ]
@@ -170,19 +170,25 @@ class Decision(UUIDTimeStampedModel):
                 )
         elif self.source_template_version is not None:
             raise ValidationError(
-                {
-                    "source_template_version": (
-                        "A template version requires a template key."
-                    )
-                }
+                {"source_template_version": ("A template version requires a template key.")}
             )
         if self.source_method_version_id:
             if self.source_template_key:
-                raise ValidationError({"source_method_version": "Choose either a built-in template or an organisation method."})
+                raise ValidationError(
+                    {
+                        "source_method_version": "Choose either a built-in template or an organisation method."
+                    }
+                )
             if self.source_method_version.organisation_id != self.organisation_id:
-                raise ValidationError({"source_method_version": "The method must belong to the decision organisation."})
+                raise ValidationError(
+                    {
+                        "source_method_version": "The method must belong to the decision organisation."
+                    }
+                )
             if self.source_method_version.status != "approved":
-                raise ValidationError({"source_method_version": "Only an approved method version can be applied."})
+                raise ValidationError(
+                    {"source_method_version": "Only an approved method version can be applied."}
+                )
         if self.workspace_id and self.organisation_id:
             if self.workspace.organisation_id != self.organisation_id:
                 raise ValidationError(

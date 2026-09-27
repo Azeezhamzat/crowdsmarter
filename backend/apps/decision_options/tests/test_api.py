@@ -113,7 +113,11 @@ def test_eligibility_and_outcome_endpoints(
     collection = reverse("decision_options:list-create", kwargs={"decision_id": decision.id})
     option_id = api_client.post(
         collection,
-        {"title": "Grant application", "description": "Reduces post-harvest loss.", "estimated_cost": "3000.00"},
+        {
+            "title": "Grant application",
+            "description": "Reduces post-harvest loss.",
+            "estimated_cost": "3000.00",
+        },
         format="json",
     ).json()["id"]
 
@@ -144,7 +148,9 @@ def test_funded_outcome_without_amount_is_rejected(
     api_client.force_authenticate(decision.owner)
     collection = reverse("decision_options:list-create", kwargs={"decision_id": decision.id})
     option_id = api_client.post(
-        collection, {"title": "App", "description": "Desc."}, format="json",
+        collection,
+        {"title": "App", "description": "Desc."},
+        format="json",
     ).json()["id"]
 
     response = api_client.post(

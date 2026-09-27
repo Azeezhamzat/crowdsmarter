@@ -9,9 +9,7 @@ from apps.reviews.models import DecisionReview
 
 
 @pytest.mark.django_db
-def test_review_requires_active_tenant_owner(
-    user_factory, decision_factory
-):  # type: ignore[no-untyped-def]
+def test_review_requires_active_tenant_owner(user_factory, decision_factory):  # type: ignore[no-untyped-def]
     decision = decision_factory(status=Decision.Status.DECISION_FINALISED)
     outsider = user_factory()
     review = DecisionReview(

@@ -22,9 +22,7 @@ class PositionServiceError(ValidationError):
     """Expected position workflow failure."""
 
 
-def _preferred_option(
-    *, decision: Decision, option_id: Any | None
-) -> DecisionOption | None:
+def _preferred_option(*, decision: Decision, option_id: Any | None) -> DecisionOption | None:
     if option_id is None:
         return None
     try:
@@ -48,8 +46,8 @@ def submit_position(
     **fields: Any,
 ) -> Position:
     """Append a new immutable version of the actor's recommendation."""
-    decision = Decision.objects.select_for_update().select_related("organisation").get(
-        id=decision.id
+    decision = (
+        Decision.objects.select_for_update().select_related("organisation").get(id=decision.id)
     )
     if not can_submit_position(actor=actor, decision=decision):
         raise PermissionDenied(
@@ -92,9 +90,7 @@ def submit_position(
             "version": position.version,
             "recommendation": position.recommendation,
             "preferred_option_id": (
-                str(position.preferred_option_id)
-                if position.preferred_option_id
-                else None
+                str(position.preferred_option_id) if position.preferred_option_id else None
             ),
         },
     )

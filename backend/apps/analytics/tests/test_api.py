@@ -9,9 +9,7 @@ from apps.organisations.models import Membership
 
 
 @pytest.mark.django_db
-def test_analytics_explains_flow_metrics(
-    api_client, decision_factory
-):  # type: ignore[no-untyped-def]
+def test_analytics_explains_flow_metrics(api_client, decision_factory):  # type: ignore[no-untyped-def]
     open_decision = decision_factory(
         status=Decision.Status.UNDER_REVIEW,
         target_decision_date=timezone.localdate() - timedelta(days=1),
@@ -49,9 +47,7 @@ def test_analytics_explains_flow_metrics(
 
 
 @pytest.mark.django_db
-def test_analytics_is_tenant_isolated(
-    api_client, user_factory, decision_factory
-):  # type: ignore[no-untyped-def]
+def test_analytics_is_tenant_isolated(api_client, user_factory, decision_factory):  # type: ignore[no-untyped-def]
     decision = decision_factory()
     api_client.force_authenticate(user_factory())
     url = reverse(
@@ -62,9 +58,7 @@ def test_analytics_is_tenant_isolated(
 
 
 @pytest.mark.django_db
-def test_analytics_insight_generates_a_narrative_for_owner(
-    api_client, decision_factory
-):  # type: ignore[no-untyped-def]
+def test_analytics_insight_generates_a_narrative_for_owner(api_client, decision_factory):  # type: ignore[no-untyped-def]
     decision = decision_factory(status=Decision.Status.DECISION_FINALISED)
     api_client.force_authenticate(decision.owner)
     url = reverse(
@@ -91,9 +85,7 @@ def test_analytics_insight_generates_a_narrative_for_owner(
 
 
 @pytest.mark.django_db
-def test_analytics_insight_is_forbidden_to_contributors(
-    api_client, user_factory, decision_factory
-):  # type: ignore[no-untyped-def]
+def test_analytics_insight_is_forbidden_to_contributors(api_client, user_factory, decision_factory):  # type: ignore[no-untyped-def]
     decision = decision_factory()
     contributor = user_factory()
     Membership.objects.create(
@@ -111,9 +103,7 @@ def test_analytics_insight_is_forbidden_to_contributors(
 
 
 @pytest.mark.django_db
-def test_analytics_insight_is_tenant_isolated(
-    api_client, user_factory, decision_factory
-):  # type: ignore[no-untyped-def]
+def test_analytics_insight_is_tenant_isolated(api_client, user_factory, decision_factory):  # type: ignore[no-untyped-def]
     decision = decision_factory()
     api_client.force_authenticate(user_factory())
     url = reverse(

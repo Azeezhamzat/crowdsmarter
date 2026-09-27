@@ -59,7 +59,10 @@ class GeminiProvider:
         client = genai.Client(api_key=self._api_key)
         response = client.models.generate_content(
             model=self.model_identifier,
-            contents=shared.SYSTEM_PROMPT + _SHAPE_INSTRUCTIONS + "\n\n" + shared.review_user_message(snapshot),
+            contents=shared.SYSTEM_PROMPT
+            + _SHAPE_INSTRUCTIONS
+            + "\n\n"
+            + shared.review_user_message(snapshot),
             config=genai_types.GenerateContentConfig(
                 response_mime_type="application/json",
                 temperature=0.2,
@@ -71,10 +74,14 @@ class GeminiProvider:
         try:
             payload: dict[str, Any] = json.loads(text)
         except (TypeError, ValueError) as error:
-            raise ValueError("The AI provider returned an unparseable structured review.") from error
+            raise ValueError(
+                "The AI provider returned an unparseable structured review."
+            ) from error
         if not isinstance(payload, dict):
             raise ValueError("The AI provider did not return a structured review.")
-        return shared.build_review_output(payload=payload, snapshot=snapshot, provider_label=self.label)
+        return shared.build_review_output(
+            payload=payload, snapshot=snapshot, provider_label=self.label
+        )
 
     def summarise_analytics(self, *, metrics: dict[str, Any]) -> AnalyticsNarrative:
         client = genai.Client(api_key=self._api_key)
@@ -97,7 +104,9 @@ class GeminiProvider:
         try:
             payload: dict[str, Any] = json.loads(text)
         except (TypeError, ValueError) as error:
-            raise ValueError("The AI provider returned an unparseable structured narrative.") from error
+            raise ValueError(
+                "The AI provider returned an unparseable structured narrative."
+            ) from error
         if not isinstance(payload, dict):
             raise ValueError("The AI provider did not return a structured narrative.")
         return analytics_shared.build_narrative(payload=payload, provider_label=self.label)
@@ -111,4 +120,6 @@ class GeminiProvider:
             )
         except Exception as error:  # noqa: BLE001 - surface any failure as a diagnosable result
             return ProviderConnectionResult(ok=False, detail=str(error))
-        return ProviderConnectionResult(ok=True, detail=f"Reached the Gemini API with model {self.model_identifier}.")
+        return ProviderConnectionResult(
+            ok=True, detail=f"Reached the Gemini API with model {self.model_identifier}."
+        )

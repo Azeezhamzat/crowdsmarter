@@ -1,5 +1,10 @@
 # CrowdSmarter Ireland-first prospect list — August 2026
 
+> **Superseded planning record:** active development is now based on the
+> structured internet-research method in `docs/research/`, not on an outreach
+> campaign. The organisations below are retained as historical research leads
+> and should not be contacted merely because they appear in this file.
+
 ## Purpose and caution
 
 These organisations are **research-qualified prospects**, not confirmed buyers or existing CrowdSmarter clients. They were selected because their public strategies or programmes show a current need for one or more of the capabilities CrowdSmarter provides: strategic foresight, stakeholder participation, evidence traceability, scenario testing, collective evaluation, decision governance, implementation review, and organisational learning.
@@ -144,7 +149,7 @@ The recommended entry point is a bounded pilot around one live decision. Do not 
 - https://www.tcd.ie/media/tcd/healthy-trinity/pdfs/TCD_Strategy_202530_PDF.pdf
 - https://www.tcd.ie/media/tcd/engineering/pdfs/Final_SoE_Industrial_Engagement_Strategy_Document.pdf
 
-## Recommended outreach order
+## Historical outreach order
 
 1. Start with warm-access organisations or units: TU Dublin, Trinity, NESC, and Teagasc.
 2. Offer a 60–90 minute decision audit using one real but non-confidential decision.

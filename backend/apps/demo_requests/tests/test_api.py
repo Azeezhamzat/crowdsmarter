@@ -9,7 +9,6 @@ from rest_framework.test import APIClient
 
 from apps.demo_requests.models import DemoRequest
 
-
 VALID_REQUEST = {
     "full_name": "Amina Yusuf",
     "work_email": "AMINA@EXAMPLE.COM",
@@ -49,7 +48,7 @@ def test_public_demo_request_is_stored_and_optionally_notified(
     assert record.status == DemoRequest.Status.NEW
     assert response.json()["reference"] == str(record.id)
     assert len(mail.outbox) == 1
-    assert "Northstar Strategy" in mail.outbox[0].subject
+    assert mail.outbox[0].subject == "CrowdSmarter decision enquiry - Northstar Strategy"
     assert mail.outbox[0].reply_to == ["amina@example.com"]
 
 
@@ -121,15 +120,17 @@ def test_notification_failure_does_not_lose_demo_request(
 
 
 @pytest.mark.django_db
-@override_settings(REST_FRAMEWORK={
-    "DEFAULT_AUTHENTICATION_CLASSES": ["rest_framework.authentication.SessionAuthentication"],
-    "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
-    "DEFAULT_THROTTLE_RATES": {
-        "demo_request": "1/hour",
-        "anon": "100/hour",
-        "user": "100/hour",
-    },
-})
+@override_settings(
+    REST_FRAMEWORK={
+        "DEFAULT_AUTHENTICATION_CLASSES": ["rest_framework.authentication.SessionAuthentication"],
+        "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
+        "DEFAULT_THROTTLE_RATES": {
+            "demo_request": "1/hour",
+            "anon": "100/hour",
+            "user": "100/hour",
+        },
+    }
+)
 def test_demo_request_is_rate_limited(monkeypatch):  # type: ignore[no-untyped-def]
     from apps.demo_requests.throttles import DemoRequestThrottle
 
@@ -183,3 +184,5 @@ def test_demo_request_can_send_a_configured_acknowledgement(
     assert mail.outbox[0].reply_to == ["amina@example.com"]
     assert mail.outbox[1].to == ["amina@example.com"]
     assert mail.outbox[1].reply_to == ["hello@crowdsmarter.com"]
+    assert mail.outbox[1].subject == "We received your CrowdSmarter decision enquiry"
+    assert "Facilitation. Systems. Collective intelligence." in mail.outbox[1].body

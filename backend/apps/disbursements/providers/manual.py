@@ -11,8 +11,16 @@ class ManualDisbursementProvider:
     key = "manual"
     label = "Manual ledger"
 
-    def issue_payout(self, *, amount, reference_hint: str = "") -> DisbursementResult:
-        reference = reference_hint.strip() or f"manual-{uuid.uuid4().hex[:12]}"
+    def issue_payout(
+        self,
+        *,
+        amount,
+        currency: str,
+        idempotency_key: str,
+        reference_hint: str = "",
+    ) -> DisbursementResult:
+        del amount, currency
+        reference = reference_hint.strip() or f"manual-{uuid.UUID(idempotency_key).hex[:12]}"
         return DisbursementResult(
             ok=True,
             status="paid",
@@ -21,4 +29,6 @@ class ManualDisbursementProvider:
         )
 
     def test_connection(self) -> ProviderConnectionResult:
-        return ProviderConnectionResult(ok=True, detail="The manual ledger requires no external connection.")
+        return ProviderConnectionResult(
+            ok=True, detail="The manual ledger requires no external connection."
+        )

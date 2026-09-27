@@ -1,11 +1,34 @@
 from django.contrib import admin
 
 from .models import (
-    CausalRelationship, Driver, DriverSignal, FeedbackLoop, FeedbackLoopDriver, FeedSubscription, ForesightCanvas,
-    FuturesWheelConsequence, Signal, SignalDecisionLink, Source, SourceAttachment,
-    Scenario, ScenarioDriverState, ScenarioImplicationLink, ScenarioReview, ScenarioSet, ScenarioSignpost,
-    Signpost, SignpostObservation, StrategicImplication, SystemStakeholder, ThreeHorizonItem, Watchlist,
-    WatchlistSignal, WindTunnelAssessment,
+    CausalRelationship,
+    Driver,
+    DriverSignal,
+    FeedbackLoop,
+    FeedbackLoopDriver,
+    FeedSubscription,
+    ForesightCanvas,
+    FuturesWheelConsequence,
+    ResearchClaim,
+    ResearchClaimSource,
+    Scenario,
+    ScenarioDriverState,
+    ScenarioImplicationLink,
+    ScenarioReview,
+    ScenarioSet,
+    ScenarioSignpost,
+    Signal,
+    SignalDecisionLink,
+    Signpost,
+    SignpostObservation,
+    Source,
+    SourceAttachment,
+    StrategicImplication,
+    SystemStakeholder,
+    ThreeHorizonItem,
+    Watchlist,
+    WatchlistSignal,
+    WindTunnelAssessment,
 )
 
 
@@ -25,10 +48,26 @@ class SignalAdmin(admin.ModelAdmin):
     readonly_fields = ("id", "created_at", "updated_at")
 
 
+@admin.register(ResearchClaim)
+class ResearchClaimAdmin(admin.ModelAdmin):
+    list_display = (
+        "statement",
+        "organisation",
+        "state",
+        "recommendation",
+        "lifecycle_status",
+        "review_due_on",
+    )
+    list_filter = ("state", "recommendation", "relevance", "lifecycle_status")
+    search_fields = ("statement", "evidence_summary", "limitations")
+    readonly_fields = ("id", "last_reviewed_at", "created_at", "updated_at")
+
+
 admin.site.register(SourceAttachment)
 admin.site.register(Watchlist)
 admin.site.register(WatchlistSignal)
 admin.site.register(SignalDecisionLink)
+admin.site.register(ResearchClaimSource)
 
 admin.site.register(FeedSubscription)
 

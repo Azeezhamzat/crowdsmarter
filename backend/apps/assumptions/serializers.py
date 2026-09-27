@@ -20,10 +20,25 @@ class AssumptionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Assumption
         fields = [
-            "id", "decision_id", "option_id", "statement", "rationale", "impact_if_false",
-            "confidence", "confidence_label", "verification_status",
-            "verification_status_label", "verification_notes", "owner", "review_date",
-            "status", "status_label", "created_by", "can_edit", "created_at", "updated_at",
+            "id",
+            "decision_id",
+            "option_id",
+            "statement",
+            "rationale",
+            "impact_if_false",
+            "confidence",
+            "confidence_label",
+            "verification_status",
+            "verification_status_label",
+            "verification_notes",
+            "owner",
+            "review_date",
+            "status",
+            "status_label",
+            "created_by",
+            "can_edit",
+            "created_at",
+            "updated_at",
         ]
         read_only_fields = fields
 

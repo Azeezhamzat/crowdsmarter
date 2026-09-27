@@ -17,6 +17,7 @@ import {
   disableMfa,
   fetchCurrentUser,
   getMfaStatus,
+  requestEmailChange,
   updateProfile,
 } from "./api";
 
@@ -26,14 +27,20 @@ const passwordSchema = z.object({
   new_password: z.string().min(12, "Use at least 12 characters."),
   confirm_password: z.string(),
 }).refine((value) => value.new_password === value.confirm_password, { path: ["confirm_password"], message: "Passwords do not match." });
+const emailSchema = z.object({
+  new_email: z.string().trim().email("Enter a valid email address."),
+  current_password: z.string().min(1, "Enter your current password."),
+});
 type ProfileInput = z.infer<typeof profileSchema>;
 type PasswordInput = z.infer<typeof passwordSchema>;
+type EmailInput = z.infer<typeof emailSchema>;
 
 export function AccountSettingsPage() {
   const queryClient = useQueryClient();
   const user = useQuery({ queryKey: ["current-user"], queryFn: fetchCurrentUser });
   const profileForm = useForm<ProfileInput>({ resolver: zodResolver(profileSchema), defaultValues: { first_name: "", last_name: "" } });
   const passwordForm = useForm<PasswordInput>({ resolver: zodResolver(passwordSchema), defaultValues: { current_password: "", new_password: "", confirm_password: "" } });
+  const emailForm = useForm<EmailInput>({ resolver: zodResolver(emailSchema), defaultValues: { new_email: "", current_password: "" } });
   useEffect(() => {
     if (user.data) profileForm.reset({ first_name: user.data.first_name, last_name: user.data.last_name });
   }, [user.data, profileForm]);
@@ -44,6 +51,10 @@ export function AccountSettingsPage() {
   const password = useMutation({
     mutationFn: (input: PasswordInput) => changePassword({ current_password: input.current_password, new_password: input.new_password }),
     onSuccess: () => passwordForm.reset(),
+  });
+  const emailChange = useMutation({
+    mutationFn: requestEmailChange,
+    onSuccess: () => emailForm.reset(),
   });
 
   const mfaStatus = useQuery({ queryKey: ["mfa-status"], queryFn: getMfaStatus });
@@ -82,8 +93,35 @@ export function AccountSettingsPage() {
           <form onSubmit={profileForm.handleSubmit((values) => profile.mutate(values))} noValidate>
             <label htmlFor="first-name">First name</label><input id="first-name" {...profileForm.register("first_name")} /><FieldError message={profileForm.formState.errors.first_name?.message} />
             <label htmlFor="last-name">Last name</label><input id="last-name" {...profileForm.register("last_name")} /><FieldError message={profileForm.formState.errors.last_name?.message} />
-            <label htmlFor="account-email">Email address</label><input id="account-email" value={user.data?.email ?? ""} readOnly /><p className="field-help">Email changes require a separately verified workflow and are not enabled in this release.</p>
             <button className="button button--primary" type="submit" disabled={profile.isPending}>{profile.isPending ? "Saving…" : "Save profile"}</button>
+          </form>
+        </section>
+        <section className="overview-card" aria-labelledby="email-title">
+          <h2 id="email-title">Email address</h2>
+          <p className="muted">Change the address you use to sign in. We verify the new address before changing your account.</p>
+          <label htmlFor="account-email">Current email address</label>
+          <input id="account-email" value={user.data?.email ?? ""} readOnly />
+          {emailChange.error ? <StatusMessage kind="error">{emailChange.error instanceof ApiError ? emailChange.error.message : "The email change could not be requested."}</StatusMessage> : null}
+          {emailChange.isSuccess ? (
+            <StatusMessage kind="success">
+              Check the new email address and open its verification link. Your current email remains active until you confirm.
+            </StatusMessage>
+          ) : null}
+          {emailChange.data?.development_verification_url ? (
+            <p className="field-help">
+              Local development only: <a href={emailChange.data.development_verification_url}>open the verification link</a>.
+            </p>
+          ) : null}
+          <form onSubmit={emailForm.handleSubmit((values) => emailChange.mutate(values))} noValidate>
+            <label htmlFor="new-account-email">New email address</label>
+            <input id="new-account-email" type="email" autoComplete="email" {...emailForm.register("new_email")} />
+            <FieldError message={emailForm.formState.errors.new_email?.message} />
+            <label htmlFor="email-change-password">Confirm with current password</label>
+            <input id="email-change-password" type="password" autoComplete="current-password" {...emailForm.register("current_password")} />
+            <FieldError message={emailForm.formState.errors.current_password?.message} />
+            <button className="button button--primary" type="submit" disabled={emailChange.isPending}>
+              {emailChange.isPending ? "Sending verification…" : "Verify new email"}
+            </button>
           </form>
         </section>
         <section className="overview-card" aria-labelledby="security-title">
@@ -151,7 +189,7 @@ export function AccountSettingsPage() {
             <span className="account-contact-card__icon"><Icon name="shield" size={20} /></span>
             <div>
               <h2 id="system-admin-title">System administration</h2>
-              <p className="muted">Use Django administration for technical access, demo-request triage, and exceptional data correction, not normal decision work.</p>
+              <p className="muted">Use Django administration for technical access, decision-enquiry triage, and exceptional data correction, not normal decision work.</p>
               <a href={contactChannels.adminUrl} target="_blank" rel="noreferrer">Open system administration <Icon name="external" size={15} /></a>
             </div>
           </section>

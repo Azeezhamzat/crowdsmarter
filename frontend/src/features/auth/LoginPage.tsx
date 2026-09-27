@@ -7,7 +7,6 @@ import { z } from "zod";
 
 import { FieldError } from "../../components/FieldError";
 import { Icon } from "../../components/Icon";
-import { LanguageSwitcher } from "../../components/LanguageSwitcher";
 import { LogoMark } from "../../components/Logo";
 import { buildMailto, contactChannels } from "../../config/contact";
 import { ApiError } from "../../lib/api";
@@ -106,11 +105,10 @@ export function LoginPage() {
       <section className="auth-introduction auth-introduction--executive" aria-labelledby="product-title">
         <Link className="auth-brand" to="/">
           <LogoMark size={38} variant="inverse" />
-          <span><strong>CrowdSmarter</strong><small>Foresight. Collective intelligence. Decisions.</small></span>
+          <span><strong>CrowdSmarter</strong><small>Facilitation. Systems. Collective intelligence.</small></span>
         </Link>
         <div className="auth-introduction__content auth-introduction__content--executive">
           <div className="auth-context-pill"><Icon name="shield" size={16} />Secure organisational workspace</div>
-          <div className="auth-language-row"><LanguageSwitcher /></div>
           <p className="eyebrow">{t.welcomeEyebrow}</p>
           <h1 id="product-title">{t.heading}</h1>
           <p>Return to your organisation’s signals, scenarios, decisions, collective evaluations, implementation commitments, and learning history.</p>
@@ -192,7 +190,7 @@ export function LoginPage() {
 
           <div className="auth-access-help">
             <Icon name="users" size={18} />
-            <div><strong>New here?</strong><span>Start your own commons for free, or ask an existing organisation to invite you.</span></div>
+            <div><strong>New here?</strong><span>Start your own commons, or ask an existing organisation to invite you.</span></div>
             <Link to="/signup">Start a commons</Link>
           </div>
           <div className="auth-support-contact">

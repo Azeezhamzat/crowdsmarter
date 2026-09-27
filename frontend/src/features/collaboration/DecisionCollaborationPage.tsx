@@ -8,7 +8,7 @@ import { z } from "zod";
 import { FieldError } from "../../components/FieldError";
 import { StatusMessage } from "../../components/StatusMessage";
 import { ApiError } from "../../lib/api";
-import type { DiscussionEntry, DiscussionKind } from "../../lib/types";
+import type { DiscussionEntry } from "../../lib/types";
 import { getDecision } from "../decisions/api";
 import { listMemberships } from "../organisations/api";
 import {
@@ -87,7 +87,7 @@ export function DecisionCollaborationPage() {
     mutationFn: (input: DiscussionInput) =>
       createDiscussionEntry(decisionId, {
         ...input,
-        kind: input.kind as DiscussionKind,
+        kind: input.kind,
         reply_to_id: replyTo?.id ?? null,
       }),
     onSuccess: async () => {
