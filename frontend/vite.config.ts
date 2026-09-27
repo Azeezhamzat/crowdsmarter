@@ -5,6 +5,17 @@ import { defaultExclude } from "vitest/config";
 
 export default defineConfig({
   plugins: [react()],
+  optimizeDeps: {
+    // These only ever get imported from inside lazy-loaded route chunks
+    // (form pages), never from the eager entry chunk, so Vite's cold-start
+    // dependency scan never finds them. Discovering them mid-navigation
+    // instead forces a dep re-bundle and a full-page reload while that
+    // route's own dynamic import is still in flight, which the browser
+    // reports as "Failed to fetch dynamically imported module" for
+    // whichever route triggered it. Listing them here pre-bundles them
+    // up front instead.
+    include: ["zod", "react-hook-form", "@hookform/resolvers/zod"],
+  },
   server: {
     proxy: {
       "/api": {
