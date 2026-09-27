@@ -79,6 +79,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - name: Clear any node_modules left with container-root ownership
+        run: sudo rm -rf frontend/node_modules
       - run: cd frontend && npm ci
       - run: cd frontend && npx playwright install --with-deps chromium
       - run: cd frontend && npm run test:e2e
