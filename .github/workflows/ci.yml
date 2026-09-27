@@ -79,7 +79,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - run: cd frontend && npm install
+      - run: cd frontend && npm ci
       - run: cd frontend && npx playwright install --with-deps chromium
       - run: cd frontend && npm run test:e2e
       - if: always()
