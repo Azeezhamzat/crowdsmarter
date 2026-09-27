@@ -33,7 +33,7 @@ dev = [
   "pytest-cov>=6,<7",
   "factory-boy>=3.3,<4",
   "ruff>=0.16,<0.17",
-  "mypy>=1.16,<2",
+  "mypy>=1.16,<3",
   "django-stubs[compatible-mypy]>=5.2,<6",
   "djangorestframework-stubs[compatible-mypy]>=3.16,<4",
 ]
